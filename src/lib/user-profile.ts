@@ -148,6 +148,7 @@ export type UserSession = {
   title: string;
   category: Category | null;
   ages: Ages | null;
+  sponsored: boolean;
   /** Null only for an unplaced draft, which the public view never sees. */
   startsAt: string | null;
   endsAt: string | null;
@@ -240,6 +241,7 @@ export function userSessions(
       title: s.title,
       category: s.category,
       ages: s.ages,
+      sponsored: s.sponsored,
       startsAt: s.startsAt,
       endsAt: s.endsAt,
       locationId: s.locationId,

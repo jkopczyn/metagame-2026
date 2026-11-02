@@ -27,6 +27,7 @@ import {
   movedTimes,
   openingDayKey,
   pacificDayKey,
+  planConflicts,
   VISIBILITY_LABEL,
   type Attendance,
   type RoomClash,
@@ -74,16 +75,27 @@ export default function ScheduleTool({
   attendance,
   viewer,
   canSeed,
+  initialEdit,
 }: {
   sessions: ScheduleSession[];
   locations: ScheduleLocation[];
   attendance: Attendance;
   viewer: (ViewerPlans & { userId: string }) | null;
   canSeed: boolean;
+  /** `?edit=<slug or id>`: open that session on load. Unknown values are ignored. */
+  initialEdit: string | null;
 }) {
-  const [editing, setEditing] = useState<Editing>(null);
+  const [linked] = useState(
+    () =>
+      saved.find((s) => s.slug === initialEdit || s.id === initialEdit) ?? null,
+  );
+  const [editing, setEditing] = useState<Editing>(
+    linked && { kind: "session", session: linked },
+  );
   const [dayKey, setDayKey] = useState(() =>
-    openingDayKey(buildDays(saved, EDITOR_DAYS)),
+    linked && isPlaced(linked)
+      ? pacificDayKey(linked.startsAt)
+      : openingDayKey(buildDays(saved, EDITOR_DAYS)),
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -522,6 +534,11 @@ export default function ScheduleTool({
           locations={locations}
           attendance={openNow ? attendance[openNow.id] : undefined}
           viewer={viewer}
+          conflicts={
+            openNow && viewer
+              ? planConflicts(openNow, sessions, viewer.userId, viewer.rsvps)
+              : []
+          }
           onClose={close}
         />
       )}

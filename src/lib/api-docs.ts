@@ -85,6 +85,16 @@ const SESSION_FIELDS: Field[] = [
     note: 'Default "draft". Published needs both times.',
   },
   {
+    name: "rsvpIsCommitment",
+    type: "boolean",
+    note: "Default false. RSVPs claim a limited spot people rely on; attendees confirm first.",
+  },
+  {
+    name: "sponsored",
+    type: "boolean",
+    note: "Default false. Tags it Sponsor on the schedule.",
+  },
+  {
     name: "hosts",
     type: "{email, name?}[]",
     note: "Lead first. An email with no account needs a name, which creates the account.",
@@ -175,7 +185,7 @@ export const TYPES: { name: string; shape: string }[] = [
   },
   {
     name: "Session",
-    shape: `{ id, slug, title, description, category, startsAt, endsAt, locationId, maxCapacity, minCapacity, ages, needs, status: ${oneOf(STATUSES)}, airtableRfpRecordId, hosts: Account[], shepherd: Account | null }. startsAt/endsAt are ISO UTC here, null while a draft is unplaced.`,
+    shape: `{ id, slug, title, description, category, startsAt, endsAt, locationId, maxCapacity, minCapacity, ages, needs, status: ${oneOf(STATUSES)}, rsvpIsCommitment, sponsored, airtableRfpRecordId, hosts: Account[], shepherd: Account | null }. startsAt/endsAt are ISO UTC here, null while a draft is unplaced.`,
   },
   {
     name: "RfpSession",

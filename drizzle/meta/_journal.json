@@ -180,8 +180,15 @@
     {
       "idx": 25,
       "version": "7",
-      "when": 1793563821047,
-      "tag": "0025_wild_fantastic_four",
+      "when": 1793403467237,
+      "tag": "0025_session_commitment_sponsor",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793586718459,
+      "tag": "0026_small_union_jack",
       "breakpoints": true
     }
   ]

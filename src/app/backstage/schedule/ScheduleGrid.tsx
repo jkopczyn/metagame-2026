@@ -275,7 +275,7 @@ function GridDay({
   return (
     <div
       onMouseLeave={() => setHover(null)}
-      className="max-h-[75vh] overflow-auto rounded-xl border border-line bg-white [--col-w:104px] [--time-w:44px] sm:[--col-w:120px] sm:[--time-w:56px]"
+      className="max-h-[75vh] overflow-auto rounded-xl border border-line bg-white [--col-w:104px] [--time-w:36px] sm:[--col-w:120px] sm:[--time-w:40px]"
     >
       <div className="min-w-fit">
         <div
@@ -313,7 +313,7 @@ function GridDay({
                 className="sticky left-0 z-20 flex justify-center border-r border-b border-line bg-white pt-1 text-[11px] text-ink/55"
                 style={{ height: SLOT_PX }}
               >
-                {slotLabel(slotStart)}
+                {slotLabel(slotStart, { period: false })}
               </div>
               {columns.map((col) => {
                 const inSlot = cellSessions(day.sessions, col.id, slotStart);

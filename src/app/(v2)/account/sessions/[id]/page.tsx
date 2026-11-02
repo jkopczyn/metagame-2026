@@ -75,6 +75,7 @@ export default async function EditSessionPage(
           maxCapacity: session.maxCapacity?.toString() ?? "",
           minCapacity: session.minCapacity?.toString() ?? "",
         }}
+        rsvpIsCommitment={session.rsvpIsCommitment}
         hosts={session.hosts.map((h) => ({
           userId: h.userId,
           name: h.name,

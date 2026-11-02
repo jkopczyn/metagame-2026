@@ -4,6 +4,7 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useState,
   type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
@@ -15,6 +16,7 @@ import {
   slotLabel,
   SLOT_MINUTES,
 } from "@/lib/schedule";
+import { boardDays, type Moment } from "@/v2/lib/moments";
 import type { LegendEntry } from "@/v2/lib/schedule-styles";
 import { DISPLAY } from "../styles";
 
@@ -35,8 +37,7 @@ export type MomentsDay<S extends MomentSession> = {
   slots: number[];
 };
 
-/** A moment on the board: a day index and minutes since Pacific midnight. */
-export type Moment = { day: number; t: number };
+export type { Moment };
 
 type Props<S extends MomentSession> = {
   days: MomentsDay<S>[];
@@ -46,6 +47,11 @@ type Props<S extends MomentSession> = {
   legend?: LegendEntry[];
   /** Where the board opens; the busiest moment when omitted. */
   startAt?: Moment;
+  /** The current moment, when it's on the board: the board follows it until
+   * the viewer moves the clock, and offers a way back. */
+  now?: Moment | null;
+  /** Leave out rooms with nothing on at the moment shown. */
+  hideQuiet?: boolean;
 };
 
 // How far the clock moves per tick of playback, and how often it ticks.
@@ -71,19 +77,17 @@ type Span<S extends MomentSession> = {
 
 // Each day's sessions as minutes since Pacific midnight, and the day's span.
 function toSpans<S extends MomentSession>(days: MomentsDay<S>[]): Span<S>[] {
-  return days
-    .filter((d) => d.slots.length > 0)
-    .map((d) => ({
-      day: d,
-      name: d.name,
-      start: d.slots[0],
-      end: d.slots[d.slots.length - 1] + SLOT_MINUTES,
-      timed: d.sessions.map((s) => {
-        const a = pacificMinutes(s.startsAt);
-        const b = pacificMinutes(s.endsAt);
-        return { s, a, b: b <= a ? b + 24 * 60 : b };
-      }),
-    }));
+  return boardDays(days).map((d) => ({
+    day: d,
+    name: d.name,
+    start: d.slots[0],
+    end: d.slots[d.slots.length - 1] + SLOT_MINUTES,
+    timed: d.sessions.map((s) => {
+      const a = pacificMinutes(s.startsAt);
+      const b = pacificMinutes(s.endsAt);
+      return { s, a, b: b <= a ? b + 24 * 60 : b };
+    }),
+  }));
 }
 
 const runningAt = <S extends MomentSession>(d: Span<S>, t: number) =>
@@ -105,7 +109,8 @@ type State = Moment & { playing: boolean };
 type Action =
   | { type: "tick" | "toggle" | "pause" }
   | { type: "seek"; t: number }
-  | { type: "day"; day: number };
+  | { type: "day"; day: number }
+  | ({ type: "goto" } & Moment);
 
 function playback(spans: Span<MomentSession>[]) {
   const last = spans.length - 1;
@@ -136,6 +141,8 @@ function playback(spans: Span<MomentSession>[]) {
       // Same time of day, another day.
       case "day":
         return { ...s, day: a.day, t: clamp(a.day, s.t) };
+      case "goto":
+        return { day: a.day, t: a.t, playing: false };
     }
   };
   return { reducer, atEnd };
@@ -157,22 +164,38 @@ function Board<S extends MomentSession>({
   onOpen,
   legend,
   startAt,
+  now,
+  hideQuiet = false,
   spans,
 }: Props<S> & { spans: Span<S>[] }) {
   const { reducer, atEnd } = useMemo(
     () => playback(spans as Span<MomentSession>[]),
     [spans],
   );
-  const [state, dispatch] = useReducer(reducer, null, () => ({
+  const [stored, dispatchStored] = useReducer(reducer, null, () => ({
     ...(startAt ?? busiest(spans as Span<MomentSession>[])),
     playing: false,
   }));
+  const [following, setFollowing] = useState(true);
+  const live = following && now != null;
+  const state = live ? { ...now, playing: false } : stored;
+  // Moving the clock lets go of the current time, picking up from it.
+  const dispatch = (a: Action) => {
+    if (live) {
+      setFollowing(false);
+      dispatchStored({ type: "goto", ...now });
+    }
+    dispatchStored(a);
+  };
   const day = Math.min(state.day, spans.length - 1);
   const { t, playing } = state;
 
   useEffect(() => {
     if (!playing) return;
-    const id = window.setInterval(() => dispatch({ type: "tick" }), TICK_MS);
+    const id = window.setInterval(
+      () => dispatchStored({ type: "tick" }),
+      TICK_MS,
+    );
     return () => window.clearInterval(id);
   }, [playing]);
 
@@ -213,24 +236,35 @@ function Board<S extends MomentSession>({
       {/* Play on the left, the day in the middle, the clock on the right; on
           a phone the clock takes its own row above. */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <button
-          type="button"
-          onClick={() => dispatch({ type: "toggle" })}
-          aria-label={
-            playing
-              ? "Pause"
-              : atEnd({ ...state, day })
-                ? "Play it again"
-                : "Play"
-          }
-          className="-ml-2 justify-self-start rounded-full p-2 text-navy/45 transition-colors hover:text-navy focus-visible:text-navy"
-        >
-          {playing ? (
-            <Pause aria-hidden className="size-6" fill="currentColor" />
-          ) : (
-            <Play aria-hidden className="size-6" fill="currentColor" />
+        <div className="flex items-center gap-2 justify-self-start">
+          <button
+            type="button"
+            onClick={() => dispatch({ type: "toggle" })}
+            aria-label={
+              playing
+                ? "Pause"
+                : atEnd({ ...state, day })
+                  ? "Play it again"
+                  : "Play"
+            }
+            className="-ml-2 rounded-full p-2 text-navy/45 transition-colors hover:text-navy focus-visible:text-navy"
+          >
+            {playing ? (
+              <Pause aria-hidden className="size-6" fill="currentColor" />
+            ) : (
+              <Play aria-hidden className="size-6" fill="currentColor" />
+            )}
+          </button>
+          {now && !following && (
+            <button
+              type="button"
+              onClick={() => setFollowing(true)}
+              className="rounded-full border-[1.5px] border-meeple px-2.5 py-1 font-space-mono text-[11px] font-bold tracking-[0.12em] text-meeple uppercase transition-colors hover:bg-meeple hover:text-cream"
+            >
+              Now
+            </button>
           )}
-        </button>
+        </div>
         <div
           role="group"
           aria-label="Day"
@@ -341,8 +375,18 @@ function Board<S extends MomentSession>({
         </ul>
       )}
 
+      {hideQuiet && !running.length && (
+        <p className="mt-4 font-space-mono text-[11px] tracking-[0.12em] text-ink/35 uppercase">
+          Nothing on at this time
+        </p>
+      )}
       <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 lg:grid-cols-5">
-        {locations.map((loc) => {
+        {(hideQuiet
+          ? locations.filter((loc) =>
+              running.some((x) => x.s.locationId === loc.id),
+            )
+          : locations
+        ).map((loc) => {
           const here = running.filter((x) => x.s.locationId === loc.id);
           return (
             <li
@@ -361,7 +405,7 @@ function Board<S extends MomentSession>({
                       key={s.id}
                       type="button"
                       onClick={() => {
-                        dispatch({ type: "pause" });
+                        dispatchStored({ type: "pause" });
                         onOpen(s, d.day);
                       }}
                       style={styleFor(s)}

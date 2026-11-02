@@ -69,6 +69,8 @@ function asSession(row: QueueRow): ScheduleSession {
     ages: null,
     needs: null,
     status: "draft",
+    rsvpIsCommitment: false,
+    sponsored: false,
     airtableRfpRecordId: null,
     hosts: row.host ? [{ userId: "", name: row.host, email: "" }] : [],
     shepherd: null,

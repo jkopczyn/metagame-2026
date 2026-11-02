@@ -19,7 +19,9 @@ Pulled over so far:
 - `components/dice/` — the above-the-fold 3D dice wordmark (`Dice` + `dice3d/`).
   The dev-only take curation panel is included but switched off
   (`DICE_EDITOR` in `Dice.tsx`); when on, `/api/dev/keep-take` writes to this
-  copy's `takes/` folder.
+  copy's `takes/` folder. `/backstage/dice-lab` (`src/app/backstage/dice-lab/`) renders
+  the same die (`DieBody`) on a transparent canvas for rolling, arranging and
+  exporting PNG assets (shirts, print).
 - `lib/dice-letter-paths.ts` — letter outlines shared by both of the above.
 - `components/tickets/` + `lib/tickets.ts`, `lib/currency-store.ts` — the
   Stripe/BTC ticket panel and modals (the API routes they call stay in

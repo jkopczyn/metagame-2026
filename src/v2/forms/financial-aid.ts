@@ -110,7 +110,10 @@ export const financialAid: FormDef = {
           tone: "win",
           title: "Approved. Your $325 ticket is waiting.",
           body: "Use the coupon code DEFAULTDISCOUNT at checkout; the button applies it for you. No need to finish this application.",
-          cta: { label: "Get my $325 ticket", href: "/buy/DEFAULTDISCOUNT" },
+          cta: {
+            label: "Get my $325 ticket",
+            href: "/ticket/DEFAULTDISCOUNT",
+          },
           show: instant100,
         },
         {

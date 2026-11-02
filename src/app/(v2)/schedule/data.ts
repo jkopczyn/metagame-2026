@@ -1,14 +1,22 @@
 import { cache } from "react";
 import { connection } from "next/server";
-import { can } from "@/lib/access";
+import { can, teamAccess } from "@/lib/access";
 import { toolAccess } from "@/lib/admin-auth";
 import { currentSession } from "@/lib/auth";
+import { ticketStep } from "@/lib/first-signin";
 import {
   publicSchedule,
   viewerSessionIds,
+  type RsvpTicket,
   type ScheduleViewer,
 } from "@/lib/schedule";
 import { loadSchedule, loadViewerPlans } from "@/lib/schedule-store";
+import { emailKey } from "@/lib/ticket-holder";
+import {
+  hasClaimedTicket,
+  ticketLabel,
+  ticketsForUser,
+} from "@/lib/ticket-store";
 
 // Pre-launch gate: canSeeSchedule() for links, scheduleGate() for the page
 // itself. Remove at launch.
@@ -59,3 +67,31 @@ export const loadMySessionIds = cache(async (): Promise<string[] | null> => {
     plans,
   );
 });
+
+/**
+ * Whether the signed-in viewer may RSVP, and any ticket bought under their
+ * email they could activate first; undefined when signed out. RSVPs need a
+ * claimed ticket, but admins can try sessions out without one.
+ */
+export async function rsvpTicket(): Promise<RsvpTicket | undefined> {
+  const account = await currentSession();
+  if (!account) return undefined;
+  const { id, email: raw } = account.user;
+  if ((await hasClaimedTicket(id)) || (await teamAccess())?.admin) {
+    return { has: true, claimable: [] };
+  }
+  const email = emailKey(raw);
+  const rows = await ticketsForUser(id, email);
+  const step = ticketStep(
+    rows.map((t) => ({ ...t, tier: ticketLabel(t.tier) })),
+    id,
+    email,
+  );
+  return {
+    has: false,
+    claimable:
+      step.kind === "claimable"
+        ? step.tickets.map(({ id, tier }) => ({ id, tier }))
+        : [],
+  };
+}

@@ -127,6 +127,9 @@ export const sessions = pgTable(
     ages: sessionAges(),
     needs: text(),
     status: sessionStatus().notNull().default("draft"),
+    // An RSVP takes a limited spot others rely on, not just a show of interest.
+    rsvpIsCommitment: boolean().notNull().default(false),
+    sponsored: boolean().notNull().default(false),
     // The accepted RFP this came from, for the Airtable sync.
     airtableRfpRecordId: text().unique(),
     // The committee member who shepherds it through review.

@@ -148,10 +148,6 @@ export default function Die({
   const group = useRef<THREE.Group>(null);
   const mover = useRef<THREE.Group>(null); // outer group: position (roll-in flight path)
 
-  // One rounded-panel geometry shared by all six faces.
-  const panelGeo = useMemo(() => roundedPanelGeometry(PANEL, PANEL_R), []);
-  useEffect(() => () => panelGeo.dispose(), [panelGeo]);
-
   // Per-face textures, built once. Letter faces rasterize async; redraw when
   // they land or an idle (static / reduced-motion) die keeps blank faces.
   const textures = useMemo(() => {
@@ -270,46 +266,61 @@ export default function Die({
   return (
     <group ref={mover}>
       <group ref={group}>
-        {/* ink body — its rounded bevel forms the dark edges/frame */}
-        <RoundedBox
-          args={[SIZE, SIZE, SIZE]}
-          radius={RADIUS}
-          smoothness={8}
-          bevelSegments={8}
-          creaseAngle={0.6}
-          castShadow
-          receiveShadow
-        >
-          <meshStandardMaterial
-            color={COLORS.ink}
-            roughness={0.9}
-            metalness={0}
-          />
-        </RoundedBox>
-
-        {/* printed faces: rounded panels filling each flat face, lit like the body
-            so they read as painted-on rather than stuck-on stickers. */}
-        {FACES.map((f, i) => (
-          <mesh key={i} geometry={panelGeo} position={f.pos} rotation={f.rot}>
-            <meshStandardMaterial
-              map={faceTextures[i]}
-              // pip faces (top/bottom) get a glossier finish so the white pips catch
-              // specular highlights and read brighter; letter faces stay a touch matte
-              roughness={i >= 4 ? 0.35 : 0.7}
-              metalness={0}
-              // letter tiles carry a keyed alpha: the black regions drop out so the
-              // die body shows through instead of a flatter, deader pure black
-              alphaTest={i < 4 ? 0.5 : 0}
-              // Minimal decal offset. `factor` scales with the face's depth slope,
-              // so anything bigger punches the panel through the bevel (and the
-              // die behind it) whenever a face turns edge-on mid-roll.
-              polygonOffset
-              polygonOffsetFactor={-1}
-              polygonOffsetUnits={-1}
-            />
-          </mesh>
-        ))}
+        <DieBody textures={faceTextures} />
       </group>
     </group>
+  );
+}
+
+// The die itself — ink body plus the six printed panels — with no pose or
+// animation of its own, so other scenes (the dice lab) render the exact hero
+// die from any texture set. `textures` follow FACES order.
+export function DieBody({ textures }: { textures: THREE.Texture[] }) {
+  // One rounded-panel geometry shared by all six faces.
+  const panelGeo = useMemo(() => roundedPanelGeometry(PANEL, PANEL_R), []);
+  useEffect(() => () => panelGeo.dispose(), [panelGeo]);
+
+  return (
+    <>
+      {/* ink body — its rounded bevel forms the dark edges/frame */}
+      <RoundedBox
+        args={[SIZE, SIZE, SIZE]}
+        radius={RADIUS}
+        smoothness={8}
+        bevelSegments={8}
+        creaseAngle={0.6}
+        castShadow
+        receiveShadow
+      >
+        <meshStandardMaterial
+          color={COLORS.ink}
+          roughness={0.9}
+          metalness={0}
+        />
+      </RoundedBox>
+
+      {/* printed faces: rounded panels filling each flat face, lit like the body
+          so they read as painted-on rather than stuck-on stickers. */}
+      {FACES.map((f, i) => (
+        <mesh key={i} geometry={panelGeo} position={f.pos} rotation={f.rot}>
+          <meshStandardMaterial
+            map={textures[i]}
+            // pip faces (top/bottom) get a glossier finish so the white pips catch
+            // specular highlights and read brighter; letter faces stay a touch matte
+            roughness={i >= 4 ? 0.35 : 0.7}
+            metalness={0}
+            // letter tiles carry a keyed alpha: the black regions drop out so the
+            // die body shows through instead of a flatter, deader pure black
+            alphaTest={i < 4 ? 0.5 : 0}
+            // Minimal decal offset. `factor` scales with the face's depth slope,
+            // so anything bigger punches the panel through the bevel (and the
+            // die behind it) whenever a face turns edge-on mid-roll.
+            polygonOffset
+            polygonOffsetFactor={-1}
+            polygonOffsetUnits={-1}
+          />
+        </mesh>
+      ))}
+    </>
   );
 }

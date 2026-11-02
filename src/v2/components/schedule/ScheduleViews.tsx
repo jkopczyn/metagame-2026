@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { FaListUl, FaThLarge } from "react-icons/fa";
+import { FaClock, FaListUl, FaThLarge } from "react-icons/fa";
 import {
   cellSessions,
   formatPacificTime,
@@ -20,7 +20,7 @@ import {
   type Lane,
   type PublicLocation,
 } from "@/lib/schedule";
-import { AgeMark, BlockSummary, blockStyle } from "./SessionBits";
+import { AgeMark, BlockSummary, blockStyle, SponsorTag } from "./SessionBits";
 
 // The day grid, the day list and the toggles the schedule is built from,
 // shared by /schedule and the profile pages' session views.
@@ -32,6 +32,7 @@ export type ViewSession = {
   title: string;
   category: Category | null;
   ages: Ages | null;
+  sponsored: boolean;
   locationId: string | null;
   hosts: { name: string }[];
   startsAt: string;
@@ -117,6 +118,7 @@ export function DayTabs({
 const VIEWS = [
   { id: "grid", label: "Grid", Icon: FaThLarge },
   { id: "list", label: "List", Icon: FaListUl },
+  { id: "moments", label: "Moments", Icon: FaClock },
 ] as const;
 
 export type View = (typeof VIEWS)[number]["id"];
@@ -125,25 +127,29 @@ export function ViewToggle({
   view,
   onSelect,
   labels,
+  views = ["grid", "list"],
 }: {
   view: View;
   onSelect: (v: View) => void;
   labels?: Partial<Record<View, string>>;
+  views?: View[];
 }) {
   return (
     <div role="group" aria-label="View" className={TOGGLE}>
-      {VIEWS.map(({ id, label, Icon }, i) => (
-        <button
-          key={id}
-          type="button"
-          aria-pressed={view === id}
-          onClick={() => onSelect(id)}
-          className={`flex items-center gap-2 px-3 py-2.5 text-xs tracking-[0.12em] uppercase transition-colors ${toggleButton(view === id, i)}`}
-        >
-          <Icon size={12} />
-          {labels?.[id] ?? label}
-        </button>
-      ))}
+      {VIEWS.filter((v) => views.includes(v.id)).map(
+        ({ id, label, Icon }, i) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={view === id}
+            onClick={() => onSelect(id)}
+            className={`flex items-center gap-2 px-3 py-2.5 text-xs tracking-[0.12em] uppercase transition-colors ${toggleButton(view === id, i)}`}
+          >
+            <Icon size={12} />
+            {labels?.[id] ?? label}
+          </button>
+        ),
+      )}
     </div>
   );
 }
@@ -230,7 +236,7 @@ export function GridDay<S extends ViewSession>({
   const now = useNow();
   const nowTop = now ? nowLinePx(day.key, day.slots[0], now) : null;
   return (
-    <div className="overflow-x-auto border-[1.5px] border-[#1b1530]/15 bg-background [--col-w:104px] [--time-w:44px] sm:[--col-w:120px] sm:[--time-w:56px]">
+    <div className="overflow-x-auto border-[1.5px] border-[#1b1530]/15 bg-background [--col-w:104px] [--time-w:36px] sm:[--col-w:120px] sm:[--time-w:40px]">
       <div className="min-w-fit">
         <div
           className="sticky top-0 z-30 grid bg-[#4096ff] text-white"
@@ -282,7 +288,7 @@ export function GridDay<S extends ViewSession>({
                 className="sticky left-0 z-20 flex justify-center border-r border-b border-[#1b1530]/15 bg-background pt-1 text-[11px] text-[#1b1530]/55"
                 style={{ height: SLOT_PX }}
               >
-                {slotLabel(slotStart)}
+                {slotLabel(slotStart, { period: false })}
               </div>
               {columns.map((col) => (
                 <div
@@ -343,6 +349,7 @@ export function SessionRow<S extends ViewSession>({
         <div className="flex flex-wrap items-start gap-1.5 leading-tight font-semibold">
           <span>{session.title}</span>
           <AgeMark ages={session.ages} />
+          {session.sponsored && <SponsorTag />}
           {badge?.(session)}
         </div>
         <div className="mt-0.5 text-[13px] text-[#1b1530]/65">

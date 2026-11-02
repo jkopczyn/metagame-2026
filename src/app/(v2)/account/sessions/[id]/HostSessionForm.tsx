@@ -44,11 +44,13 @@ function Note({ state }: { state: SaveState }) {
 export default function HostSessionForm({
   sessionId,
   initial: values,
+  rsvpIsCommitment,
   hosts,
   viewerId,
 }: {
   sessionId: string;
   initial: Record<string, string>;
+  rsvpIsCommitment: boolean;
   hosts: Host[];
   viewerId: string;
 }) {
@@ -139,6 +141,21 @@ export default function HostSessionForm({
             rows={3}
             className={field}
           />
+        </label>
+        <label className="flex items-start gap-2.5 text-sm text-ink">
+          <input
+            type="checkbox"
+            name="rsvpIsCommitment"
+            defaultChecked={rsvpIsCommitment}
+            className="mt-0.5 size-4 accent-meeple"
+          />
+          <span>
+            <span className="font-semibold">RSVP is a commitment</span>
+            <span className="block text-ink/60">
+              Attendees claim a limited spot people rely on, and confirm before
+              they do.
+            </span>
+          </span>
         </label>
         <div className="flex items-center gap-4">
           <button

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { FaStripeS } from "react-icons/fa";
 import { listCodes, mint, setActive, type MintState } from "./actions";
 import {
   buttonClass,
@@ -21,8 +22,10 @@ const CUSTOM = "__custom__";
 // Coupons are made by hand in the dashboard (the key is Coupons: Read only).
 const STRIPE_ACCOUNT = "acct_1QeQd1CtO443EG3n";
 
-const redeemUrl = (origin: string, code: string) =>
-  `${origin.replace(/\/$/, "")}/buy/${code}`;
+const codeUrl = (origin: string, path: "buy" | "ticket", code: string) =>
+  `${origin.replace(/\/$/, "")}/${path}/${code}`;
+const usable = (active: boolean, redeemed: number, max: number | null) =>
+  active && (max == null || redeemed < max);
 
 const initial: MintState = {};
 
@@ -361,9 +364,18 @@ function Field({
   );
 }
 
-function CopyButtons({ code, url }: { code: string; url?: string }) {
+function CopyButtons({
+  code,
+  origin,
+  checkout,
+}: {
+  code: string;
+  origin: string;
+  checkout: boolean;
+}) {
   const codeCopy = useCopy();
   const urlCopy = useCopy();
+  const checkoutCopy = useCopy();
   const label = (status: string, idle: string) =>
     status === "copied" ? "Copied" : status === "failed" ? "Select it" : idle;
   return (
@@ -375,13 +387,23 @@ function CopyButtons({ code, url }: { code: string; url?: string }) {
       >
         {label(codeCopy.status, "Copy code")}
       </button>
-      {url && (
+      <button
+        type="button"
+        onClick={() => urlCopy.copy(codeUrl(origin, "buy", code))}
+        title="Lands on the home page with the code saved for checkout"
+        className={smallButtonClass}
+      >
+        {label(urlCopy.status, "Copy link")}
+      </button>
+      {checkout && (
         <button
           type="button"
-          onClick={() => urlCopy.copy(url)}
-          className={smallButtonClass}
+          onClick={() => checkoutCopy.copy(codeUrl(origin, "ticket", code))}
+          title="Goes straight to Standard checkout with the code applied"
+          className={`${smallButtonClass} inline-flex items-center gap-1.5`}
         >
-          {label(urlCopy.status, "Copy link")}
+          <FaStripeS aria-hidden className="text-[#635BFF]" />
+          {label(checkoutCopy.status, "Copy checkout link")}
         </button>
       )}
     </>
@@ -389,8 +411,8 @@ function CopyButtons({ code, url }: { code: string; url?: string }) {
 }
 
 function Result({ minted, origin }: { minted: MintResult; origin: string }) {
-  const url = redeemUrl(origin, minted.code);
   const { prior } = minted;
+  const checkout = usable(minted.active, prior?.redeemed ?? 0, minted.max);
   return (
     <div
       className={`mt-6 rounded-lg border p-4 ${
@@ -423,11 +445,16 @@ function Result({ minted, origin }: { minted: MintResult; origin: string }) {
       <p className="my-2 font-mono text-2xl break-all text-navy select-all">
         {minted.code}
       </p>
-      <p className="mb-2 font-mono text-sm break-all text-ink/70 select-all">
-        {url}
+      <p className="font-mono text-sm break-all text-ink/70 select-all">
+        {codeUrl(origin, "buy", minted.code)}
       </p>
-      <div className="flex flex-wrap gap-2">
-        <CopyButtons code={minted.code} url={url} />
+      {checkout && (
+        <p className="font-mono text-sm break-all text-ink/70 select-all">
+          {codeUrl(origin, "ticket", minted.code)}
+        </p>
+      )}
+      <div className="mt-2 flex flex-wrap gap-2">
+        <CopyButtons code={minted.code} origin={origin} checkout={checkout} />
       </div>
       <p className="mt-3 text-xs text-ink/60">
         {minted.max == null
@@ -554,7 +581,7 @@ function Existing({
                 <StripeRow
                   key={c.id}
                   code={c}
-                  url={redeemUrl(origin, c.code)}
+                  origin={origin}
                   acting={acting === c.id}
                   onToggle={canArchive ? () => toggle(c) : undefined}
                 />
@@ -576,7 +603,7 @@ function Existing({
                       <StripeRow
                         key={c.id}
                         code={c}
-                        url={redeemUrl(origin, c.code)}
+                        origin={origin}
                         acting={acting === c.id}
                         onToggle={canArchive ? () => toggle(c) : undefined}
                       />
@@ -594,12 +621,12 @@ function Existing({
 
 function StripeRow({
   code: c,
-  url,
+  origin,
   acting,
   onToggle,
 }: {
   code: StripeCode;
-  url: string;
+  origin: string;
   acting: boolean;
   /** Absent for view-only users, who get no archive control. */
   onToggle?: () => void;
@@ -627,7 +654,11 @@ function StripeRow({
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
-        <CopyButtons code={c.code} url={url} />
+        <CopyButtons
+          code={c.code}
+          origin={origin}
+          checkout={usable(c.active, c.redeemed, c.max)}
+        />
         {onToggle && (
           <button
             type="button"

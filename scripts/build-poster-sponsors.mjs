@@ -12,7 +12,7 @@ const sources = {
     "public/images/sponsors/goodhart-labs-logos/svg/goodhart-labs-stacked-black.svg",
   dmodel: "public/images/sponsors/dmodel_logo.png",
   walrus: "brand-kit/Metagame_2026_Brand_Kit/sponsors/walrusfi/logo-nav.svg",
-  arbor: "brand-kit/Metagame_2026_Brand_Kit/sponsors/arbor.png",
+  arbor: "public/images/sponsors/arbor_logo.png",
   francisco: "public/images/sponsors/francisco_san_logo.png",
   manifund: "public/images/sponsors/manifund_logo.png",
   asylum: "public/images/sponsors/outside_the_asylum.png",

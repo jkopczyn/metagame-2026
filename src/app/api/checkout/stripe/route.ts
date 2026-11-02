@@ -85,7 +85,7 @@ function compUtm(promo: Stripe.PromotionCode): Utm {
 }
 
 /**
- * A `promo` on the link (/buy/CODE) is applied for the buyer, as is the tier's
+ * A `promo` on the link (/ticket/CODE) is applied for the buyer, as is the tier's
  * own code during early-bird; Stripe then shows no code box. Otherwise — or on
  * the unlisted `code=own` link, or when the code isn't redeemable — the box is shown.
  */
@@ -127,7 +127,7 @@ async function promoParams(
  * GET /api/checkout/stripe?tier=standard[&code=own | &promo=<code>]
  *   | ?tier=supporter&chip=<usd> | ?tier=day-pass&day=<friday|saturday|sunday>
  *   [&utm_source=…&utm_medium=…&utm_campaign=…&first_visit=…&posthog_id=…&posthog_session_id=…]
- * Creates a hosted Checkout Session and redirects to it. /buy and /buy/<code>
+ * Creates a hosted Checkout Session and redirects to it. /ticket and /ticket/<code>
  * redirect here (next.config.ts).
  */
 export async function GET(request: Request) {

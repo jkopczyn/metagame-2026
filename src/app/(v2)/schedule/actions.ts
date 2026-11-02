@@ -3,13 +3,14 @@
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { currentSession } from "@/lib/auth";
-import type { RsvpStatus, SessionRsvps } from "@/lib/schedule";
+import type { RsvpStatus, RsvpTicket, SessionRsvps } from "@/lib/schedule";
 import {
   cancelRsvp,
   loadSessionRsvps,
   rsvp,
   setBookmark,
 } from "@/lib/schedule-store";
+import { rsvpTicket } from "./data";
 
 // No revalidatePath: it would re-render the whole current route behind every
 // click. The caller updates in place from this result.
@@ -18,6 +19,8 @@ export type PlanResult = {
   status?: RsvpStatus | null;
   bookmarked?: boolean;
   rsvps?: SessionRsvps;
+  /** Refused for want of a claimed ticket: any the viewer could activate. */
+  needsTicket?: RsvpTicket["claimable"];
 };
 
 /** The signed-in user, if they may act on this session. */
@@ -54,6 +57,13 @@ async function act(
 /** Going, or waitlisted when the session is full. */
 export async function rsvpTo(sessionId: string): Promise<PlanResult> {
   return act(sessionId, async (userId) => {
+    const ticket = await rsvpTicket();
+    if (ticket && !ticket.has) {
+      return {
+        error: "You need a ticket to RSVP.",
+        needsTicket: ticket.claimable,
+      };
+    }
     const status = await rsvp(sessionId, userId);
     return { status, rsvps: await loadSessionRsvps(sessionId) };
   });

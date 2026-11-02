@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { FaStar } from "react-icons/fa";
+import { toast } from "sonner";
 import {
   onlySessions,
   openingDayKey,
@@ -23,6 +24,7 @@ import {
   ViewToggle,
   type View,
 } from "./ScheduleViews";
+import ScheduleMoments from "./ScheduleMoments";
 import ScheduleSearch from "./ScheduleSearch";
 
 type PublicDay = Day<PublicSession>;
@@ -77,10 +79,10 @@ export default function PublicSchedule({
     if (found) setDayKey(found.key);
   }
 
-  // Phones start on the list; deferred so server and first client render match.
+  // Phones start on moments; deferred so server and first client render match.
   useEffect(() => {
     if (!window.matchMedia("(max-width: 767px)").matches) return;
-    const t = setTimeout(() => setView("list"), 0);
+    const t = setTimeout(() => setView("moments"), 0);
     return () => clearTimeout(t);
   }, []);
 
@@ -115,7 +117,15 @@ export default function PublicSchedule({
           <button
             type="button"
             aria-pressed={onlyMine}
-            onClick={() => setOnlyMine((on) => !on)}
+            onClick={() => {
+              setOnlyMine(!onlyMine);
+              toast(
+                onlyMine
+                  ? "Showing all sessions."
+                  : "Now showing only your sessions.",
+                { id: "schedule-filter" },
+              );
+            }}
             className={`${TOGGLE} ml-auto shrink-0 items-center gap-2 px-3 py-2.5 text-xs tracking-[0.12em] uppercase transition-colors ${toggleButton(onlyMine, 0)}`}
           >
             <FaStar size={12} />
@@ -124,13 +134,25 @@ export default function PublicSchedule({
         )}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <DayTabs days={days} selected={day.key} onSelect={setDayKey} />
-        <ViewToggle view={view} onSelect={setView} />
+        {view !== "moments" && (
+          <DayTabs days={days} selected={day.key} onSelect={setDayKey} />
+        )}
+        <ViewToggle
+          view={view}
+          onSelect={setView}
+          views={["grid", "list", "moments"]}
+        />
       </div>
 
       <CategoryLegend />
 
-      {onlyMine && day.sessions.length === 0 ? (
+      {view === "moments" ? (
+        <ScheduleMoments
+          days={shownDays}
+          columns={columns}
+          onOpen={(s) => router.push(href(s), { scroll: false })}
+        />
+      ) : onlyMine && day.sessions.length === 0 ? (
         <EmptyPanel>
           {mine?.length
             ? `None of your sessions are on ${day.name}.`

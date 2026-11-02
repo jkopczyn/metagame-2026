@@ -61,7 +61,8 @@ export default function RouteModal({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      // Radix preventDefaults the Escape that dismisses a nested layer.
+      if (e.key === "Escape" && !e.defaultPrevented) close();
     };
     window.addEventListener("keydown", onKey);
     const overflow = document.body.style.overflow;

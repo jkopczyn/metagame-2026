@@ -18,6 +18,10 @@ import {
   outsideHours,
   overlapLanes,
   overlapWarning,
+  planConflicts,
+  rsvpPrompt,
+  slotLabel,
+  type PlanConflict,
   type LocationVisibility,
   type ScheduleSession,
 } from "./schedule";
@@ -36,6 +40,8 @@ const session = (over: Partial<ScheduleSession>): ScheduleSession => ({
   ages: null,
   needs: null,
   status: "draft",
+  rsvpIsCommitment: false,
+  sponsored: false,
   airtableRfpRecordId: null,
   hosts: [],
   shepherd: null,
@@ -43,6 +49,18 @@ const session = (over: Partial<ScheduleSession>): ScheduleSession => ({
 });
 
 const at = (iso: string) => new Date(iso);
+
+describe("slotLabel", () => {
+  it("includes the period by default", () => {
+    expect(slotLabel(9 * 60 + 30)).toBe("9:30 AM");
+    expect(slotLabel(12 * 60)).toBe("12:00 PM");
+  });
+
+  it("drops the period for the grid gutter", () => {
+    expect(slotLabel(9 * 60 + 30, { period: false })).toBe("9:30");
+    expect(slotLabel(21 * 60, { period: false })).toBe("9:00");
+  });
+});
 
 describe("movedTimes", () => {
   it("keeps a placed session's length", () => {
@@ -359,6 +377,185 @@ describe("clashDescription", () => {
     expect(overlapWarning(clash)).toBe(
       'Saved, but this overlaps "Chess" in Eigen Hall (10:00 AM–10:55 AM).',
     );
+  });
+});
+
+describe("rsvpPrompt", () => {
+  it("RSVPs an interest-only session in one click", () => {
+    expect(rsvpPrompt(false, false)).toEqual({ label: "RSVP", confirms: [] });
+    expect(rsvpPrompt(false, true)).toEqual({
+      label: "Join waitlist",
+      confirms: [],
+    });
+  });
+
+  it("asks before claiming a spot in a commitment session", () => {
+    const open = rsvpPrompt(true, false);
+    expect(open.label).toBe("Claim a spot");
+    expect(open.confirms[0]?.body).toMatch(/firmer commitment/);
+  });
+
+  it("asks before joining a commitment session's waitlist too", () => {
+    const full = rsvpPrompt(true, true);
+    expect(full.label).toBe("Join waitlist");
+    expect(full.confirms[0]?.body).toMatch(/firmer commitment/);
+  });
+
+  const clash = (over: Partial<PlanConflict>): PlanConflict => ({
+    role: "going",
+    title: "Chess",
+    startsAt: "2026-11-07T21:00:00.000Z",
+    endsAt: "2026-11-07T22:00:00.000Z",
+    commitment: false,
+    ...over,
+  });
+
+  it("warns about a clash before an interest-only RSVP", () => {
+    const out = rsvpPrompt(false, false, [clash({ role: "host" })]);
+    expect(out.confirms).toHaveLength(1);
+    expect(out.confirms[0]).toMatchObject({
+      title: "You’re hosting something at this time",
+      conflicts: ["You’re hosting “Chess” 1:00 PM–2:00 PM PT"],
+      tone: "warning",
+    });
+  });
+
+  it("follows a clash dialog with the commitment one when you're running something", () => {
+    const out = rsvpPrompt(true, false, [clash({ role: "host" })]);
+    expect(out.confirms.map((c) => c.title)).toEqual([
+      "You’re hosting something at this time",
+      "RSVPing here is a commitment",
+    ]);
+    expect(out.confirms[0].body).not.toMatch(/limited spots/);
+    expect(out.confirms[1].body).toMatch(/firmer commitment/);
+  });
+
+  it("doesn't repeat the stakes when the clash dialog already has them", () => {
+    expect(rsvpPrompt(true, false, [clash({})]).confirms).toHaveLength(1);
+    expect(
+      rsvpPrompt(true, false, [clash({ commitment: true })]).confirms,
+    ).toHaveLength(1);
+  });
+
+  it("names each clash in one dialog", () => {
+    const out = rsvpPrompt(true, false, [
+      clash({ role: "shepherd", title: "Go" }),
+      clash({ role: "waitlist" }),
+    ]);
+    expect(out.confirms[0]?.title).toBe(
+      "You’re shepherding something at this time",
+    );
+    expect(out.confirms[0]?.conflicts).toEqual([
+      "You’re shepherding “Go” 1:00 PM–2:00 PM PT",
+      "You’re on the waitlist for “Chess” 1:00 PM–2:00 PM PT",
+    ]);
+    expect(out.confirms[0]?.body).toBe(
+      "Make sure you can fulfill your shepherd duties.",
+    );
+    expect(out.confirms[0]?.tone).toBe("urgent");
+  });
+
+  it("adds the stakes when the clash is only another RSVP", () => {
+    const out = rsvpPrompt(true, false, [clash({})]);
+    expect(out.confirms[0]?.body).toMatch(
+      /^The session you’re joining has limited spots/,
+    );
+  });
+
+  it("doesn't treat a waitlist place as a held spot", () => {
+    const out = rsvpPrompt(false, false, [
+      clash({ role: "waitlist", commitment: true }),
+    ]);
+    expect(out.confirms[0]?.body).toBe("");
+  });
+
+  it("keeps the held-spot note when you're also running something", () => {
+    const out = rsvpPrompt(true, false, [
+      clash({ commitment: true }),
+      clash({ role: "host", title: "Go" }),
+    ]);
+    expect(out.confirms[0]?.body).toMatch(
+      /^Your existing RSVP is for a session/,
+    );
+  });
+
+  it("calls out a clashing commitment RSVP", () => {
+    const out = rsvpPrompt(false, false, [clash({ commitment: true })]);
+    expect(out.confirms[0]?.conflicts).toEqual([
+      "You’ve already RSVP’d to “Chess” 1:00 PM–2:00 PM PT",
+    ]);
+    expect(out.confirms[0]?.body).toMatch(
+      /^Your existing RSVP is for a session with limited spots/,
+    );
+    expect(out.confirms[0]?.tone).toBe("urgent");
+  });
+});
+
+describe("planConflicts", () => {
+  const at = (h: number, m = 0) =>
+    `2026-11-07T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00.000Z`;
+  const target = session({
+    id: "t",
+    status: "published",
+    startsAt: at(20),
+    endsAt: at(21),
+  });
+  const me = { userId: "me", name: "Me", email: "me@x" };
+  const other = (over: Partial<ScheduleSession>) =>
+    session({ status: "published", startsAt: at(20), endsAt: at(21), ...over });
+  const ids = (sessions: ScheduleSession[], rsvps = {}) =>
+    planConflicts(target, [target, ...sessions], "me", rsvps).map((c) => [
+      c.title,
+      c.role,
+    ]);
+
+  it("finds hosting, shepherding and RSVPs that overlap, in time order", () => {
+    expect(
+      ids(
+        [
+          other({ id: "r", title: "R", startsAt: at(20, 30), endsAt: at(22) }),
+          other({ id: "h", title: "H", hosts: [me], startsAt: at(19, 30) }),
+          other({ id: "s", title: "S", shepherd: me }),
+          other({ id: "w", title: "W" }),
+        ],
+        { r: "going", w: "waitlist", t: "going" },
+      ),
+    ).toEqual([
+      ["H", "host"],
+      ["S", "shepherd"],
+      ["W", "waitlist"],
+      ["R", "going"],
+    ]);
+  });
+
+  it("names a session once, by its strongest tie", () => {
+    expect(
+      ids([other({ id: "h", title: "H", hosts: [me], shepherd: me })], {
+        h: "going",
+      }),
+    ).toEqual([["H", "host"]]);
+  });
+
+  it("skips back-to-back sessions, other people's, drafts and unplaced ones", () => {
+    expect(
+      ids(
+        [
+          other({ id: "before", startsAt: at(19), endsAt: at(20) }),
+          other({ id: "after", startsAt: at(21), endsAt: at(22) }),
+          other({ id: "theirs", hosts: [{ ...me, userId: "x" }] }),
+          other({ id: "draft", status: "draft", hosts: [me] }),
+          other({ id: "tba", startsAt: null, endsAt: null, hosts: [me] }),
+          other({ id: "marked" }),
+        ],
+        { before: "going", after: "going" },
+      ),
+    ).toEqual([]);
+  });
+
+  it("has nothing to clash with while the target is unplaced", () => {
+    const tba = { id: "t", startsAt: null, endsAt: null };
+    const busy = other({ id: "h", hosts: [me] });
+    expect(planConflicts(tba, [busy], "me", {})).toEqual([]);
   });
 });
 

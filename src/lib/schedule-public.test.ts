@@ -25,6 +25,8 @@ const session = (over: Partial<ScheduleSession>): ScheduleSession => ({
   ages: null,
   needs: "a projector",
   status: "published",
+  rsvpIsCommitment: false,
+  sponsored: false,
   airtableRfpRecordId: "rec1",
   hosts: [{ userId: "u1", name: "Ada", email: "ada@example.com" }],
   shepherd: { userId: "u9", name: "Grace", email: "grace@example.com" },
@@ -89,6 +91,17 @@ describe("publicSchedule", () => {
     expect(json).not.toContain("Grace");
     expect(json).not.toContain("u9");
     expect(sessions[0].hosts).toEqual([{ name: "Ada" }]);
+  });
+
+  it("carries the commitment and sponsor flags", () => {
+    const { sessions } = publicSchedule({
+      locations: [],
+      sessions: [session({ rsvpIsCommitment: true, sponsored: true })],
+    });
+    expect(sessions[0]).toMatchObject({
+      rsvpIsCommitment: true,
+      sponsored: true,
+    });
   });
 
   it("does not show a nameless host's email as their name", () => {

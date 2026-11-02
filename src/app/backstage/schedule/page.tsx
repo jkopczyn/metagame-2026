@@ -8,7 +8,9 @@ import {
   loadViewerPlans,
 } from "@/lib/schedule-store";
 
-export default async function AdminSchedulePage() {
+export default async function AdminSchedulePage(
+  props: PageProps<"/backstage/schedule">,
+) {
   // Per-request on every branch, or the sign-in branch gets baked in as
   // static at build time.
   await connection();
@@ -16,6 +18,7 @@ export default async function AdminSchedulePage() {
   const access = await toolAccess("schedule.manage");
   if (!access) return <SignIn next="/backstage/schedule" />;
 
+  const { edit } = await props.searchParams;
   const [schedule, attendance, plans] = await Promise.all([
     loadSchedule(),
     loadAttendance(),
@@ -30,6 +33,7 @@ export default async function AdminSchedulePage() {
       attendance={attendance}
       viewer={viewer}
       canSeed={canSeed}
+      initialEdit={typeof edit === "string" ? edit : null}
     />
   );
 }

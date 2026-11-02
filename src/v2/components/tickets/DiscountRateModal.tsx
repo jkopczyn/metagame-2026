@@ -11,7 +11,7 @@ import {
 import { FINANCIAL_AID_FORM_URL } from "@/v2/lib/links";
 import { HEADING } from "../styles";
 
-export const DISCOUNT_RATE_HREF = "/buy/DISCOUNT-RATE";
+export const DISCOUNT_RATE_HREF = "/ticket/DISCOUNT-RATE";
 
 export default function DiscountRateModal({
   onClose,

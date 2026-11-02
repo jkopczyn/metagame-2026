@@ -18,6 +18,8 @@ const session = (over: Partial<ScheduleSession>): ScheduleSession => ({
   ages: null,
   needs: null,
   status: "published",
+  rsvpIsCommitment: false,
+  sponsored: false,
   airtableRfpRecordId: null,
   hosts: [],
   shepherd: null,
@@ -113,5 +115,33 @@ describe("accountSessions", () => {
       full: true,
     });
     expect(out.bookmarks.map((r) => r.id)).toEqual(["starred"]);
+  });
+
+  it("flags a bookmark that clashes with an RSVP", () => {
+    const out = accountSessions(
+      "me",
+      [
+        session({
+          id: "going",
+          title: "Chess",
+          startsAt: "2026-11-07T17:00:00.000Z",
+          endsAt: "2026-11-07T18:00:00.000Z",
+          locationId: "r1",
+        }),
+        session({
+          id: "starred",
+          startsAt: "2026-11-07T17:30:00.000Z",
+          endsAt: "2026-11-07T18:30:00.000Z",
+          locationId: "r1",
+        }),
+      ],
+      [{ id: "r1", name: "Bayes" }],
+      { rsvps: { going: "going" }, bookmarks: ["starred"] },
+      {},
+      false,
+    );
+    expect(out.bookmarks[0].conflicts).toMatchObject([
+      { role: "going", title: "Chess" },
+    ]);
   });
 });

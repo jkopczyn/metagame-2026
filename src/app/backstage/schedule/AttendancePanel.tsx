@@ -9,6 +9,7 @@ import PlanButtons from "@/v2/components/schedule/PlanButtons";
 import type {
   Attendance,
   Attendee,
+  PlanConflict,
   ScheduleSession,
   ViewerPlans,
 } from "@/lib/schedule";
@@ -20,10 +21,12 @@ export default function AttendancePanel({
   session,
   attendance = NONE,
   viewer,
+  conflicts,
 }: {
   session: ScheduleSession;
   attendance?: Attendance[string];
   viewer: (ViewerPlans & { userId: string }) | null;
+  conflicts: PlanConflict[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -86,6 +89,8 @@ export default function AttendancePanel({
           status={viewer.rsvps[session.id] ?? null}
           bookmarked={viewer.bookmarks.includes(session.id)}
           full={cap !== null && going.length >= cap}
+          commitment={session.rsvpIsCommitment}
+          conflicts={conflicts}
           onSettled={() => router.refresh()}
         />
       ) : (

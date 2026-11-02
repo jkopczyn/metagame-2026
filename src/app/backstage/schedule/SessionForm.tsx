@@ -40,6 +40,7 @@ import {
   wallAt,
   pacificMinutes,
   type Attendance,
+  type PlanConflict,
   type ScheduleLocation,
   type ScheduleSession,
   type ViewerPlans,
@@ -86,6 +87,33 @@ function Field({
   );
 }
 
+function Checkbox({
+  name,
+  label,
+  hint,
+  defaultChecked,
+}: {
+  name: string;
+  label: string;
+  hint: string;
+  defaultChecked: boolean;
+}) {
+  return (
+    <label className="flex items-start gap-2">
+      <input
+        type="checkbox"
+        name={name}
+        defaultChecked={defaultChecked}
+        className="mt-0.5 size-4 accent-meeple"
+      />
+      <span>
+        <span className="font-medium text-ink/80">{label}</span>
+        <span className="block text-xs text-ink/50">{hint}</span>
+      </span>
+    </label>
+  );
+}
+
 /** Prefill for a new session, e.g. from clicking an empty grid slot. */
 export type SessionDefaults = {
   day: string;
@@ -115,6 +143,7 @@ export default function SessionForm({
   locations,
   attendance,
   viewer,
+  conflicts,
   onClose,
 }: {
   session: ScheduleSession | null;
@@ -122,6 +151,7 @@ export default function SessionForm({
   locations: ScheduleLocation[];
   attendance?: Attendance[string];
   viewer: (ViewerPlans & { userId: string }) | null;
+  conflicts: PlanConflict[];
   onClose: () => void;
 }) {
   const [day, setDay] = useState(
@@ -469,6 +499,21 @@ export default function SessionForm({
             </Field>
           </div>
 
+          <div className="flex flex-col gap-2 text-sm sm:col-span-2">
+            <Checkbox
+              name="rsvpIsCommitment"
+              label="RSVP is a commitment"
+              hint="Attendees claim a limited spot people rely on, and confirm before they do."
+              defaultChecked={session?.rsvpIsCommitment ?? false}
+            />
+            <Checkbox
+              name="sponsored"
+              label="Sponsor session"
+              hint="Tagged “Sponsor” on the schedule."
+              defaultChecked={session?.sponsored ?? false}
+            />
+          </div>
+
           <HostPicker
             initial={session?.hosts ?? []}
             error={state.field === "hosts" ? state.error : null}
@@ -532,6 +577,7 @@ export default function SessionForm({
             session={session}
             attendance={attendance}
             viewer={viewer}
+            conflicts={conflicts}
           />
         )}
       </DialogContent>

@@ -2,6 +2,7 @@ import {
   BookOpenIcon,
   CalendarIcon,
   DatabaseIcon,
+  DicesIcon,
   DollarSignIcon,
   KeyIcon,
   LinkIcon,
@@ -120,6 +121,14 @@ const TOOLS: {
     name: "Database schema",
     blurb: "ER diagram and column-by-column reference for the Postgres schema.",
     perm: "schema.view",
+  },
+  {
+    href: "/backstage/dice-lab",
+    icon: DicesIcon,
+    name: "Dice lab",
+    blurb:
+      "Arrange the hero dice and export transparent PNG or SVG assets for print.",
+    perm: "misc.dice_lab",
   },
 ];
 

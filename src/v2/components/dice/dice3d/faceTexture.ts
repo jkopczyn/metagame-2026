@@ -49,8 +49,8 @@ function toTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
 // edge), peeking through the cutouts — same illusion as the LogoDice wordmark.
 const LETTER_HIGHLIGHT = false;
 // Cutout width / corner radius for the 3D faces (the wordmark uses 52 / 48).
-const GLYPH = { slot: 40, r: 48 };
-const HI = 8;
+export const GLYPH = { slot: 40, r: 48 };
+export const HI = 8;
 
 function tintedGlyph(img: HTMLImageElement, fill: string): HTMLCanvasElement {
   const [c, cx] = makeCanvas();
@@ -61,11 +61,13 @@ function tintedGlyph(img: HTMLImageElement, fill: string): HTMLCanvasElement {
   return c;
 }
 
+// `color` is a brand key (blue / orange) or any CSS color (dice-lab tints).
 export function letterTexture(
   letter: string,
-  color: "blue" | "orange",
+  color: string,
   onLoad?: () => void,
 ): THREE.CanvasTexture {
+  const fill = color in COLORS ? COLORS[color as keyof typeof COLORS] : color;
   const [canvas, ctx] = makeCanvas();
   const tex = toTexture(canvas);
   const img = new Image();
@@ -80,7 +82,7 @@ export function letterTexture(
       const dx = color === "blue" ? HI : -HI;
       ctx.drawImage(tintedGlyph(img, COLORS.white), dx, -HI);
     }
-    ctx.drawImage(tintedGlyph(img, COLORS[color]), 0, 0);
+    ctx.drawImage(tintedGlyph(img, fill), 0, 0);
     tex.needsUpdate = true;
     onLoad?.();
   };

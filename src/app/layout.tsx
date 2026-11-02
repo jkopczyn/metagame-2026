@@ -8,6 +8,7 @@ import {
 } from "next/font/google";
 import BootSync from "@/v2/components/BootSync";
 import UtmCapture from "@/v2/components/UtmCapture";
+import { Toaster } from "@/v2/components/ui/sonner";
 import { PUZZLE_BOOT_SCRIPT } from "@/v2/puzzle/boot";
 import "./globals.css";
 
@@ -105,6 +106,7 @@ export default function RootLayout({
         <BootSync />
         <UtmCapture />
         {children}
+        <Toaster />
       </body>
     </html>
   );
