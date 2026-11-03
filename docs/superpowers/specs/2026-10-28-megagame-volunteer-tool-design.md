@@ -211,3 +211,11 @@ Settled on 2026-11-01:
 ## 11. Assumptions the design makes that the request did not state
 
 Kept unless the user objects: quests have a class (nullable) and a lock window from the notes; codes are 6-char Crockford with the ticket normalizer; answer matching ignores case, whitespace, punctuation and accents, with several accepted answers per quest; attempt logging; group confirmations undo as a group; no offline mode; CSV import rather than an editor; dashboard extras (per-volunteer counts, overrides list, cumulative view, export, auto-refresh); session rewards recorded per session by the shepherd or host; the duplicate-completion rule has no override.
+
+## 12. Revision 2026-11-03
+
+The project owner reviewed the built tool and asked for one page. The volunteer tool is now a single page titled "Quest Board" at `/backstage/megagame`, gated on `megagame.verify`. In order, it shows the quest section (code entry and scanner, then the checker, player list, per-player status, confirmation and its result with undo), the level-up section, recent actions by every volunteer with undo where the viewer may undo, and the completions and level-ups chart over time. The quest, the player list, the confirmation id, the level-up player, the number of recent actions and the chart choices are all query parameters. `/q/<code>` sends a volunteer to the board with that quest open.
+
+Dropped from the tool: the separate quest, level-up, quest management and dashboard pages, the quest CSV import form, the quest list with QR downloads, the CSV exports, the levels grid, the per-quest, per-volunteer and cumulative tables, and the separate list of recent overrides. Overrides now appear among the recent actions with their reason.
+
+Quest import (expected to be a script) and an admin dashboard are later work. The store queries and the CSV parser they will need are kept. QR downloads for quest labels are also later work.
