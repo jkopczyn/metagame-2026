@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { EDITOR_DAYS } from "@/lib/schedule";
 import { when } from "../format";
 import {
   MAX_BUCKETS,
@@ -135,8 +136,12 @@ describe("formatters", () => {
     );
   });
 
-  it("names con days", () => {
+  it("names con days and other days the same way", () => {
     expect(dayLabel("2026-11-07")).toBe("Saturday Nov 7");
-    expect(dayLabel("2026-11-05")).toBe("2026-11-05");
+    expect(dayLabel("2026-11-03")).toBe("Tuesday Nov 3");
+    expect(dayLabel("2026-11-05")).toBe("Thursday Nov 5");
+    expect(dayLabel("2026-10-31")).toBe("Saturday Oct 31");
+    for (const d of EDITOR_DAYS)
+      expect(dayLabel(d.key)).toBe(`${d.name} ${d.dateLabel}`);
   });
 });
