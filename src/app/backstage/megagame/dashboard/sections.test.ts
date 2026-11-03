@@ -122,6 +122,11 @@ describe("ConcentrationSection", () => {
     expect(html).toContain("0.17");
   });
 
+  it("marks each line with a circle when there is only one bucket", () => {
+    const html = renderConcentration(false);
+    expect(html.match(/<circle /g)).toHaveLength(2);
+  });
+
   it("does not hide the charts on phones", () => {
     expect(renderConcentration(false)).not.toContain("hidden sm:block");
   });
