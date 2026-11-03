@@ -9,9 +9,11 @@ import {
   gini,
   lorenzPoints,
   playerKey,
+  quantile,
   rankPlayers,
   shareSummary,
   topShare,
+  transitions,
   type ProgressCompletion,
   type ProgressLevelEvent,
   type ProgressPlayer,
@@ -364,5 +366,125 @@ describe("cumulativeLevels", () => {
     ]);
     expect(out[0].wizard).toEqual([0, 1, 0, 0, 0, 0]);
     expect(out[1].wizard).toEqual([0, 1, 1, 0, 0, 0]);
+  });
+});
+
+const H = 3_600_000;
+
+describe("quantile", () => {
+  it("interpolates between closest ranks", () => {
+    expect(quantile([1, 2, 3, 4], 0.25)).toBe(1.75);
+    expect(quantile([1, 2, 3, 4], 0.5)).toBe(2.5);
+    expect(quantile([1, 2, 3, 4], 0.75)).toBe(3.25);
+    expect(quantile([5], 0.25)).toBe(5);
+    expect(quantile([], 0.5)).toBeNull();
+  });
+});
+
+describe("transitions", () => {
+  const levelEvents = [
+    // p1 joined before the con: time at level 1 counts from con start (08:00Z).
+    ev("p1", "wizard", 1, "picker", "2026-11-01T12:00:00.000Z"),
+    ev("p1", "wizard", 2, "volunteer", "2026-11-06T10:00:00.000Z"),
+    ev("p1", "wizard", 3, "volunteer", "2026-11-06T14:00:00.000Z"),
+    ev("p2", "wizard", 1, "picker", "2026-11-06T09:00:00.000Z"),
+    ev("p2", "wizard", 2, "volunteer", "2026-11-06T13:00:00.000Z"),
+    // p3 skips level 2.
+    ev("p3", "wizard", 1, "picker", "2026-11-06T09:00:00.000Z"),
+    ev("p3", "wizard", 3, "volunteer", "2026-11-06T12:00:00.000Z"),
+    ev("p4", "wizard", 1, "picker", "2026-11-06T10:00:00.000Z"),
+    ev("p4", "wizard", 2, "volunteer", "2026-11-06T16:00:00.000Z"),
+    // Level 2 before level 1: ignored.
+    ev("p5", "wizard", 2, "volunteer", "2026-11-06T09:00:00.000Z"),
+    ev("p5", "wizard", 1, "picker", "2026-11-06T11:00:00.000Z"),
+    // Deleted accounts: ignored.
+    ev(null, "wizard", 1, "picker", "2026-11-06T09:00:00.000Z"),
+    ev(null, "wizard", 2, "volunteer", "2026-11-06T09:30:00.000Z"),
+    ev("p7", "pirate", 1, "picker", "2026-11-01T12:00:00.000Z"),
+  ];
+  const players = [
+    player("p1", { wizard: 3 }),
+    player("p2", { wizard: 2 }),
+    player("p3", { wizard: 3 }),
+    player("p4", { wizard: 2 }),
+    player("p6", { wizard: 2 }), // no event behind this level
+    player("p7", { pirate: 1 }),
+  ];
+  const now = at("2026-11-06T20:00:00.000Z");
+  const t = transitions(levelEvents, players, now);
+  const row = (cls: string, from: number) =>
+    t.rows.find((r) => r.class === cls && r.from === from)!;
+  const cur = (cls: string, level: number) =>
+    t.current.find((r) => r.class === cls && r.level === level)!;
+
+  it("has a row per class and transition, in order", () => {
+    expect(t.rows).toHaveLength(12);
+    expect(t.rows.slice(0, 4).map((r) => [r.class, r.from, r.to])).toEqual([
+      ["wizard", 1, 2],
+      ["wizard", 2, 3],
+      ["wizard", 3, 4],
+      ["wizard", 4, 5],
+    ]);
+  });
+
+  it("clamps the start to con start and takes quartiles of the made durations", () => {
+    expect(row("wizard", 1)).toEqual({
+      class: "wizard",
+      from: 1,
+      to: 2,
+      made: 3,
+      skipped: 1,
+      q25: 3 * H,
+      median: 4 * H,
+      q75: 5 * H,
+    });
+    expect(row("wizard", 2)).toMatchObject({
+      made: 1,
+      skipped: 0,
+      median: 4 * H,
+    });
+  });
+
+  it("leaves empty transitions at zero with null durations", () => {
+    expect(row("pirate", 1)).toMatchObject({
+      made: 0,
+      skipped: 0,
+      q25: null,
+      median: null,
+      q75: null,
+    });
+  });
+
+  it("counts players at each current level, with the median over those with an event", () => {
+    expect(cur("wizard", 2)).toEqual({
+      class: "wizard",
+      level: 2,
+      players: 3,
+      withEvent: 2,
+      medianSince: 5.5 * H,
+    });
+    expect(cur("wizard", 3)).toMatchObject({
+      players: 2,
+      withEvent: 2,
+      medianSince: 7 * H,
+    });
+    expect(cur("wizard", 1)).toMatchObject({
+      players: 0,
+      withEvent: 0,
+      medianSince: null,
+    });
+    expect(cur("pirate", 1)).toMatchObject({ players: 1, medianSince: 12 * H });
+  });
+
+  it("never reports a negative time before the con", () => {
+    const early = transitions(
+      levelEvents,
+      players,
+      at("2026-11-02T00:00:00.000Z"),
+    );
+    expect(
+      early.current.find((r) => r.class === "pirate" && r.level === 1)!
+        .medianSince,
+    ).toBe(0);
   });
 });
