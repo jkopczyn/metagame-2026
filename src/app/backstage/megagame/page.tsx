@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import SignIn from "../SignIn";
@@ -51,6 +52,16 @@ export default async function QuestBoard(
 
   return (
     <>
+      {viewer.manager && (
+        <p className="text-right text-sm">
+          <Link
+            href="/backstage/megagame/dashboard"
+            className="text-ink/60 underline underline-offset-2 hover:text-meeple"
+          >
+            Dashboard
+          </Link>
+        </p>
+      )}
       <QuestSection params={params} viewer={viewer} notice={notice} />
       <LevelUpSection params={params} />
       <RecentActions params={params} viewer={viewer} />

@@ -83,9 +83,12 @@ describe("Quest Board for a volunteer", () => {
 
   it("renders the four sections in order with the viewer's undo rights", async () => {
     const el = (await QuestBoard(props({ quest: "A2C4EF" }))) as {
-      props: { children: { type: unknown; props: Record<string, unknown> }[] };
+      props: { children: unknown[] };
     };
-    const sections = el.props.children;
+    const sections = el.props.children.filter(Boolean) as {
+      type: unknown;
+      props: Record<string, unknown>;
+    }[];
     expect(sections.map((s) => (s.type as { name: string }).name)).toEqual([
       "QuestSection",
       "LevelUpSection",
@@ -94,6 +97,32 @@ describe("Quest Board for a volunteer", () => {
     ]);
     expect(sections[0].props.viewer).toEqual({ userId: "v1", manager: false });
     expect(auth.toolAccess).toHaveBeenCalledWith("megagame.manage");
+  });
+});
+
+const hrefs = (node: unknown): string[] => {
+  if (Array.isArray(node)) return node.flatMap(hrefs);
+  if (!node || typeof node !== "object" || !("props" in node)) return [];
+  const props = (node as { props: Record<string, unknown> }).props;
+  return [
+    ...(typeof props.href === "string" ? [props.href] : []),
+    ...hrefs(props.children),
+  ];
+};
+
+describe("Quest Board dashboard link", () => {
+  it("is hidden from a volunteer without megagame.manage", async () => {
+    auth.toolAccess.mockImplementation(async (p: string) =>
+      p === "megagame.verify" ? { name: "Vol", userId: "v1" } : null,
+    );
+    const el = await QuestBoard(props({}));
+    expect(hrefs(el)).not.toContain("/backstage/megagame/dashboard");
+  });
+
+  it("is shown to a manager", async () => {
+    auth.toolAccess.mockResolvedValue({ name: "Boss", userId: "m1" });
+    const el = await QuestBoard(props({}));
+    expect(hrefs(el)).toContain("/backstage/megagame/dashboard");
   });
 });
 
