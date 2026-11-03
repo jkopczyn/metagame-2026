@@ -88,6 +88,10 @@ function OverTime({
         last={endLabel(ends.at(-1)!, size)}
       />
       <Legend series={series} />
+      <p className={NOTE}>
+        The top 20% share and the Gini coefficient are both fractions of 1, so a
+        share of 0.5 on the chart is 50% in the table.
+      </p>
       <div className={BOX}>
         <table className={TABLE}>
           <thead>

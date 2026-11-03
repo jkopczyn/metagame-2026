@@ -62,8 +62,8 @@ export function LineChart({
     <figure className="flex flex-col gap-1">
       <div className="flex gap-2">
         <span className="flex w-10 shrink-0 flex-col justify-between text-right text-xs text-ink/50">
-          <span>100%</span>
-          <span>0%</span>
+          <span>1</span>
+          <span>0</span>
         </span>
         <svg
           viewBox={`0 0 ${W} ${H}`}
