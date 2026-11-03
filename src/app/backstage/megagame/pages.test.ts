@@ -82,10 +82,16 @@ describe("Quest Board for a volunteer", () => {
   });
 
   it("renders the four sections in order with the viewer's undo rights", async () => {
+    type Node = { type: unknown; props: Record<string, unknown> };
     const el = (await QuestBoard(props({ quest: "A2C4EF" }))) as {
-      props: { children: { type: unknown; props: Record<string, unknown> }[] };
+      props: { children: Node[] };
     };
-    const sections = el.props.children;
+    // The first two sections sit in a grid of wrapper divs on wide screens.
+    const unwrap = (n: Node): Node[] =>
+      typeof n.type === "string"
+        ? ([n.props.children] as (Node | Node[])[]).flat().flatMap(unwrap)
+        : [n];
+    const sections = el.props.children.flatMap(unwrap);
     expect(sections.map((s) => (s.type as { name: string }).name)).toEqual([
       "QuestSection",
       "LevelUpSection",
