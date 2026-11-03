@@ -9,18 +9,27 @@ import { findPlayerByCode } from "./megagame-store";
 // own rule, since a badge page must stay open to everyone.
 
 /** The redirect for a quest label's link. Nobody without the permission sees the quest. */
-export async function questLinkTarget(rawCode: string): Promise<string> {
+export async function questLinkTarget(
+  rawCode: string,
+  players?: string | string[],
+): Promise<string> {
   const code = normalizeMegagameCode(rawCode);
+  const list = [players].flat()[0]?.trim();
+  const keep = list ? `?${new URLSearchParams({ players: list })}` : "";
   if (!(await currentSession())) {
-    return `/login?next=${encodeURIComponent(`/q/${code}`)}`;
+    return `/login?next=${encodeURIComponent(`/q/${code}${keep}`)}`;
   }
-  if (await can("megagame.verify")) return `/backstage/megagame/q/${code}`;
+  if (await can("megagame.verify")) {
+    const query = new URLSearchParams({ quest: code });
+    if (list) query.set("players", list);
+    return `/backstage/megagame?${query}`;
+  }
   return "/account";
 }
 
 export type PublicPlayer = { name: string; levels: MegagameLevels };
 
-/** A volunteer adds the player to their list; anyone else sees name and levels. */
+/** A volunteer adds the player to the Quest Board's list; anyone else sees name and levels. */
 export async function playerLinkTarget(
   rawCode: string,
 ): Promise<{ redirect: string } | { player: PublicPlayer | null }> {

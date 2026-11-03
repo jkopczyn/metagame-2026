@@ -21,13 +21,24 @@ beforeEach(() => {
 });
 
 describe("questLinkTarget", () => {
-  it("sends a volunteer to the quest page in the tool, code normalized", async () => {
+  it("sends a volunteer to the quest on the board, code normalized", async () => {
     auth.currentSession.mockResolvedValue(session);
     access.can.mockResolvedValue(session);
     expect(await questLinkTarget("a2c-4ef")).toBe(
-      "/backstage/megagame/q/A2C4EF",
+      "/backstage/megagame?quest=A2C4EF",
     );
     expect(access.can).toHaveBeenCalledWith("megagame.verify");
+  });
+
+  it("keeps a player list on the way to the board and through sign-in", async () => {
+    expect(await questLinkTarget("A2C4EF", "u1,u2")).toBe(
+      `/login?next=${encodeURIComponent("/q/A2C4EF?players=u1%2Cu2")}`,
+    );
+    auth.currentSession.mockResolvedValue(session);
+    access.can.mockResolvedValue(session);
+    expect(await questLinkTarget("A2C4EF", ["u1,u2"])).toBe(
+      "/backstage/megagame?quest=A2C4EF&players=u1%2Cu2",
+    );
   });
 
   it("sends a signed-out viewer to sign in and come back", async () => {

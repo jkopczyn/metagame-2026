@@ -45,4 +45,20 @@ describe("routeScan", () => {
       }),
     ).toEqual({ message: "That is a quest label. Scan a player's badge." });
   });
+
+  it("reads a Quest Board link's quest or player parameter", () => {
+    expect(
+      routeScan(
+        "https://example.com/backstage/megagame?quest=a2c-4ef&players=u1",
+        "player",
+        both,
+      ),
+    ).toEqual({ kind: "quest", code: "A2C4EF" });
+    expect(
+      routeScan("/backstage/megagame?player=b3d5f7", "quest", both),
+    ).toEqual({ kind: "player", code: "B3D5F7" });
+    expect(routeScan("/backstage/megagame?quest=a2c", "player", both)).toEqual({
+      message: "That QR code is not a quest label or a badge.",
+    });
+  });
 });

@@ -11,5 +11,6 @@ export const metadata: Metadata = {
 export default async function QuestLinkPage(props: PageProps<"/q/[code]">) {
   await connection();
   const { code } = await props.params;
-  redirect(await questLinkTarget(code));
+  const { players } = await props.searchParams;
+  redirect(await questLinkTarget(code, players));
 }

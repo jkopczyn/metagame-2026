@@ -18,7 +18,6 @@ const { auth, store, blob, nav } = vi.hoisted(() => ({
     findLevelEvent: vi.fn(),
     recordLevelUp: vi.fn(),
     voidLevelEvent: vi.fn(),
-    importQuests: vi.fn(),
     recordQuestAttempt: vi.fn(),
   },
   blob: {
@@ -41,7 +40,6 @@ import { revalidatePath } from "next/cache";
 import {
   confirmCompletions,
   findPlayers,
-  importQuestCsv,
   levelUp,
   logAnswerAttempt,
   lookupPlayer,
@@ -126,10 +124,16 @@ describe("gating", () => {
 });
 
 describe("confirmCompletions", () => {
-  const submit = (players: string[], id = ID) =>
+  const submit = (players: string[], id = ID, list?: string) =>
     confirmCompletions(
       {},
-      form({ id, questId: QUEST, questCode: "a2c4ef", player: players }),
+      form({
+        id,
+        questId: QUEST,
+        questCode: "a2c4ef",
+        player: players,
+        ...(list === undefined ? {} : { list }),
+      }),
     );
 
   beforeEach(() => {
@@ -146,10 +150,17 @@ describe("confirmCompletions", () => {
     expect(store.confirmQuest).not.toHaveBeenCalled();
   });
 
+  it("keeps the whole player list on the board with the result", async () => {
+    store.confirmQuest.mockResolvedValue({ status: "ok" });
+    await expect(submit(["u1"], ID, "u1,u3")).rejects.toThrow(
+      `REDIRECT /backstage/megagame?quest=A2C4EF&players=u1%2Cu3&c=${ID}`,
+    );
+  });
+
   it("records as the signed-in volunteer and opens the result by its id", async () => {
     store.confirmQuest.mockResolvedValue({ status: "ok" });
     await expect(submit(["u1", "u2"])).rejects.toThrow(
-      `REDIRECT /backstage/megagame/q/A2C4EF?c=${ID}`,
+      `REDIRECT /backstage/megagame?quest=A2C4EF&c=${ID}`,
     );
     expect(store.confirmQuest).toHaveBeenCalledWith({
       id: ID,
@@ -397,64 +408,6 @@ describe("undoLevelUp", () => {
     expect((await undoLevelUp({}, form({ id: ID }))).error).toMatch(
       /faction picker/,
     );
-  });
-});
-
-describe("importQuestCsv", () => {
-  const CSV = "title,kind,answers\nThe riddle,answer,Fire|Flame";
-
-  it("needs megagame.manage and touches no data without it", async () => {
-    holds("megagame.verify");
-    expect(await importQuestCsv({}, form({ csv: CSV }))).toEqual({
-      errors: [auth.EXPIRED],
-    });
-    expect(auth.requireAccess).toHaveBeenCalledWith("megagame.manage");
-    expect(store.importQuests).not.toHaveBeenCalled();
-  });
-
-  it("returns the parse errors and imports nothing", async () => {
-    holds("megagame.verify", "megagame.manage");
-    expect(
-      await importQuestCsv({}, form({ csv: "title,kind,answers\n,answer,x" })),
-    ).toEqual({
-      errors: ["Line 2: title is required."],
-      csv: "title,kind,answers\n,answer,x",
-    });
-    expect(store.importQuests).not.toHaveBeenCalled();
-  });
-
-  it("refuses a paste over the size limit and imports nothing", async () => {
-    holds("megagame.verify", "megagame.manage");
-    const csv = CSV + "\n" + "Another,answer,x\n".repeat(40_000);
-    expect(csv.length).toBeGreaterThan(500_000);
-    expect(await importQuestCsv({}, form({ csv }))).toEqual({
-      errors: ["The paste is longer than 500,000 characters. Split it up."],
-      csv,
-    });
-    expect(store.importQuests).not.toHaveBeenCalled();
-  });
-
-  it("imports the parsed rows and reports the counts", async () => {
-    holds("megagame.verify", "megagame.manage");
-    store.importQuests.mockResolvedValue({ created: 1, updated: 2 });
-    expect(await importQuestCsv({}, form({ csv: CSV }))).toEqual({
-      done: "Added 1 quest and updated 2.",
-    });
-    expect(store.importQuests).toHaveBeenCalledWith([
-      {
-        code: null,
-        title: "The riddle",
-        class: null,
-        kind: "answer",
-        answers: ["Fire", "Flame"],
-        evidence: null,
-        hint: null,
-        minLevel: null,
-        maxLevel: null,
-        active: null,
-      },
-    ]);
-    expect(revalidatePath).toHaveBeenCalledWith("/backstage/megagame/quests");
   });
 });
 

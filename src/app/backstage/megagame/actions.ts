@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { EXPIRED, requireAccess, type Access } from "@/lib/admin-auth";
 import { LARGE_IMAGE_MAX_BYTES, uploadImage } from "@/lib/blob";
 import { isMegagameClass } from "@/lib/megagame-levels";
-import { parseQuestCsv } from "@/lib/megagame-quest-csv";
 import {
   checkLevelUp,
   isCompleteMegagameCode,
@@ -20,7 +19,6 @@ import {
   findLevelEvent,
   findPlayerByCode,
   findQuestByCode,
-  importQuests,
   playersByIds,
   recordLevelUp,
   recordQuestAttempt,
@@ -31,6 +29,8 @@ import {
   type PlayerSummary,
 } from "@/lib/megagame-store";
 import { formatTicketCode } from "@/lib/ticket-code-format";
+import { boardHref } from "./board-params";
+import { parsePlayerIds } from "./player-list";
 import { isUuid } from "./uuid";
 
 const TOOL = "/backstage/megagame";
@@ -128,7 +128,13 @@ export async function confirmCompletions(
       return { error: STALE };
   }
   revalidatePath(TOOL, "layout");
-  redirect(`${TOOL}/q/${quest.code}?c=${id}`);
+  redirect(
+    boardHref({
+      quest: quest.code,
+      players: parsePlayerIds(str(formData, "list", 4000)),
+      confirmation: id,
+    }),
+  );
 }
 
 const MAX_ANSWER_CHARS = 200;
@@ -312,38 +318,4 @@ export async function undoLevelUp(
   }
   revalidatePath(TOOL, "layout");
   return { done: true };
-}
-
-// ---- Quest import ----
-
-export type ImportState = { errors?: string[]; done?: string; csv?: string };
-
-const MAX_CSV_CHARS = 500_000;
-const quests = (n: number) => `${n} ${n === 1 ? "quest" : "quests"}`;
-
-export async function importQuestCsv(
-  _prev: ImportState,
-  formData: FormData,
-): Promise<ImportState> {
-  if (!(await requireAccess("megagame.manage"))) return { errors: [EXPIRED] };
-  const csv = String(formData.get("csv") ?? "");
-  if (csv.length > MAX_CSV_CHARS)
-    return {
-      errors: [
-        `The paste is longer than ${MAX_CSV_CHARS.toLocaleString("en-US")} characters. Split it up.`,
-      ],
-      csv,
-    };
-  const { rows, errors } = parseQuestCsv(csv);
-  if (errors.length > 0) return { errors, csv };
-  const { created, updated } = await importQuests(rows);
-  revalidatePath(`${TOOL}/quests`);
-  return {
-    done:
-      created && updated
-        ? `Added ${quests(created)} and updated ${updated}.`
-        : updated
-          ? `Updated ${quests(updated)}.`
-          : `Added ${quests(created)}.`,
-  };
 }
