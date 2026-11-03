@@ -370,4 +370,13 @@ describe("CohortsSection", () => {
     expect(html).toContain("0.5");
     expect(html).toContain("2 of 4 claimed-ticket holders");
   });
+
+  it("says activity before the first con day is its own row and not counted as not yet active", () => {
+    const html = renderToStaticMarkup(
+      createElement(CohortsSection, { data: cohortData }),
+    );
+    expect(html).toContain(
+      "Activity before the first con day appears as its own cohort row and is not counted as not yet active.",
+    );
+  });
 });
