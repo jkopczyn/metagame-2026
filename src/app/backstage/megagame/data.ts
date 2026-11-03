@@ -1,4 +1,7 @@
 import "server-only";
+import { fillSeries, type SeriesRow } from "./over-time/series";
+import type { OverTimeView } from "./over-time/view";
+import { MEGAGAME_CLASSES, type MegagameClass } from "@/lib/megagame-levels";
 import {
   isCompleteMegagameCode,
   playerQuestStatus,
@@ -6,12 +9,17 @@ import {
   type QuestWindow,
 } from "@/lib/megagame-rules";
 import {
+  completionSeries,
+  completionsInClass,
+  confirmationOutcome,
   findQuestByCode,
+  levelEventSeries,
   liveCompletions,
   playersByIds,
   recentConfirmations,
   recentLevelUps,
   recentVoids,
+  type ConfirmationOutcome,
   type PlayerSummary,
   type Quest,
   type RecentConfirmation,
@@ -131,4 +139,77 @@ export async function loadRecentActions(
       total > limit ||
       Object.values(sources).some((rows) => rows.length >= limit),
   };
+}
+
+export type ConfirmationView = {
+  outcome: ConfirmationOutcome;
+  mayUndo: boolean;
+  nameOf: Record<string, string>;
+  /** Per-player completion ids, for managers only. */
+  completionIds: Record<string, string>;
+};
+
+/** Null when the id names no confirmation of this quest. */
+export async function loadConfirmation(
+  id: string,
+  quest: Quest,
+  viewer: Viewer,
+): Promise<ConfirmationView | null> {
+  const outcome = await confirmationOutcome(id);
+  if (!outcome || outcome.confirmation.questId !== quest.id) return null;
+  const { confirmation } = outcome;
+  const live = outcome.status !== "voided";
+  const [players, completions] = await Promise.all([
+    playersByIds(confirmation.requestedUserIds),
+    live && viewer.manager
+      ? liveCompletions(quest.id, outcome.recorded)
+      : Promise.resolve([]),
+  ]);
+  return {
+    outcome,
+    mayUndo: viewer.manager || confirmation.confirmedBy === viewer.userId,
+    nameOf: Object.fromEntries(players.map((p) => [p.id, p.name])),
+    completionIds: Object.fromEntries(
+      completions
+        .filter((c) => c.confirmationId === id)
+        .map((c) => [c.userId, c.id]),
+    ),
+  };
+}
+
+export async function loadListedPlayers(
+  ids: readonly string[],
+): Promise<PlayerSummary[]> {
+  return ids.length > 0 ? playersByIds(ids) : [];
+}
+
+export type LevelUpTarget = {
+  player: PlayerSummary;
+  completions: Record<MegagameClass, number>;
+};
+
+export async function loadLevelUpTarget(
+  userId: string,
+): Promise<LevelUpTarget | null> {
+  const [player] = await playersByIds([userId]);
+  if (!player) return null;
+  const counts = await Promise.all(
+    MEGAGAME_CLASSES.map(
+      async (c) => [c, await completionsInClass(player.id, c)] as const,
+    ),
+  );
+  return {
+    player,
+    completions: Object.fromEntries(counts) as Record<MegagameClass, number>,
+  };
+}
+
+/** Empty when the range has too many buckets, without querying. */
+export async function loadOverTime(view: OverTimeView): Promise<SeriesRow[]> {
+  if (view.tooMany) return [];
+  const [completions, levelEvents] = await Promise.all([
+    completionSeries(view.size, view.from, view.to),
+    levelEventSeries(view.size, view.from, view.to),
+  ]);
+  return fillSeries(view.buckets, completions, levelEvents);
 }

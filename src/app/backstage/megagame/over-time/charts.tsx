@@ -1,7 +1,7 @@
 import type { MegagameClass } from "@/lib/megagame-levels";
 
 // Lighter than the faction emblem colors so all three sit in one lightness
-// band; the tables carry every number, so color is never the only key.
+// band; the table carries every number, so color is never the only key.
 export const CLASS_COLORS: Record<MegagameClass, string> = {
   wizard: "#5A2FD0",
   pirate: "#B8AA00",
@@ -104,21 +104,5 @@ export function StackedBars({
         </figcaption>
       )}
     </figure>
-  );
-}
-
-/** A single horizontal bar for a table cell, scaled to `max`. */
-export function InlineBar({ value, max }: { value: number; max: number }) {
-  const w = max > 0 ? (value / max) * 100 : 0;
-  return (
-    <svg
-      viewBox="0 0 100 8"
-      preserveAspectRatio="none"
-      aria-hidden="true"
-      className="h-2 w-full min-w-12"
-    >
-      <rect width="100" height="8" rx="2" fill="#173059" opacity="0.08" />
-      {w > 0 && <rect width={w} height="8" rx="2" fill="#173059" />}
-    </svg>
   );
 }

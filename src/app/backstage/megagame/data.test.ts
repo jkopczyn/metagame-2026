@@ -8,13 +8,22 @@ const { store, tickets } = vi.hoisted(() => ({
     recentConfirmations: vi.fn(),
     recentLevelUps: vi.fn(),
     recentVoids: vi.fn(),
+    completionSeries: vi.fn(),
+    levelEventSeries: vi.fn(),
+    confirmationOutcome: vi.fn(),
+    completionsInClass: vi.fn(),
   },
   tickets: { claimedCounts: vi.fn() },
 }));
 vi.mock("@/lib/megagame-store", () => store);
 vi.mock("@/lib/ticket-store", () => tickets);
 
+import { parseBoardParams } from "./board-params";
+import { overTimeView } from "./over-time/view";
 import {
+  loadConfirmation,
+  loadLevelUpTarget,
+  loadOverTime,
   loadPlayerRows,
   loadQuest,
   loadRecentActions,
@@ -196,5 +205,96 @@ describe("loadRecentActions", () => {
     const many = await loadRecentActions(1, viewer);
     expect(many.actions.map((a) => a.key)).toEqual(["confirmation-c1"]);
     expect(many.more).toBe(true);
+  });
+});
+
+describe("loadOverTime", () => {
+  it("queries the series over the chosen range, with day buckets from Pacific midnight", async () => {
+    store.completionSeries.mockResolvedValue([]);
+    store.levelEventSeries.mockResolvedValue([]);
+    const view = overTimeView(
+      parseBoardParams({ range: "con", bucket: "1d" }),
+      new Date("2026-11-01T18:00:00.000Z"),
+    );
+    const rows = await loadOverTime(view);
+    const from = new Date("2026-11-06T08:00:00.000Z");
+    const to = new Date("2026-11-09T08:00:00.000Z");
+    expect(store.completionSeries).toHaveBeenCalledWith("1d", from, to);
+    expect(store.levelEventSeries).toHaveBeenCalledWith("1d", from, to);
+    expect(rows).toHaveLength(3);
+  });
+
+  it("skips the queries when the range has too many buckets", async () => {
+    const view = overTimeView(
+      parseBoardParams({ range: "con", bucket: "5m" }),
+      new Date("2026-11-07T18:00:00.000Z"),
+    );
+    expect(await loadOverTime(view)).toEqual([]);
+    expect(store.completionSeries).not.toHaveBeenCalled();
+  });
+});
+
+describe("loadConfirmation", () => {
+  const C = "6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b";
+  const quest = { id: "q1" } as never;
+  const outcome = {
+    status: "ok",
+    confirmation: {
+      questId: "q1",
+      confirmedBy: "v1",
+      requestedUserIds: ["u1"],
+    },
+    recorded: ["u1"],
+    alreadyCompleted: [],
+    notRecorded: [],
+  };
+
+  it("refuses a confirmation of another quest", async () => {
+    store.confirmationOutcome.mockResolvedValue({
+      ...outcome,
+      confirmation: { ...outcome.confirmation, questId: "q2" },
+    });
+    expect(
+      await loadConfirmation(C, quest, { userId: "v1", manager: false }),
+    ).toBeNull();
+  });
+
+  it("lets its volunteer undo it and gives per-player ids only to a manager", async () => {
+    store.confirmationOutcome.mockResolvedValue(outcome);
+    store.liveCompletions.mockResolvedValue([
+      { id: "k1", userId: "u1", confirmationId: C },
+    ]);
+    const own = await loadConfirmation(C, quest, {
+      userId: "v1",
+      manager: false,
+    });
+    expect(own).toMatchObject({
+      mayUndo: true,
+      nameOf: { u1: "U1" },
+      completionIds: {},
+    });
+    expect(store.liveCompletions).not.toHaveBeenCalled();
+    const other = await loadConfirmation(C, quest, {
+      userId: "v2",
+      manager: false,
+    });
+    expect(other?.mayUndo).toBe(false);
+    const boss = await loadConfirmation(C, quest, {
+      userId: "m1",
+      manager: true,
+    });
+    expect(boss).toMatchObject({ mayUndo: true, completionIds: { u1: "k1" } });
+  });
+});
+
+describe("loadLevelUpTarget", () => {
+  it("is null for an unknown player and counts completions per class otherwise", async () => {
+    store.playersByIds.mockResolvedValueOnce([]);
+    expect(await loadLevelUpTarget("nope")).toBeNull();
+    store.completionsInClass.mockImplementation(async (_u, c: string) =>
+      c === "wizard" ? 3 : 0,
+    );
+    const target = await loadLevelUpTarget("u1");
+    expect(target?.completions).toEqual({ wizard: 3, pirate: 0, alien: 0 });
   });
 });

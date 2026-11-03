@@ -90,7 +90,7 @@ const TOOLS: {
   {
     href: "/backstage/megagame",
     icon: SwordsIcon,
-    name: "Megagame",
+    name: "Quest Board",
     blurb: "Confirm quest completions and record level-ups.",
     perm: "megagame.verify",
   },

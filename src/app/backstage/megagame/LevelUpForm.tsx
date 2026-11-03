@@ -1,9 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { buttonClass, fieldClass, selectClass, selectStyle } from "../../ui";
-import { levelUp, undoLevelUp, type LevelUpState } from "../actions";
-import UndoForm from "../UndoForm";
+import { buttonClass, fieldClass, selectClass, selectStyle } from "../ui";
+import { levelUp, undoLevelUp, type LevelUpState } from "./actions";
+import UndoForm from "./UndoForm";
 import { downscaleImage } from "@/lib/downscale-image";
 import {
   CLASS_LABELS,

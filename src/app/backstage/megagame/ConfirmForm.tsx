@@ -13,12 +13,15 @@ export default function ConfirmForm({
   questId,
   questCode,
   players,
+  list,
 }: {
   id: string;
   questId: string;
   questCode: string;
   /** Only the players who can be recorded. */
   players: string[];
+  /** The whole list, kept on the board with the result. */
+  list: string[];
 }) {
   const [state, run, pending] = useActionState(confirmCompletions, {});
   const n = players.length;
@@ -27,6 +30,7 @@ export default function ConfirmForm({
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="questId" value={questId} />
       <input type="hidden" name="questCode" value={questCode} />
+      <input type="hidden" name="list" value={list.join(",")} />
       {players.map((p) => (
         <input key={p} type="hidden" name="player" value={p} />
       ))}

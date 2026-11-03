@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import {
   TICKET_CODE_LENGTH,
   normalizeTicketCode,
@@ -22,7 +22,7 @@ export default function CodeEntry({
 }) {
   const form = useRef<HTMLFormElement>(null);
   const [round, setRound] = useState(0);
-  const id = `code-${label.replace(/\W+/g, "-").toLowerCase()}`;
+  const id = useId();
 
   return (
     <form

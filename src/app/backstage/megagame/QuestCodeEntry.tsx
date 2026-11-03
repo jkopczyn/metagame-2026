@@ -2,18 +2,20 @@
 
 import { useRouter } from "next/navigation";
 import CodeEntry from "./CodeEntry";
-import { listHref } from "./player-list";
+import { boardHref, type BoardParams } from "./board-params";
 import ScanCodes from "./ScanCodes";
 
-export default function QuestCodeEntry({ players }: { players: string[] }) {
+export default function QuestCodeEntry({ params }: { params: BoardParams }) {
   const router = useRouter();
   const open = (code: string) =>
-    router.push(listHref(`/backstage/megagame/q/${code}`, players));
+    router.push(boardHref({ ...params, quest: code, confirmation: null }), {
+      scroll: false,
+    });
   return (
     <div className="flex flex-col gap-3">
       <CodeEntry
         label="Quest code"
-        autoFocus
+        autoFocus={!params.quest}
         onCode={(code) => {
           open(code);
           return false;

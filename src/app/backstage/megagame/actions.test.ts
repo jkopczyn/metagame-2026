@@ -36,7 +36,6 @@ vi.mock("@/lib/blob", () => blob);
 vi.mock("next/navigation", () => nav);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-import { revalidatePath } from "next/cache";
 import {
   confirmCompletions,
   findPlayers,

@@ -1,4 +1,4 @@
-import { MEGAGAME_CLASSES, type MegagameClass } from "@/lib/megagame-levels";
+import { boardHref, type BoardParams } from "../board-params";
 import {
   BUCKET_MINUTES,
   bucketSeries,
@@ -11,8 +11,6 @@ import {
   fromPacificWall,
   pacificDayKey,
 } from "@/lib/schedule";
-
-export const DASHBOARD = "/backstage/megagame/dashboard";
 
 export const RANGE_PRESETS = ["2h", "today", "con"] as const;
 export type RangePreset = (typeof RANGE_PRESETS)[number];
@@ -48,9 +46,7 @@ function rangeFor(preset: RangePreset, now: Date): { from: Date; to: Date } {
   return { from: first, to: during ? now : end };
 }
 
-export type DashboardParams = Record<string, string | string[] | undefined>;
-
-export type DashboardView = {
+export type OverTimeView = {
   preset: RangePreset;
   size: BucketSize;
   /** Whether the bucket came from the URL rather than the range's default. */
@@ -61,18 +57,15 @@ export type DashboardView = {
   to: Date;
   buckets: Date[];
   tooMany: boolean;
-  cls: MegagameClass;
 };
 
-const first = (v: string | string[] | undefined) => [v].flat()[0];
-
-export function dashboardView(sp: DashboardParams, now: Date): DashboardView {
-  const range = first(sp.range);
+export function overTimeView(
+  { range, bucket }: Pick<BoardParams, "range" | "bucket">,
+  now: Date,
+): OverTimeView {
   const preset = RANGE_PRESETS.find((p) => p === range) ?? "today";
-  const bucket = first(sp.bucket);
   const chosenSize = isBucketSize(bucket);
   const size = chosenSize ? bucket : DEFAULT_BUCKET[preset];
-  const cls = MEGAGAME_CLASSES.find((c) => c === first(sp.cls)) ?? "wizard";
 
   const range0 = rangeFor(preset, now);
   const from = bucketStart(range0.from, size);
@@ -84,19 +77,21 @@ export function dashboardView(sp: DashboardParams, now: Date): DashboardView {
   const buckets = tooMany
     ? []
     : bucketSeries(from, new Date(to.getTime() - 1), size);
-  return { preset, size, chosenSize, from, to, buckets, tooMany, cls };
+  return { preset, size, chosenSize, from, to, buckets, tooMany };
 }
 
+/** The board's other choices stay; a new range drops a chosen bucket for its own default. */
 export function viewHref(
-  view: DashboardView,
-  change: { range?: RangePreset; bucket?: BucketSize; cls?: MegagameClass },
+  params: BoardParams,
+  view: OverTimeView,
+  change: { range?: RangePreset; bucket?: BucketSize },
 ): string {
-  const range = change.range ?? view.preset;
-  const params = new URLSearchParams({ range });
   const bucket =
     change.bucket ??
-    (change.range === undefined && view.chosenSize ? view.size : undefined);
-  if (bucket) params.set("bucket", bucket);
-  params.set("cls", change.cls ?? view.cls);
-  return `${DASHBOARD}?${params}`;
+    (change.range === undefined && view.chosenSize ? view.size : null);
+  return boardHref({
+    ...params,
+    range: change.range ?? view.preset,
+    bucket,
+  });
 }

@@ -1,51 +1,38 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { auth, store, data } = vi.hoisted(() => ({
+const { auth, store, data, nav } = vi.hoisted(() => ({
   auth: { toolAccess: vi.fn(), requireAccess: vi.fn(), EXPIRED: "expired" },
-  store: {
-    findQuestByCode: vi.fn(),
-    findPlayerByCode: vi.fn(),
-    recentConfirmations: vi.fn(),
-    confirmationOutcome: vi.fn(),
-    liveCompletions: vi.fn(),
-    playersByIds: vi.fn(),
-    completionsInClass: vi.fn(),
-    levelEventsFor: vi.fn(),
-    listQuests: vi.fn(),
-    levelGrid: vi.fn(),
-    claimedTicketHolderCount: vi.fn(),
-    questCompletionCounts: vi.fn(),
-    distinctCompletingPlayers: vi.fn(),
-    completionsByVolunteer: vi.fn(),
-    completionSeries: vi.fn(),
-    levelEventSeries: vi.fn(),
-    liveLevelEventsBefore: vi.fn(),
-    recentOverrides: vi.fn(),
-    recentVoids: vi.fn(),
+  store: { findPlayerByCode: vi.fn() },
+  data: {
+    loadPlayerRows: vi.fn(),
+    loadQuest: vi.fn(),
+    loadConfirmation: vi.fn(),
+    loadLevelUpTarget: vi.fn(),
+    loadListedPlayers: vi.fn(),
+    loadRecentActions: vi.fn(),
+    loadOverTime: vi.fn(),
   },
-  data: { loadPlayerRows: vi.fn() },
+  nav: {
+    redirect: vi.fn((to: string) => {
+      throw new Error(`REDIRECT ${to}`);
+    }),
+  },
 }));
 vi.mock("@/lib/admin-auth", () => auth);
 vi.mock("@/lib/megagame-store", () => store);
 vi.mock("./data", () => data);
 vi.mock("./actions", () => ({}));
 vi.mock("next/server", () => ({ connection: vi.fn() }));
-vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
-vi.mock("@/lib/site-origin", () => ({
-  siteOriginFromHeaders: vi.fn(async () => "https://x.test"),
-}));
+vi.mock("next/navigation", () => nav);
 
 import SignIn from "../SignIn";
-import MegagameHome from "./page";
-import LevelUpPage from "./level/page";
-import QuestPage from "./q/[code]/page";
-import QuestsPage from "./quests/page";
-import DashboardPage from "./dashboard/page";
+import QuestBoard from "./page";
+import QuestSection from "./QuestSection";
 
 const C = "6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b";
-const props = <T>(params: T, searchParams: Record<string, string>) =>
+const props = (searchParams: Record<string, string>) =>
   ({
-    params: Promise.resolve(params),
+    params: Promise.resolve({}),
     searchParams: Promise.resolve(searchParams),
   }) as never;
 
@@ -56,127 +43,121 @@ beforeEach(() => {
 
 const expectSignInOnly = (el: unknown, next: string) => {
   expect(el).toMatchObject({ type: SignIn, props: { next } });
-  for (const fn of [...Object.values(store), data.loadPlayerRows])
+  for (const fn of [...Object.values(store), ...Object.values(data)])
     expect(fn).not.toHaveBeenCalled();
 };
 
-describe("megagame pages without megagame.verify", () => {
-  it("home shows only the sign-in, keeping the list", async () => {
-    const el = await MegagameHome(props({}, { players: "u1,u2" }));
-    expect(auth.toolAccess).toHaveBeenCalledWith("megagame.verify");
-    expectSignInOnly(el, "/backstage/megagame?players=u1%2Cu2");
-  });
-
-  it("quest page shows only the sign-in and never loads the quest or its answers", async () => {
-    const el = await QuestPage(props({ code: "a2c4ef" }, { players: "u1" }));
-    expect(auth.toolAccess).toHaveBeenCalledWith("megagame.verify");
-    expectSignInOnly(el, "/backstage/megagame/q/A2C4EF?players=u1");
-  });
-
-  it("quest page keeps a confirmation id through sign-in", async () => {
-    const el = await QuestPage(
-      props({ code: "a2c4ef" }, { players: "u1", c: C }),
-    );
-    expectSignInOnly(el, `/backstage/megagame/q/A2C4EF?players=u1&c=${C}`);
-  });
-
-  it("quest page drops a malformed confirmation id", async () => {
-    const el = await QuestPage(props({ code: "a2c4ef" }, { c: "nope" }));
-    expectSignInOnly(el, "/backstage/megagame/q/A2C4EF");
-  });
-
-  it("level-up page shows only the sign-in", async () => {
-    const el = await LevelUpPage(props({}, { u: "u1" }));
-    expect(auth.toolAccess).toHaveBeenCalledWith("megagame.verify");
-    expectSignInOnly(el, "/backstage/megagame/level?u=u1");
-  });
-});
-
-describe("quest management page", () => {
-  it("needs megagame.manage and loads nothing without it", async () => {
-    const el = await QuestsPage();
-    expect(auth.toolAccess).toHaveBeenCalledWith("megagame.manage");
-    expectSignInOnly(el, "/backstage/megagame/quests");
-  });
-
-  it("is refused to a volunteer holding only megagame.verify", async () => {
-    auth.toolAccess.mockImplementation(async (p: string) =>
-      p === "megagame.verify" ? { name: "Vol", userId: "v1" } : null,
-    );
-    expectSignInOnly(await QuestsPage(), "/backstage/megagame/quests");
-  });
-
-  it("loads the quests for a manager", async () => {
-    auth.toolAccess.mockResolvedValue({ name: "Boss", userId: "m1" });
-    store.listQuests.mockResolvedValue([]);
-    await QuestsPage();
-    expect(store.listQuests).toHaveBeenCalled();
-  });
-});
-
-describe("dashboard page", () => {
-  it("needs megagame.verify, keeps its choices through sign-in, and loads nothing without it", async () => {
-    const el = await DashboardPage(
-      props({}, { range: "con", bucket: "1h", cls: "alien" }),
+describe("Quest Board without megagame.verify", () => {
+  it("shows only the sign-in, keeping the quest, list and confirmation", async () => {
+    const el = await QuestBoard(
+      props({ quest: "a2c4ef", players: "u1,u2", c: C }),
     );
     expect(auth.toolAccess).toHaveBeenCalledWith("megagame.verify");
     expectSignInOnly(
       el,
-      "/backstage/megagame/dashboard?range=con&bucket=1h&cls=alien",
+      `/backstage/megagame?quest=A2C4EF&players=u1%2Cu2&c=${C}`,
     );
   });
 
-  it("loads the figures for a volunteer, with the series over the chosen range", async () => {
-    auth.toolAccess.mockResolvedValue({ name: "Vol", userId: "v1" });
-    store.levelGrid.mockResolvedValue({
-      wizard: [0, 1, 0, 0, 0, 0],
-      pirate: [0, 0, 0, 0, 0, 0],
-      alien: [0, 0, 0, 0, 0, 0],
-    });
-    store.claimedTicketHolderCount.mockResolvedValue(10);
-    store.questCompletionCounts.mockResolvedValue([]);
-    store.distinctCompletingPlayers.mockResolvedValue(0);
-    store.completionsByVolunteer.mockResolvedValue([]);
-    store.completionSeries.mockResolvedValue([]);
-    store.levelEventSeries.mockResolvedValue([]);
-    store.liveLevelEventsBefore.mockResolvedValue([]);
-    store.recentOverrides.mockResolvedValue([]);
-    store.recentVoids.mockResolvedValue([]);
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date("2026-11-01T18:00:00.000Z"));
-    try {
-      await DashboardPage(props({}, { range: "con", bucket: "1d" }));
-    } finally {
-      vi.useRealTimers();
+  it("drops a malformed confirmation id and keeps a badge code", async () => {
+    const el = await QuestBoard(props({ c: "nope", player: "b3d5f7" }));
+    expectSignInOnly(el, "/backstage/megagame?player=b3d5f7");
+  });
+});
+
+describe("Quest Board for a volunteer", () => {
+  beforeEach(() => {
+    auth.toolAccess.mockImplementation(async (p: string) =>
+      p === "megagame.verify" ? { name: "Vol", userId: "v1" } : null,
+    );
+  });
+
+  it("adds a badge's player to the list and keeps the quest", async () => {
+    store.findPlayerByCode.mockResolvedValue({ id: "u3" });
+    await expect(
+      QuestBoard(props({ quest: "A2C4EF", players: "u1", player: "b3d5f7" })),
+    ).rejects.toThrow(
+      "REDIRECT /backstage/megagame?quest=A2C4EF&players=u1%2Cu3",
+    );
+  });
+
+  it("renders the four sections in order with the viewer's undo rights", async () => {
+    const el = (await QuestBoard(props({ quest: "A2C4EF" }))) as {
+      props: { children: { type: unknown; props: Record<string, unknown> }[] };
+    };
+    const sections = el.props.children;
+    expect(sections.map((s) => (s.type as { name: string }).name)).toEqual([
+      "QuestSection",
+      "LevelUpSection",
+      "RecentActions",
+      "OverTime",
+    ]);
+    expect(sections[0].props.viewer).toEqual({ userId: "v1", manager: false });
+    expect(auth.toolAccess).toHaveBeenCalledWith("megagame.manage");
+  });
+});
+
+type Node = { type?: unknown; props?: Record<string, unknown> };
+
+/** Element type names, text and component props in a rendered tree, without running child components. */
+function walk(
+  node: unknown,
+  out = {
+    types: [] as string[],
+    text: "",
+    props: [] as Record<string, unknown>[],
+  },
+) {
+  if (typeof node === "string" || typeof node === "number") out.text += node;
+  else if (Array.isArray(node)) for (const n of node) walk(n, out);
+  else if (node && typeof node === "object") {
+    const { type, props } = node as Node;
+    if (typeof type === "function") {
+      out.types.push(type.name);
+      if (props) out.props.push(props);
     }
-    expect(store.completionSeries).toHaveBeenCalledWith(
-      "1d",
-      new Date("2026-11-06T08:00:00.000Z"),
-      new Date("2026-11-09T08:00:00.000Z"),
-    );
-    expect(store.levelEventSeries).toHaveBeenCalledWith(
-      "1d",
-      new Date("2026-11-06T08:00:00.000Z"),
-      new Date("2026-11-09T08:00:00.000Z"),
-    );
-    expect(store.liveLevelEventsBefore).toHaveBeenCalledWith(
-      new Date("2026-11-09T08:00:00.000Z"),
-    );
+    if (props) walk(props.children, out);
+  }
+  return out;
+}
+
+describe("QuestSection", () => {
+  const viewer = { userId: "v1", manager: false };
+  const params = (
+    quest: string | null,
+    confirmation: string | null = null,
+  ) => ({
+    quest,
+    players: [],
+    confirmation,
+    levelUp: null,
+    recent: 30,
+    range: null,
+    bucket: null,
   });
 
-  it("skips the series queries when the range has too many buckets", async () => {
-    auth.toolAccess.mockResolvedValue({ name: "Vol", userId: "v1" });
-    for (const fn of Object.values(store)) fn.mockResolvedValue([]);
-    store.levelGrid.mockResolvedValue({
-      wizard: [0, 0, 0, 0, 0, 0],
-      pirate: [0, 0, 0, 0, 0, 0],
-      alien: [0, 0, 0, 0, 0, 0],
+  it("loads no quest without a code", async () => {
+    data.loadPlayerRows.mockResolvedValue([]);
+    await QuestSection({ params: params(null), viewer, notice: null });
+    expect(data.loadQuest).not.toHaveBeenCalled();
+  });
+
+  it("does not open an inactive quest", async () => {
+    data.loadQuest.mockResolvedValue({
+      status: "inactive",
+      quest: { id: "q1", code: "A2C4EF", title: "Riddle", active: false },
     });
-    store.claimedTicketHolderCount.mockResolvedValue(0);
-    store.distinctCompletingPlayers.mockResolvedValue(0);
-    await DashboardPage(props({}, { range: "con", bucket: "5m" }));
-    expect(store.completionSeries).not.toHaveBeenCalled();
-    expect(store.levelEventSeries).not.toHaveBeenCalled();
-    expect(store.liveLevelEventsBefore).not.toHaveBeenCalled();
+    const el = await QuestSection({
+      params: params("A2C4EF"),
+      viewer,
+      notice: null,
+    });
+    const found = walk(el);
+    expect(found.text).toContain(" is not active, so it can");
+    expect(found.types).toContain("PlayerList");
+    expect(found.types).not.toContain("CheckAndConfirm");
+    expect(found.props.find((p) => "quest" in p && p.quest !== null)).toBe(
+      undefined,
+    );
   });
 });

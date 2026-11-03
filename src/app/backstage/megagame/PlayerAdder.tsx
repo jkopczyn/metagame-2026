@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useId, useState, useTransition } from "react";
 import { fieldClass, smallButtonClass } from "../ui";
 import { findPlayers, lookupPlayer, type PlayerHit } from "./actions";
 import CodeEntry from "./CodeEntry";
@@ -28,6 +28,7 @@ export default function PlayerAdder({
   const [hits, setHits] = useState<PlayerHit[]>([]);
   const [pending, start] = useTransition();
   const [search] = useState(latestRequest);
+  const searchId = useId();
 
   useEffect(() => {
     const q = query.trim();
@@ -77,14 +78,11 @@ export default function PlayerAdder({
         }}
       />
       <div className="flex flex-col gap-2">
-        <label
-          htmlFor="player-search"
-          className="text-sm font-medium text-ink/80"
-        >
+        <label htmlFor={searchId} className="text-sm font-medium text-ink/80">
           Or search by name
         </label>
         <input
-          id="player-search"
+          id={searchId}
           type="search"
           autoComplete="off"
           value={query}

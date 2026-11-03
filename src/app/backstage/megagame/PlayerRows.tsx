@@ -2,7 +2,8 @@ import Link from "next/link";
 import type { PlayerRow } from "./data";
 import { levelsText, when } from "./format";
 import { Avatar } from "./PlayerAdder";
-import { listHref, withoutPlayer } from "./player-list";
+import { boardHref, type BoardParams } from "./board-params";
+import { withoutPlayer } from "./player-list";
 
 const LINK =
   "text-sm text-ink/60 underline underline-offset-2 hover:text-meeple";
@@ -10,12 +11,10 @@ const LINK =
 /** The current player list, each with its status and a Remove link. */
 export default function PlayerRows({
   rows,
-  ids,
-  path,
+  params,
 }: {
   rows: PlayerRow[];
-  ids: string[];
-  path: string;
+  params: BoardParams;
 }) {
   if (rows.length === 0) {
     return <p className="text-sm text-ink/60">No players added yet.</p>;
@@ -53,7 +52,10 @@ export default function PlayerRows({
             )}
             <div className="mt-1 flex gap-4">
               <Link
-                href={listHref(path, withoutPlayer(ids, player.id))}
+                href={boardHref({
+                  ...params,
+                  players: withoutPlayer(params.players, player.id),
+                })}
                 scroll={false}
                 replace
                 className={LINK}
@@ -61,7 +63,8 @@ export default function PlayerRows({
                 Remove
               </Link>
               <Link
-                href={`/backstage/megagame/level?u=${encodeURIComponent(player.id)}`}
+                href={`${boardHref({ ...params, levelUp: player.id })}#level-up`}
+                replace
                 className={LINK}
               >
                 Level up
