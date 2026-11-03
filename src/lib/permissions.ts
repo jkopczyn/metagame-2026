@@ -203,7 +203,7 @@ export const PERMISSIONS = {
     level: "edit",
     label: "Verify quests",
     description:
-      "Record quest completions and level-ups at /backstage/megagame, and read its dashboard.",
+      "Record quest completions and level-ups at /backstage/megagame.",
   },
   "megagame.manage": {
     audience: "team",
@@ -211,7 +211,7 @@ export const PERMISSIONS = {
     level: "edit",
     label: "Manage megagame",
     description:
-      "Import and edit quests, change level requirements, and void anyone's records.",
+      "Import and edit quests, change level requirements, void anyone's records, and read the progress dashboard at /backstage/megagame/dashboard.",
     implies: ["megagame.verify"],
   },
   "misc.dice_lab": {
