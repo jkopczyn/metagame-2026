@@ -4,6 +4,7 @@ import SignIn from "../../SignIn";
 import Section from "../Section";
 import AutoRefresh from "./AutoRefresh";
 import ClassesSection from "./ClassesSection";
+import CohortsSection from "./CohortsSection";
 import ConcentrationSection from "./ConcentrationSection";
 import LevelGrid from "./LevelGrid";
 import TransitionsSection from "./TransitionsSection";
@@ -113,6 +114,10 @@ export default async function DashboardPage(
 
       <Section title="Level transitions">
         <TransitionsSection data={progress.transitions} />
+      </Section>
+
+      <Section title="Cohorts">
+        <CohortsSection data={progress.cohorts} />
       </Section>
 
       <Section title="Export">
