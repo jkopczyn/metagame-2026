@@ -50,7 +50,9 @@ export default function CohortsSection({ data }: { data: CohortTable }) {
       <p className={NOTE}>
         A player&apos;s cohort is the Pacific day of their first completion or
         volunteer level-up; faction picks do not count. Cohorts cover the whole
-        con whatever range is picked above. Deleted accounts are left out.
+        con whatever range is picked above. Activity before the first con day
+        appears as its own cohort row and is not counted as not yet active.
+        Deleted accounts are left out.
       </p>
     </>
   );
