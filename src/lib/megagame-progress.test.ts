@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   CON_START,
   DELETED_PLAYER,
+  bucketEnds,
+  classTable,
   concentration,
+  cumulativeLevels,
   gini,
   lorenzPoints,
   playerKey,
@@ -258,5 +261,108 @@ describe("ignored level events", () => {
       [],
     );
     expect(c.levelUps.total).toBe(0);
+  });
+});
+
+describe("bucketEnds", () => {
+  it("ends each bucket one size later, cut at the range end", () => {
+    const ends = bucketEnds(
+      [at("2026-11-06T17:00:00.000Z"), at("2026-11-06T18:00:00.000Z")],
+      "1h",
+      at("2026-11-06T18:30:00.000Z"),
+    );
+    expect(ends.map((d) => d.toISOString())).toEqual([
+      "2026-11-06T18:00:00.000Z",
+      "2026-11-06T18:30:00.000Z",
+    ]);
+  });
+});
+
+describe("classTable", () => {
+  const completions = [
+    done("u2", "pirate", "2026-11-06T17:00:00.000Z"),
+    done("u1", "wizard", "2026-11-06T18:00:00.000Z"),
+    done("u1", null, "2026-11-06T18:20:00.000Z"),
+    done("u1", "wizard", "2026-11-06T19:00:00.000Z"), // after the range end
+  ];
+  const levelEvents = [
+    ev("u3", "wizard", 1, "picker", "2026-11-06T18:10:00.000Z"),
+    ev("u1", "wizard", 2, "volunteer", "2026-11-06T18:15:00.000Z"),
+  ];
+  const players = [
+    player("u1", { wizard: 2 }),
+    player("u2", { pirate: 1 }),
+    player("u3", { wizard: 1 }),
+  ];
+  const buckets = [
+    at("2026-11-06T17:00:00.000Z"),
+    at("2026-11-06T18:00:00.000Z"),
+  ];
+  const ends = [at("2026-11-06T18:00:00.000Z"), at("2026-11-06T18:30:00.000Z")];
+  const t = classTable(completions, levelEvents, players, buckets, ends);
+
+  it("counts current members from the level columns", () => {
+    expect(t.members).toEqual({ wizard: 2, pirate: 1, alien: 0 });
+  });
+
+  it("fills each bucket by class, with any-class completions apart", () => {
+    expect(t.rows).toHaveLength(2);
+    expect(t.rows[0].byClass).toEqual({
+      wizard: { completions: 0, levelUps: 0, activePlayers: 0, memberShare: 0 },
+      pirate: { completions: 1, levelUps: 0, activePlayers: 1, memberShare: 1 },
+      alien: {
+        completions: 0,
+        levelUps: 0,
+        activePlayers: 0,
+        memberShare: null,
+      },
+    });
+    expect(t.rows[0].anyClass).toBe(0);
+    // u1 completes and levels up; u3's picker join is not activity: one active wizard of two members.
+    expect(t.rows[1].byClass.wizard).toEqual({
+      completions: 1,
+      levelUps: 1,
+      activePlayers: 1,
+      memberShare: 0.5,
+    });
+    expect(t.rows[1].anyClass).toBe(1);
+  });
+
+  it("totals sum counts and count distinct players over the range", () => {
+    expect(t.totals.byClass.wizard).toEqual({
+      completions: 1,
+      levelUps: 1,
+      activePlayers: 1,
+      memberShare: 0.5,
+    });
+    expect(t.totals.byClass.pirate.completions).toBe(1);
+    expect(t.totals.anyClass).toBe(1);
+  });
+
+  it("has no rows and zero totals with no buckets", () => {
+    const none = classTable(completions, levelEvents, players, [], []);
+    expect(none.rows).toEqual([]);
+    expect(none.totals.byClass.wizard).toEqual({
+      completions: 0,
+      levelUps: 0,
+      activePlayers: 0,
+      memberShare: 0,
+    });
+  });
+});
+
+describe("cumulativeLevels", () => {
+  it("counts picker joins as level 1 from their time and drops deleted accounts", () => {
+    const levelEvents = [
+      ev("u3", "wizard", 1, "picker", "2026-11-06T18:10:00.000Z"),
+      ev("u1", "wizard", 2, "volunteer", "2026-11-06T18:15:00.000Z"),
+      ev(null, "wizard", 3, "volunteer", "2026-11-06T18:00:00.000Z"),
+    ];
+    const out = cumulativeLevels(levelEvents, [
+      at("2026-11-06T18:12:00.000Z"),
+      at("2026-11-06T18:30:00.000Z"),
+    ]);
+    expect(out[0].wizard).toEqual([0, 1, 0, 0, 0, 0]);
+    expect(out[1].wizard).toEqual([0, 1, 1, 0, 0, 0]);
   });
 });
