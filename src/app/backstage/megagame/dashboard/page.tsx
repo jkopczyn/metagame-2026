@@ -92,7 +92,7 @@ export default async function DashboardPage(
             <li key={t}>
               <a
                 href={`/backstage/megagame/dashboard/export/${t}`}
-                download
+                download={`${t}.csv`}
                 className="font-semibold text-navy underline underline-offset-2 hover:text-meeple"
               >
                 {t}.csv
