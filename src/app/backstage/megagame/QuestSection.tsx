@@ -199,6 +199,7 @@ async function CheckAndConfirm({
           questCode={quest.code}
           players={recordable}
           list={params.players}
+          board={boardHref(params).split("?")[1] ?? ""}
         />
       </PlayerListView>
     </>

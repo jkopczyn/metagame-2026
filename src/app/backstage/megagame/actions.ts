@@ -29,7 +29,7 @@ import {
   type PlayerSummary,
 } from "@/lib/megagame-store";
 import { formatTicketCode } from "@/lib/ticket-code-format";
-import { boardHref } from "./board-params";
+import { boardHref, parseBoardParams } from "./board-params";
 import { parsePlayerIds } from "./player-list";
 import { isUuid } from "./uuid";
 
@@ -128,8 +128,10 @@ export async function confirmCompletions(
       return { error: STALE };
   }
   revalidatePath(TOOL, "layout");
+  const board = new URLSearchParams(str(formData, "board", 4000));
   redirect(
     boardHref({
+      ...parseBoardParams(Object.fromEntries(board)),
       quest: quest.code,
       players: parsePlayerIds(str(formData, "list", 4000)),
       confirmation: id,

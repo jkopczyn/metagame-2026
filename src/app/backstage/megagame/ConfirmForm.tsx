@@ -14,6 +14,7 @@ export default function ConfirmForm({
   questCode,
   players,
   list,
+  board,
 }: {
   id: string;
   questId: string;
@@ -22,6 +23,8 @@ export default function ConfirmForm({
   players: string[];
   /** The whole list, kept on the board with the result. */
   list: string[];
+  /** The board's query string, so the other sections keep their choices. */
+  board: string;
 }) {
   const [state, run, pending] = useActionState(confirmCompletions, {});
   const n = players.length;
@@ -31,6 +34,7 @@ export default function ConfirmForm({
       <input type="hidden" name="questId" value={questId} />
       <input type="hidden" name="questCode" value={questCode} />
       <input type="hidden" name="list" value={list.join(",")} />
+      <input type="hidden" name="board" value={board} />
       {players.map((p) => (
         <input key={p} type="hidden" name="player" value={p} />
       ))}

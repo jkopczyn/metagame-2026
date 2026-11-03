@@ -123,7 +123,7 @@ describe("gating", () => {
 });
 
 describe("confirmCompletions", () => {
-  const submit = (players: string[], id = ID, list?: string) =>
+  const submit = (players: string[], id = ID, list?: string, board?: string) =>
     confirmCompletions(
       {},
       form({
@@ -132,6 +132,7 @@ describe("confirmCompletions", () => {
         questCode: "a2c4ef",
         player: players,
         ...(list === undefined ? {} : { list }),
+        ...(board === undefined ? {} : { board }),
       }),
     );
 
@@ -153,6 +154,20 @@ describe("confirmCompletions", () => {
     store.confirmQuest.mockResolvedValue({ status: "ok" });
     await expect(submit(["u1"], ID, "u1,u3")).rejects.toThrow(
       `REDIRECT /backstage/megagame?quest=A2C4EF&players=u1%2Cu3&c=${ID}`,
+    );
+  });
+
+  it("keeps the level-up, recent, range and bucket choices on the board", async () => {
+    store.confirmQuest.mockResolvedValue({ status: "ok" });
+    await expect(
+      submit(
+        ["u1"],
+        ID,
+        "u1",
+        "quest=ZZZZZZ&players=u9&c=old&levelup=u2&recent=60&range=7d&bucket=hour",
+      ),
+    ).rejects.toThrow(
+      `REDIRECT /backstage/megagame?quest=A2C4EF&players=u1&c=${ID}&levelup=u2&recent=60&range=7d&bucket=hour`,
     );
   });
 
