@@ -73,6 +73,7 @@ import {
   listQuests,
   liveCompletions,
   recentConfirmations,
+  recentLevelUps,
   recordLevelUp,
   recordPickerJoin,
   recordQuestAttempt,
@@ -822,6 +823,46 @@ describe("recentConfirmations", () => {
     expect(players).not.toContain("cardinality");
     expect(players).toContain("from quest_completions q");
     expect(players).toContain('q.confirmation_id = "confirmations"."id"');
+  });
+
+  it("filters to one volunteer when given one", async () => {
+    queue([]);
+    await recentConfirmations("v1");
+    const where = dialect.sqlToQuery(
+      arg(chainOf(db.select, 0), "where") as SQL,
+    );
+    expect(where.sql).toContain('"confirmations"."confirmed_by" = $');
+    expect(where.params).toEqual(["v1"]);
+  });
+
+  it("lists every volunteer's confirmations with who made them when given null", async () => {
+    queue([]);
+    await recentConfirmations(null, 30);
+    const c = chainOf(db.select, 0);
+    expect(arg(c, "where")).toBeUndefined();
+    expect(arg(c, "limit")).toBe(30);
+    const fields = (
+      db.select.mock.calls[0] as unknown as [Record<string, unknown>]
+    )[0];
+    expect(Object.keys(fields)).toEqual(
+      expect.arrayContaining(["confirmedBy", "confirmedByName"]),
+    );
+  });
+});
+
+describe("recentLevelUps", () => {
+  it("lists live and voided volunteer level-ups from every volunteer, newest first", async () => {
+    queue([]);
+    await recentLevelUps(30);
+    const c = chainOf(db.select, 0);
+    const where = dialect.sqlToQuery(arg(c, "where") as SQL);
+    expect(where.sql).toContain('"level_events"."source" = $');
+    expect(where.params).toEqual(["volunteer"]);
+    expect(where.sql).not.toContain("voided_at");
+    expect(render(arg(c, "orderBy"))).toContain(
+      '"level_events"."awarded_at" desc',
+    );
+    expect(arg(c, "limit")).toBe(30);
   });
 });
 

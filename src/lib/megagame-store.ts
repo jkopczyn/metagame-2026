@@ -582,16 +582,19 @@ export type RecentConfirmation = {
   questTitle: string;
   questCode: string;
   players: number;
+  confirmedBy: string | null;
+  confirmedByName: string | null;
   createdAt: Date;
   voidedAt: Date | null;
 };
 
-/** A volunteer's latest confirmations, for the Undo list on the tool's home page. */
+/** The latest confirmations, by one volunteer or, with null, by everyone. */
 export async function recentConfirmations(
-  confirmedBy: string,
+  confirmedBy: string | null,
   limit = 10,
 ): Promise<RecentConfirmation[]> {
   const { confirmations, quests } = schema;
+  const by = alias(schema.user, "confirmer");
   return getDb()
     .select({
       id: confirmations.id,
@@ -600,13 +603,63 @@ export async function recentConfirmations(
       questCode: quests.code,
       // What it recorded, or had recorded before a whole undo.
       players: sql<number>`(select count(*)::int from quest_completions q where q.confirmation_id = ${confirmations.id} and (q.voided_at is null or ${confirmations.voidedAt} is not null))`,
+      confirmedBy: confirmations.confirmedBy,
+      confirmedByName: by.name,
       createdAt: confirmations.createdAt,
       voidedAt: confirmations.voidedAt,
     })
     .from(confirmations)
     .innerJoin(quests, eq(quests.id, confirmations.questId))
-    .where(eq(confirmations.confirmedBy, confirmedBy))
+    .leftJoin(by, eq(by.id, confirmations.confirmedBy))
+    .where(
+      confirmedBy === null
+        ? undefined
+        : eq(confirmations.confirmedBy, confirmedBy),
+    )
     .orderBy(desc(confirmations.createdAt))
+    .limit(limit);
+}
+
+export type RecentLevelUp = {
+  id: string;
+  playerName: string | null;
+  class: string;
+  level: number;
+  awardedBy: string | null;
+  awardedByName: string | null;
+  awardedAt: Date;
+  checksPassed: boolean;
+  overrideReason: string | null;
+  cardPhotoUrl: string | null;
+  note: string | null;
+  voidedAt: Date | null;
+};
+
+/** Volunteer level-ups by everyone, live and voided, newest first. */
+export async function recentLevelUps(limit = 30): Promise<RecentLevelUp[]> {
+  const { levelEvents } = schema;
+  const player = alias(schema.user, "player");
+  const awarder = alias(schema.user, "awarder");
+  return getDb()
+    .select({
+      id: levelEvents.id,
+      playerName: player.name,
+      class: levelEvents.class,
+      level: levelEvents.level,
+      awardedBy: levelEvents.awardedBy,
+      awardedByName: awarder.name,
+      awardedAt: levelEvents.awardedAt,
+      checksPassed: levelEvents.checksPassed,
+      overrideReason: levelEvents.overrideReason,
+      cardPhotoUrl: levelEvents.cardPhotoUrl,
+      note: levelEvents.note,
+      voidedAt: levelEvents.voidedAt,
+    })
+    .from(levelEvents)
+    .leftJoin(player, eq(player.id, levelEvents.userId))
+    .leftJoin(awarder, eq(awarder.id, levelEvents.awardedBy))
+    .where(eq(levelEvents.source, "volunteer"))
+    .orderBy(desc(levelEvents.awardedAt))
     .limit(limit);
 }
 
