@@ -7,6 +7,8 @@ import { DELETED_PLAYER, type Concentration } from "@/lib/megagame-progress";
 import { NO_LEVELS } from "@/lib/megagame-levels";
 import ClassesSection from "./ClassesSection";
 import type { ClassTable } from "@/lib/megagame-progress";
+import TransitionsSection from "./TransitionsSection";
+import type { Transitions } from "@/lib/megagame-progress";
 
 describe("LevelGrid", () => {
   it("shows players per level with percentages of ticket holders", () => {
@@ -254,5 +256,53 @@ describe("ClassesSection", () => {
     expect(html).not.toMatch(/aria-label="Players at each level by class/);
     expect(html).not.toContain("Total");
     expect(html).not.toContain("(end)");
+  });
+});
+
+const HOUR = 3_600_000;
+const transitionData: Transitions = {
+  rows: [
+    {
+      class: "wizard",
+      from: 1,
+      to: 2,
+      made: 3,
+      skipped: 1,
+      q25: 3 * HOUR,
+      median: 4 * HOUR,
+      q75: 5 * HOUR,
+    },
+    {
+      class: "wizard",
+      from: 2,
+      to: 3,
+      made: 0,
+      skipped: 0,
+      q25: null,
+      median: null,
+      q75: null,
+    },
+  ],
+  current: [
+    {
+      class: "wizard",
+      level: 2,
+      players: 3,
+      withEvent: 2,
+      medianSince: 5.5 * HOUR,
+    },
+  ],
+};
+
+describe("TransitionsSection", () => {
+  it("shows counts, skips and durations, with a dash where nobody made it", () => {
+    const html = renderToStaticMarkup(
+      createElement(TransitionsSection, { data: transitionData }),
+    );
+    expect(html).toContain("1 → 2");
+    expect(html).toContain("3h 00m");
+    expect(html).toContain("4h 00m");
+    expect(html).toContain("5h 30m");
+    expect(html).toContain("–");
   });
 });

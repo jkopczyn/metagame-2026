@@ -6,6 +6,7 @@ import AutoRefresh from "./AutoRefresh";
 import ClassesSection from "./ClassesSection";
 import ConcentrationSection from "./ConcentrationSection";
 import LevelGrid from "./LevelGrid";
+import TransitionsSection from "./TransitionsSection";
 import { NOTE } from "./styles";
 import {
   RANGE_LABELS,
@@ -107,6 +108,10 @@ export default async function DashboardPage(
           tooMany={view.tooMany}
           rangeLabel={RANGE_LABELS[view.preset]}
         />
+      </Section>
+
+      <Section title="Level transitions">
+        <TransitionsSection data={progress.transitions} />
       </Section>
 
       <Section title="Export">
