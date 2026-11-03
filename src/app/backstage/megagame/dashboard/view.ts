@@ -132,7 +132,12 @@ export const endLabel = (end: Date, size: BucketSize) =>
     ? `${DAY.format(new Date(end.getTime() - 1))} (end)`
     : when(end);
 
+// A day key is already a Pacific date, so it is formatted at noon UTC in UTC
+// to keep that calendar date. The output matches CONFERENCE_DAYS' labels.
 export function dayLabel(key: string): string {
-  const day = CONFERENCE_DAYS.find((d) => d.key === key);
-  return day ? `${day.name} ${day.dateLabel}` : key;
+  const at = new Date(`${key}T12:00:00.000Z`);
+  if (Number.isNaN(at.getTime())) return key;
+  const part = (opts: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat("en-US", { timeZone: "UTC", ...opts }).format(at);
+  return `${part({ weekday: "long" })} ${part({ month: "short", day: "numeric" })}`;
 }
