@@ -10,6 +10,12 @@ import {
   type MegagameClass,
   type MegagameLevels,
 } from "./megagame-levels";
+import {
+  BUCKET_MINUTES,
+  cumulativeLevelDistribution,
+  type BucketSize,
+  type DatedLevelEvent,
+} from "./megagame-rules";
 import { CONFERENCE_DAYS, fromPacificWall } from "./schedule";
 
 export type ProgressCompletion = {
@@ -79,6 +85,27 @@ export type Concentration = {
   };
   series: ConcentrationPoint[];
   mostActive: ActivePlayerRow[];
+};
+
+export type ClassCell = {
+  completions: number;
+  levelUps: number;
+  activePlayers: number;
+  /** activePlayers / current members; null when the class has no members. */
+  memberShare: number | null;
+};
+
+export type ClassRow = {
+  start: Date;
+  end: Date;
+  byClass: Record<MegagameClass, ClassCell>;
+  anyClass: number;
+};
+
+export type ClassTable = {
+  members: Record<MegagameClass, number>;
+  rows: ClassRow[];
+  totals: { byClass: Record<MegagameClass, ClassCell>; anyClass: number };
 };
 
 export const DELETED_PLAYER = "\u0000deleted";
@@ -262,4 +289,107 @@ export function concentration(
     series,
     mostActive,
   };
+}
+
+export function bucketEnds(
+  buckets: readonly Date[],
+  size: BucketSize,
+  to: Date,
+): Date[] {
+  const step = BUCKET_MINUTES[size] * 60_000;
+  return buckets.map(
+    (b) => new Date(Math.min(b.getTime() + step, to.getTime())),
+  );
+}
+
+function classCells(
+  completions: readonly ProgressCompletion[],
+  levelEvents: readonly ProgressLevelEvent[],
+  members: Record<MegagameClass, number>,
+  start: number,
+  end: number,
+): { byClass: Record<MegagameClass, ClassCell>; anyClass: number } {
+  const inWindow = (d: Date) => d.getTime() >= start && d.getTime() < end;
+  const counts = perClass(() => ({ completions: 0, levelUps: 0 }));
+  const active = perClass(() => new Set<string>());
+  let anyClass = 0;
+  for (const c of completions) {
+    if (!inWindow(c.confirmedAt)) continue;
+    const cls = questClass(c.class);
+    if (!cls) {
+      anyClass++;
+      continue;
+    }
+    counts[cls].completions++;
+    active[cls].add(playerKey(c.userId));
+  }
+  for (const e of levelEvents) {
+    if (!inWindow(e.awardedAt) || !isLevelUp(e) || !isMegagameClass(e.class))
+      continue;
+    counts[e.class].levelUps++;
+    active[e.class].add(playerKey(e.userId));
+  }
+  return {
+    byClass: perClassFrom((cls) => ({
+      ...counts[cls],
+      activePlayers: active[cls].size,
+      memberShare: members[cls] > 0 ? active[cls].size / members[cls] : null,
+    })),
+    anyClass,
+  };
+}
+
+export function classTable(
+  completions: readonly ProgressCompletion[],
+  levelEvents: readonly ProgressLevelEvent[],
+  players: readonly ProgressPlayer[],
+  buckets: readonly Date[],
+  ends: readonly Date[],
+): ClassTable {
+  const members = perClassFrom(
+    (cls) => players.filter((p) => p.levels[cls] >= 1).length,
+  );
+  const rows = buckets.map(
+    (start, i): ClassRow => ({
+      start,
+      end: ends[i],
+      ...classCells(
+        completions,
+        levelEvents,
+        members,
+        start.getTime(),
+        ends[i].getTime(),
+      ),
+    }),
+  );
+  const totals =
+    buckets.length === 0
+      ? classCells([], [], members, 0, 0)
+      : classCells(
+          completions,
+          levelEvents,
+          members,
+          buckets[0].getTime(),
+          ends.at(-1)!.getTime(),
+        );
+  return { members, rows, totals };
+}
+
+export function cumulativeLevels(
+  levelEvents: readonly ProgressLevelEvent[],
+  ends: readonly Date[],
+): Record<MegagameClass, number[]>[] {
+  const dated: DatedLevelEvent[] = levelEvents.flatMap((e) =>
+    e.userId === null
+      ? []
+      : [
+          {
+            userId: e.userId,
+            class: e.class,
+            level: e.level,
+            awardedAt: e.awardedAt,
+          },
+        ],
+  );
+  return cumulativeLevelDistribution(dated, ends);
 }
