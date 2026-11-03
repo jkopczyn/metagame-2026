@@ -13,7 +13,7 @@ export default function QuestBoardLayout({
 }) {
   return (
     <ToolLayout title="Quest Board" href="/backstage/megagame">
-      <div className="mx-auto flex max-w-xl flex-col gap-10">{children}</div>
+      <div className="mx-auto flex max-w-5xl flex-col gap-10">{children}</div>
     </ToolLayout>
   );
 }

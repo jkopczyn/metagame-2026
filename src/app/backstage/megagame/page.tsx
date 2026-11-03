@@ -51,8 +51,15 @@ export default async function QuestBoard(
 
   return (
     <>
-      <QuestSection params={params} viewer={viewer} notice={notice} />
-      <LevelUpSection params={params} />
+      {/* Side by side on wide screens; the phone keeps the top-to-bottom order. */}
+      <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
+        <div className="min-w-0">
+          <QuestSection params={params} viewer={viewer} notice={notice} />
+        </div>
+        <div className="min-w-0">
+          <LevelUpSection params={params} />
+        </div>
+      </div>
       <RecentActions params={params} viewer={viewer} />
       <OverTime params={params} />
     </>
