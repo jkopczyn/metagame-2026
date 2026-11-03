@@ -6,14 +6,14 @@ Date: 2026-11-03. Settled with the user in the design session of 2026-11-01 to 2
 
 A page for the design team, during the con, answering two questions from the event log: are some things progressing faster than others (classes, level transitions, join cohorts), and how far are power users pulling away from everyone else (concentration of completions and level-ups). It reads only what the volunteer tool already records: `level_events`, `quest_completions`, `confirmations`, `quest_attempts`, and the user level columns. Nothing about the card game or session rewards is captured, by decision: without a photo of the level-up sheet such data would not be useful, and not much even then.
 
-The user is trimming the existing `/backstage/megagame/dashboard` on the volunteer branch to only the recent-actions and voids log. The progress page absorbs the current level grid and the CSV export links from it; per-quest and per-volunteer counts are dropped.
+The user is revising the volunteer branch (session `rebuild-quest-board`) so that the recent-actions and voids log moves out of `/backstage/megagame/dashboard`, which frees that route. The progress page takes the route over, replacing the old dashboard page wholesale on this branch; it keeps the current level grid and the CSV export links and drops per-quest and per-volunteer counts. Settled 2026-11-03.
 
 ## 2. Access and placement
 
-- Route: `/backstage/megagame/progress`. Gated on `megagame.manage` (the page names players; volunteers keep the trimmed dashboard). Signed-out or unpermitted viewers get the same `SignIn` treatment as the other megagame pages.
-- Linked from the Megagame tool home for holders of `megagame.manage`. No link is added to the dashboard page, so the user's trim of that page does not conflict with this work.
-- Range and bucket pickers in the URL, as on the dashboard: presets `2h`, `today`, `con`; bucket sizes from the `BUCKET_SIZES` whitelist in `megagame-rules.ts`. The progress page has its own small `view.ts` for parsing the query string and computing the range; it does not import from the dashboard directory. Bucket math stays in `megagame-rules.ts`; con dates come from `CONFERENCE_DAYS` in `src/lib/schedule.ts`.
-- The page refreshes every 60 s with the same `AutoRefresh` pattern (its own copy if the dashboard's component is removed).
+- Route: `/backstage/megagame/dashboard`, replacing the old dashboard page. Gated on `megagame.manage` (the page names players; the old page was gated on `megagame.verify`). Signed-out or unpermitted viewers get the same `SignIn` treatment as the other megagame pages.
+- The existing dashboard link on the Megagame tool home is shown only to holders of `megagame.manage`. The export route under `dashboard/export/[table]` stays as it is.
+- Range and bucket pickers in the URL, as before: presets `2h`, `today`, `con`; bucket sizes from the `BUCKET_SIZES` whitelist in `megagame-rules.ts`. The dashboard directory's `view.ts`, `charts.tsx`, `series.ts` and `AutoRefresh.tsx` may be kept, trimmed or rewritten as the new page needs; the old `page.tsx` and whatever only it used are removed. Bucket math stays in `megagame-rules.ts`; con dates come from `CONFERENCE_DAYS` in `src/lib/schedule.ts`.
+- The page refreshes every 60 s with the existing `AutoRefresh` pattern.
 
 ## 3. Data loading and computation
 
@@ -74,9 +74,10 @@ Inline SVG only, no charting dependency, matching the dashboard's approach: a Lo
 
 ## 10. Effects on existing code
 
-- No schema change. No change to the volunteer tool, the picker, the dashboard page, or the export route.
-- New: `src/lib/megagame-progress.ts` with tests; two load queries in `megagame-store.ts` with mocked-DB tests; `src/app/backstage/megagame/progress/{page.tsx,view.ts,charts.tsx}` plus tests following the dashboard's `view.test.ts` and `pages.test.ts` patterns; one link on the tool home.
-- The branch is based on `megagame-volunteer` and ships after that branch's PR. If the dashboard trim removes `view.ts`, `charts.tsx` or `AutoRefresh.tsx` from the dashboard directory, the progress page is unaffected because it has its own copies of what it needs.
+- No schema change. No change to the volunteer tool, the picker, or the export route.
+- New: `src/lib/megagame-progress.ts` with tests; two load queries in `megagame-store.ts` with mocked-DB tests; a rewritten `src/app/backstage/megagame/dashboard/page.tsx` with its helpers and tests following the existing `view.test.ts` and `pages.test.ts` patterns; the tool-home link gated on `megagame.manage`.
+- Removed: the old dashboard page and the store queries only it used (`questCompletionCounts`, `distinctCompletingPlayers`, `completionsByVolunteer`, `completionSeries`, `levelEventSeries`, `recentOverrides`, `recentVoids`) unless the volunteer branch's revision still uses them, in which case they stay. The tests of removed code go with it.
+- The branch is based on `megagame-volunteer` and ships after that branch's PR. The volunteer branch's revision also edits the dashboard directory, so this branch is rebased onto it once that revision lands; both sides remove the old page, so the expected conflict resolution is "take this branch's new page".
 
 ## 11. Testing
 
@@ -90,7 +91,7 @@ Unit tests on the pure module: empty input; one player; ties in the share rankin
 - Comparison dimensions: classes, level transitions, join cohorts. Individual quests are not a dimension (2026-11-01).
 - Cohort = day of first con activity, option 1 of three (2026-11-01).
 - Gate on `megagame.manage`; durations clamp to con start; cohorts ignore the range picker (2026-11-03, "reasonable").
-- The dashboard is being trimmed to the action log on the volunteer branch; the progress page absorbs the level grid and export links (2026-11-03, left to Claude).
+- The action log leaves the dashboard route on the volunteer branch; this page takes `/backstage/megagame/dashboard` and absorbs the level grid and export links (2026-11-03).
 
 ## 13. Assumptions the design makes that the user did not state
 
