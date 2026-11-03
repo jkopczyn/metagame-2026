@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 const NAV =
-  "text-sm whitespace-nowrap text-ink/60 underline-offset-2 hover:text-meeple hover:underline";
+  "hidden text-sm whitespace-nowrap text-ink/60 underline-offset-2 hover:text-meeple hover:underline sm:inline";
 
 export default function MegagameLayout({
   children,
