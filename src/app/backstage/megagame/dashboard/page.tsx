@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import SignIn from "../../SignIn";
 import Section from "../Section";
 import AutoRefresh from "./AutoRefresh";
+import ClassesSection from "./ClassesSection";
 import ConcentrationSection from "./ConcentrationSection";
 import LevelGrid from "./LevelGrid";
 import { NOTE } from "./styles";
@@ -90,6 +91,17 @@ export default async function DashboardPage(
       <Section title="Concentration">
         <ConcentrationSection
           data={progress.concentration}
+          ends={progress.ends}
+          size={view.size}
+          tooMany={view.tooMany}
+          rangeLabel={RANGE_LABELS[view.preset]}
+        />
+      </Section>
+
+      <Section title="Classes">
+        <ClassesSection
+          table={progress.classes}
+          cumulative={progress.cumulative}
           ends={progress.ends}
           size={view.size}
           tooMany={view.tooMany}

@@ -5,6 +5,8 @@ import LevelGrid from "./LevelGrid";
 import ConcentrationSection from "./ConcentrationSection";
 import { DELETED_PLAYER, type Concentration } from "@/lib/megagame-progress";
 import { NO_LEVELS } from "@/lib/megagame-levels";
+import ClassesSection from "./ClassesSection";
+import type { ClassTable } from "@/lib/megagame-progress";
 
 describe("LevelGrid", () => {
   it("shows players per level with percentages of ticket holders", () => {
@@ -146,5 +148,111 @@ describe("ConcentrationSection", () => {
     expect(html).not.toContain("(end)");
     expect(html).not.toContain('role="alert"');
     expect(html).toMatch(/aria-label="[^"]*Lorenz/);
+  });
+});
+
+const cell = (
+  completions: number,
+  levelUps: number,
+  activePlayers: number,
+  memberShare: number | null,
+) => ({
+  completions,
+  levelUps,
+  activePlayers,
+  memberShare,
+});
+const classData: ClassTable = {
+  members: { wizard: 2, pirate: 1, alien: 0 },
+  rows: [
+    {
+      start: new Date("2026-11-06T08:00:00.000Z"),
+      end: new Date("2026-11-07T08:00:00.000Z"),
+      byClass: {
+        wizard: cell(1, 1, 1, 0.5),
+        pirate: cell(1, 0, 1, 1),
+        alien: cell(0, 0, 0, null),
+      },
+      anyClass: 4,
+    },
+  ],
+  totals: {
+    byClass: {
+      wizard: cell(1, 1, 1, 0.5),
+      pirate: cell(1, 0, 1, 1),
+      alien: cell(0, 0, 0, null),
+    },
+    anyClass: 4,
+  },
+};
+const emptyClassData: ClassTable = {
+  members: classData.members,
+  rows: [],
+  totals: {
+    byClass: {
+      wizard: cell(0, 0, 0, 0),
+      pirate: cell(0, 0, 0, 0),
+      alien: cell(0, 0, 0, null),
+    },
+    anyClass: 0,
+  },
+};
+const renderClasses = (tooMany: boolean) =>
+  renderToStaticMarkup(
+    createElement(ClassesSection, {
+      table: classData,
+      cumulative: [
+        {
+          wizard: [0, 3, 1, 0, 0, 0],
+          pirate: [0, 1, 0, 0, 0, 0],
+          alien: [0, 0, 0, 0, 0, 0],
+        },
+      ],
+      ends: [new Date("2026-11-07T08:00:00.000Z")],
+      size: "1d",
+      tooMany,
+      rangeLabel: "Whole con",
+    }),
+  );
+
+describe("ClassesSection", () => {
+  it("shows a row per bucket and a total row", () => {
+    const html = renderClasses(false);
+    expect(html).toContain("Fri, Nov 6");
+    expect(html).toContain("Total");
+    expect(html).toContain("50%"); // wizard: 1 active of 2 members
+    expect(html).toContain("100%"); // pirate: 1 active of 1 member
+    expect(html).toContain("% of members");
+    expect(html).toContain("faction picks do not count");
+  });
+
+  it("draws the cumulative bars with a label and a table fallback, also on phones", () => {
+    const html = renderClasses(false);
+    expect(html).toMatch(/aria-label="Players at each level by class/);
+    expect(html).toContain("3 / 1 / 0 / 0 / 0");
+    expect(html).not.toContain("hidden sm:block");
+  });
+
+  it("shows only the alert when there are too many buckets", () => {
+    const html = renderClasses(true);
+    expect(html).toContain('role="alert"');
+    expect(html).not.toContain("Total");
+  });
+
+  it("shows an empty state with no table, bars or end labels when the range has no buckets", () => {
+    const html = renderToStaticMarkup(
+      createElement(ClassesSection, {
+        table: emptyClassData,
+        cumulative: [],
+        ends: [],
+        size: "1d",
+        tooMany: false,
+        rangeLabel: "Today",
+      }),
+    );
+    expect(html).toContain("This range has not started yet");
+    expect(html).not.toMatch(/aria-label="Players at each level by class/);
+    expect(html).not.toContain("Total");
+    expect(html).not.toContain("(end)");
   });
 });
