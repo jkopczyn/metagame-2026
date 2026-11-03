@@ -1,4 +1,11 @@
-import { polylinePoints, seriesPoints } from "./chart-geometry";
+import { CLASS_COLORS } from "../over-time/charts";
+import { polylinePoints, seriesPoints, stackSegments } from "./chart-geometry";
+import {
+  CLASS_LABELS,
+  MAX_LEVEL,
+  MEGAGAME_CLASSES,
+  type MegagameClass,
+} from "@/lib/megagame-levels";
 import type { LorenzPoint } from "@/lib/megagame-progress";
 
 export function LorenzPlot({
@@ -103,5 +110,62 @@ export function LineChart({
         {last !== first && <span>{last}</span>}
       </figcaption>
     </figure>
+  );
+}
+
+const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
+
+/** Per row, one bar per class stacked from level 1 at the bottom; callers render it only when there is at least one row. */
+export function ClassLevelBars({
+  label,
+  rows,
+}: {
+  label: string;
+  rows: { label: string; byClass: Record<MegagameClass, number[]> }[];
+}) {
+  const max = Math.max(
+    1,
+    ...rows.flatMap((r) =>
+      MEGAGAME_CLASSES.map((c) => sum(r.byClass[c].slice(1))),
+    ),
+  );
+  const slot = W / rows.length;
+  const bar = (slot * 0.8) / MEGAGAME_CLASSES.length;
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none"
+      role="img"
+      aria-label={label}
+      className="h-32 w-full"
+    >
+      {rows.map((r, i) => (
+        <g key={i}>
+          <title>{r.label}</title>
+          {MEGAGAME_CLASSES.map((c, j) => {
+            const counts = r.byClass[c].slice(1);
+            const x = i * slot + slot * 0.1 + j * bar;
+            return (
+              <g key={c}>
+                <title>
+                  {`${CLASS_LABELS[c]}: ${counts.map((n, k) => `${k + 1}: ${n}`).join(", ")}`}
+                </title>
+                {stackSegments(counts, max, H).map((seg, k) => (
+                  <rect
+                    key={k}
+                    x={x}
+                    y={seg.y}
+                    width={bar}
+                    height={seg.height}
+                    fill={CLASS_COLORS[c]}
+                    fillOpacity={0.3 + 0.7 * ((k + 1) / MAX_LEVEL)}
+                  />
+                ))}
+              </g>
+            );
+          })}
+        </g>
+      ))}
+    </svg>
   );
 }
