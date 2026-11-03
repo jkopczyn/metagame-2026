@@ -26,6 +26,11 @@ import {
   type MegagameClass,
   type MegagameLevels,
 } from "./megagame-levels";
+import type {
+  ProgressCompletion,
+  ProgressLevelEvent,
+  ProgressPlayer,
+} from "./megagame-progress";
 import type { QuestImportRow } from "./megagame-quest-csv";
 import {
   BUCKET_ORIGIN,
@@ -924,6 +929,81 @@ export async function levelEventsFor(userId: string): Promise<LevelEvent[]> {
 }
 
 // ---- Dashboard ----
+
+/** Every live completion with its quest's class, for the progress page. */
+export async function liveCompletionLog(): Promise<ProgressCompletion[]> {
+  const { questCompletions, quests } = schema;
+  return getDb()
+    .select({
+      userId: questCompletions.userId,
+      class: quests.class,
+      confirmedAt: questCompletions.confirmedAt,
+    })
+    .from(questCompletions)
+    .innerJoin(quests, eq(quests.id, questCompletions.questId))
+    .where(isNull(questCompletions.voidedAt));
+}
+
+/** Every live level event, deleted accounts included, for the progress page. */
+export async function liveLevelEventLog(): Promise<ProgressLevelEvent[]> {
+  const { levelEvents } = schema;
+  return getDb()
+    .select({
+      userId: levelEvents.userId,
+      class: levelEvents.class,
+      level: levelEvents.level,
+      source: levelEvents.source,
+      awardedAt: levelEvents.awardedAt,
+    })
+    .from(levelEvents)
+    .where(isNull(levelEvents.voidedAt));
+}
+
+/** Names and level columns of everyone in a class plus these ids. */
+export async function progressPlayers(
+  ids: readonly string[],
+): Promise<ProgressPlayer[]> {
+  const { user } = schema;
+  const unique = [...new Set(ids)];
+  const rows = await getDb()
+    .select({
+      id: user.id,
+      name: user.name,
+      wizard: user.wizardLevel,
+      pirate: user.pirateLevel,
+      alien: user.alienLevel,
+    })
+    .from(user)
+    .where(
+      or(
+        gt(user.wizardLevel, 0),
+        gt(user.pirateLevel, 0),
+        gt(user.alienLevel, 0),
+        unique.length > 0 ? inArray(user.id, unique) : undefined,
+      ),
+    );
+  return rows.map(({ wizard, pirate, alien, ...rest }) => ({
+    ...rest,
+    levels: { wizard, pirate, alien },
+  }));
+}
+
+/** Accounts that have claimed a paid ticket: the page's denominator. */
+export async function claimedTicketHolderIds(): Promise<string[]> {
+  const { tickets } = schema;
+  const rows = await getDb()
+    .select({ id: tickets.ownerUserId })
+    .from(tickets)
+    .where(
+      and(
+        visibleTickets,
+        isNotNull(tickets.ownerUserId),
+        eq(tickets.status, "paid"),
+      ),
+    )
+    .groupBy(tickets.ownerUserId);
+  return rows.flatMap((r) => (r.id ? [r.id] : []));
+}
 
 /** Players per current level in each class, from the user columns; index = level. */
 export async function levelGrid(): Promise<Record<MegagameClass, number[]>> {
