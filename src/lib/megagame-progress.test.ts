@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   CON_START,
   DELETED_PLAYER,
+  activeUserIds,
   bucketEnds,
   classTable,
+  cohorts,
+  computeProgress,
   concentration,
   cumulativeLevels,
   gini,
+  levelGridOf,
   lorenzPoints,
   playerKey,
   quantile,
@@ -486,5 +490,164 @@ describe("transitions", () => {
       early.current.find((r) => r.class === "pirate" && r.level === 1)!
         .medianSince,
     ).toBe(0);
+  });
+});
+
+describe("cohorts", () => {
+  const completions = [
+    done("A", "wizard", "2026-11-06T20:00:00.000Z"), // Fri 12:00 PT
+    done("A", null, "2026-11-07T18:00:00.000Z"), // Sat 10:00 PT
+    done("D", "pirate", "2026-11-07T08:00:00.000Z"), // Sat 00:00 PT exactly
+    done("D", "pirate", "2026-11-08T19:00:00.000Z"), // Sun 11:00 PT
+    done(null, null, "2026-11-06T20:00:00.000Z"), // deleted: no cohort
+  ];
+  const levelEvents = [
+    ev("B", "pirate", 1, "picker", "2026-11-06T09:00:00.000Z"),
+    ev("B", "pirate", 2, "volunteer", "2026-11-07T07:30:00.000Z"), // Fri 23:30 PT
+    ev("C", "alien", 1, "picker", "2026-11-06T10:00:00.000Z"), // picker only
+  ];
+  const players = [
+    player("A", { wizard: 2 }),
+    player("B", { pirate: 2 }),
+    player("C", { alien: 1 }),
+    player("D", { pirate: 1 }),
+  ];
+  const t = cohorts(completions, levelEvents, players, ["A", "C", "D", "H"]);
+  const day = (key: string) => t.rows.find((r) => r.day === key)!;
+
+  it("has a row per con day and the con days as retention columns", () => {
+    expect(t.days).toEqual(["2026-11-06", "2026-11-07", "2026-11-08"]);
+    expect(t.rows.map((r) => r.day)).toEqual(t.days);
+  });
+
+  it("puts a player in the Pacific day of their first completion or volunteer level-up", () => {
+    expect(day("2026-11-06")).toEqual({
+      day: "2026-11-06",
+      size: 2, // A, and B at 23:30 Friday Pacific
+      completionsMean: 1,
+      completionsMedian: 1,
+      levelUpsMean: 0.5,
+      reachedLevel2Share: 1,
+      retention: [null, 0.5, 0],
+    });
+    expect(day("2026-11-07")).toEqual({
+      day: "2026-11-07",
+      size: 1, // D at midnight Pacific
+      completionsMean: 2,
+      completionsMedian: 2,
+      levelUpsMean: 0,
+      reachedLevel2Share: 0,
+      retention: [null, null, 1],
+    });
+  });
+
+  it("leaves an empty cohort with null statistics", () => {
+    expect(day("2026-11-08")).toEqual({
+      day: "2026-11-08",
+      size: 0,
+      completionsMean: null,
+      completionsMedian: null,
+      levelUpsMean: null,
+      reachedLevel2Share: null,
+      retention: [null, null, null],
+    });
+  });
+
+  it("counts holders with no activity as not yet active; picker joins do not count", () => {
+    expect(t).toMatchObject({
+      holders: 4,
+      notYetActive: 2,
+      notYetActiveShare: 0.5,
+    });
+  });
+
+  it("adds a row for a day outside the con and gives it every con day as retention", () => {
+    const pre = cohorts(
+      [done("E", "alien", "2026-11-05T20:00:00.000Z")],
+      [],
+      [],
+      [],
+    );
+    expect(pre.rows[0]).toMatchObject({
+      day: "2026-11-05",
+      size: 1,
+      retention: [0, 0, 0],
+    });
+    expect(pre.notYetActiveShare).toBeNull();
+  });
+});
+
+describe("activeUserIds", () => {
+  it("lists distinct real users in first-appearance order", () => {
+    expect(
+      activeUserIds(
+        [
+          done("u2", null, "2026-11-06T18:00:00.000Z"),
+          done(null, null, "2026-11-06T18:00:00.000Z"),
+        ],
+        [
+          ev("u1", "wizard", 1, "picker", "2026-11-06T09:00:00.000Z"),
+          ev("u2", "wizard", 2, "volunteer", "2026-11-06T19:00:00.000Z"),
+        ],
+      ),
+    ).toEqual(["u2", "u1"]);
+  });
+});
+
+describe("levelGridOf", () => {
+  it("counts players per current level in each class, ignoring level 0", () => {
+    const grid = levelGridOf([
+      player("a", { wizard: 2 }),
+      player("b", { wizard: 2, pirate: 1 }),
+      player("c", { alien: 5 }),
+      player("d"),
+    ]);
+    expect(grid).toEqual({
+      wizard: [0, 0, 2, 0, 0, 0],
+      pirate: [0, 1, 0, 0, 0, 0],
+      alien: [0, 0, 0, 0, 0, 1],
+    });
+  });
+});
+
+describe("computeProgress", () => {
+  it("returns every section for empty input", () => {
+    const p = computeProgress({
+      completions: [],
+      levelEvents: [],
+      players: [],
+      holderIds: [],
+      buckets: [at("2026-11-06T17:00:00.000Z")],
+      size: "1h",
+      to: at("2026-11-06T17:30:00.000Z"),
+      now: at("2026-11-06T17:30:00.000Z"),
+    });
+    expect(p.ends.map((d) => d.toISOString())).toEqual([
+      "2026-11-06T17:30:00.000Z",
+    ]);
+    expect(p.grid.wizard).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(p.concentration.series).toHaveLength(1);
+    expect(p.classes.rows).toHaveLength(1);
+    expect(p.cumulative).toHaveLength(1);
+    expect(p.transitions.rows).toHaveLength(12);
+    expect(p.transitions.current).toHaveLength(15);
+    expect(p.cohorts.rows.map((r) => r.size)).toEqual([0, 0, 0]);
+  });
+
+  it("leaves the bucketed views empty when there are no buckets", () => {
+    const p = computeProgress({
+      completions: [done("u1", "wizard", "2026-11-06T18:00:00.000Z")],
+      levelEvents: [],
+      players: [],
+      holderIds: [],
+      buckets: [],
+      size: "5m",
+      to: at("2026-11-07T00:00:00.000Z"),
+      now: at("2026-11-07T00:00:00.000Z"),
+    });
+    expect(p.concentration.series).toEqual([]);
+    expect(p.classes.rows).toEqual([]);
+    expect(p.cumulative).toEqual([]);
+    expect(p.concentration.completions.players).toBe(1);
   });
 });

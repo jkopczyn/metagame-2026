@@ -16,7 +16,7 @@ import {
   type BucketSize,
   type DatedLevelEvent,
 } from "./megagame-rules";
-import { CONFERENCE_DAYS, fromPacificWall } from "./schedule";
+import { CONFERENCE_DAYS, fromPacificWall, pacificDayKey } from "./schedule";
 
 export type ProgressCompletion = {
   userId: string | null;
@@ -130,6 +130,51 @@ export type CurrentLevelRow = {
 };
 
 export type Transitions = { rows: TransitionRow[]; current: CurrentLevelRow[] };
+
+export type CohortRow = {
+  /** A Pacific day key such as "2026-11-06". */
+  day: string;
+  size: number;
+  completionsMean: number | null;
+  completionsMedian: number | null;
+  levelUpsMean: number | null;
+  reachedLevel2Share: number | null;
+  /** One cell per CONFERENCE_DAYS entry; null unless that day is after `day`. */
+  retention: (number | null)[];
+};
+
+export type CohortTable = {
+  /** CONFERENCE_DAYS keys, the retention columns. */
+  days: string[];
+  rows: CohortRow[];
+  holders: number;
+  notYetActive: number;
+  notYetActiveShare: number | null;
+};
+
+export type ProgressInput = {
+  completions: readonly ProgressCompletion[];
+  levelEvents: readonly ProgressLevelEvent[];
+  players: readonly ProgressPlayer[];
+  holderIds: readonly string[];
+  /** Bucket starts from dashboardView; empty when the range has too many. */
+  buckets: readonly Date[];
+  size: BucketSize;
+  /** The range's exclusive end. */
+  to: Date;
+  now: Date;
+};
+
+export type Progress = {
+  ends: Date[];
+  /** Players per current level in each class; index = level, index 0 unused. */
+  grid: Record<MegagameClass, number[]>;
+  concentration: Concentration;
+  classes: ClassTable;
+  cumulative: Record<MegagameClass, number[]>[];
+  transitions: Transitions;
+  cohorts: CohortTable;
+};
 
 export const DELETED_PLAYER = "\u0000deleted";
 export const playerKey = (userId: string | null): string =>
@@ -506,4 +551,117 @@ export function transitions(
   );
 
   return { rows, current };
+}
+
+const dayOf = (d: Date) => pacificDayKey(d.toISOString());
+const mean = (xs: readonly number[]) =>
+  xs.length ? sum(xs) / xs.length : null;
+
+export function cohorts(
+  completions: readonly ProgressCompletion[],
+  levelEvents: readonly ProgressLevelEvent[],
+  players: readonly ProgressPlayer[],
+  holderIds: readonly string[],
+): CohortTable {
+  const first = new Map<string, Date>();
+  const days = new Map<string, Set<string>>();
+  const completed = new Map<string, number>();
+  const leveled = new Map<string, number>();
+  const touch = (id: string, at: Date) => {
+    const f = first.get(id);
+    if (!f || at < f) first.set(id, at);
+    const set = days.get(id) ?? new Set<string>();
+    set.add(dayOf(at));
+    days.set(id, set);
+  };
+  for (const c of completions) {
+    if (c.userId === null) continue;
+    bump(completed, c.userId);
+    touch(c.userId, c.confirmedAt);
+  }
+  for (const e of levelEvents) {
+    if (e.userId === null || !isLevelUp(e) || !isMegagameClass(e.class))
+      continue;
+    bump(leveled, e.userId);
+    touch(e.userId, e.awardedAt);
+  }
+
+  const conDays = CONFERENCE_DAYS.map((d) => d.key as string);
+  const members = new Map<string, string[]>();
+  for (const [id, at] of first) {
+    const key = dayOf(at);
+    members.set(key, [...(members.get(key) ?? []), id]);
+  }
+  const levelsOf = new Map(players.map((p) => [p.id, p.levels]));
+  const rowDays = [...new Set([...conDays, ...members.keys()])].sort();
+
+  const rows = rowDays.map((day): CohortRow => {
+    const ids = members.get(day) ?? [];
+    const size = ids.length;
+    const share = (n: number) => (size ? n / size : null);
+    const comps = ids.map((id) => completed.get(id) ?? 0).sort((a, b) => a - b);
+    return {
+      day,
+      size,
+      completionsMean: mean(comps),
+      completionsMedian: quantile(comps, 0.5),
+      levelUpsMean: mean(ids.map((id) => leveled.get(id) ?? 0)),
+      reachedLevel2Share: share(
+        ids.filter((id) =>
+          MEGAGAME_CLASSES.some((c) => (levelsOf.get(id) ?? NO_LEVELS)[c] >= 2),
+        ).length,
+      ),
+      retention: conDays.map((d) =>
+        size && d > day
+          ? ids.filter((id) => days.get(id)!.has(d)).length / size
+          : null,
+      ),
+    };
+  });
+
+  const holders = new Set(holderIds);
+  const notYetActive = [...holders].filter((id) => !first.has(id)).length;
+  return {
+    days: conDays,
+    rows,
+    holders: holders.size,
+    notYetActive,
+    notYetActiveShare: holders.size ? notYetActive / holders.size : null,
+  };
+}
+
+export function activeUserIds(
+  completions: readonly ProgressCompletion[],
+  levelEvents: readonly ProgressLevelEvent[],
+): string[] {
+  const ids = new Set<string>();
+  for (const c of completions) if (c.userId) ids.add(c.userId);
+  for (const e of levelEvents) if (e.userId) ids.add(e.userId);
+  return [...ids];
+}
+
+export function levelGridOf(
+  players: readonly ProgressPlayer[],
+): Record<MegagameClass, number[]> {
+  const grid = perClass(() => new Array<number>(MAX_LEVEL + 1).fill(0));
+  for (const p of players)
+    for (const c of MEGAGAME_CLASSES) {
+      const level = p.levels[c];
+      if (level >= 1 && level <= MAX_LEVEL) grid[c][level]++;
+    }
+  return grid;
+}
+
+export function computeProgress(input: ProgressInput): Progress {
+  const { completions, levelEvents, players, buckets } = input;
+  const ends = bucketEnds(buckets, input.size, input.to);
+  return {
+    ends,
+    grid: levelGridOf(players),
+    concentration: concentration(completions, levelEvents, players, ends),
+    classes: classTable(completions, levelEvents, players, buckets, ends),
+    cumulative: cumulativeLevels(levelEvents, ends),
+    transitions: transitions(levelEvents, players, input.now),
+    cohorts: cohorts(completions, levelEvents, players, input.holderIds),
+  };
 }
