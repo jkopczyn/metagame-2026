@@ -96,4 +96,29 @@ describe("dashboard page", () => {
       DashboardPage(props({ range: "con", bucket: "5m" })),
     ).resolves.toBeTruthy();
   });
+
+  it("names each export download after its table with a .csv extension", async () => {
+    auth.toolAccess.mockResolvedValue({ name: "Boss", userId: "m1" });
+    loadEmpty();
+    const el = await DashboardPage(props({}));
+    const links: { href: string; download: unknown }[] = [];
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) return node.forEach(walk);
+      if (!node || typeof node !== "object" || !("props" in node)) return;
+      const { type, props } = node as {
+        type: unknown;
+        props: { href?: string; download?: unknown; children?: unknown };
+      };
+      if (type === "a" && props.href?.includes("/dashboard/export/"))
+        links.push({ href: props.href, download: props.download });
+      walk(props.children);
+    };
+    walk(el);
+    expect(links.length).toBeGreaterThan(0);
+    for (const { href, download } of links) {
+      const table = href.split("/").at(-1);
+      expect(href).toBe(`/backstage/megagame/dashboard/export/${table}`);
+      expect(download).toBe(`${table}.csv`);
+    }
+  });
 });
