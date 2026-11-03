@@ -2,48 +2,55 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the page at `/backstage/megagame/dashboard` with a progress page for the design team that shows concentration of completions and level-ups, classes side by side, level transitions and join cohorts, computed in memory from the live event log.
+**Goal:** Add a progress page for the design team at `/backstage/megagame/dashboard` that shows concentration of completions and level-ups, classes side by side, level transitions and join cohorts, computed in memory from the live event log, together with the current level grid and the CSV exports.
 
-**Architecture:** Two new store queries load every live completion and every live level event in one HTTP request each; a third loads the players behind them and a fourth the claimed-ticket holder ids. A new pure module, `src/lib/megagame-progress.ts`, turns those arrays plus the range's buckets and `now` into every table the page shows. The page is a server component split into one component per section, with inline SVG charts whose geometry lives in a small tested `.ts` module.
+**Architecture:** The volunteer branch is now a single Quest Board page at `/backstage/megagame` and has no dashboard directory, so everything under `src/app/backstage/megagame/dashboard/` is new or restored from commit 6487c9f. Three store queries load every live completion, every live level event and the claimed-ticket holder ids in one HTTP request each; a fourth loads the players (everyone with a level above 0, plus the ids behind the events). A new pure module, `src/lib/megagame-progress.ts`, turns those arrays plus the range's buckets and `now` into every table the page shows, including the level grid. The page is an async server component; each section is a synchronous component with inline SVG charts whose geometry lives in a small tested `.ts` module.
 
 **Tech Stack:** Next.js 16.4 (app router, server components), React 19, Drizzle over Neon (neon-http), Vitest 5, Tailwind classes as in the existing backstage pages.
 
-**Spec:** `docs/superpowers/specs/2026-11-03-megagame-progress-dashboard-design.md`. Read it before starting any task. Section numbers below ("spec 4", "spec 6") refer to it.
+**Spec:** `docs/superpowers/specs/2026-11-03-megagame-progress-dashboard-design.md`. Read it before starting any task. Section numbers below ("spec 4", "spec 6") refer to it. The Quest Board revision is described in section 12 of `docs/superpowers/specs/2026-10-28-megagame-volunteer-tool-design.md`.
 
 ## Global Constraints
 
-- Work only in the worktree `/home/jkop/Code/metagame-2026/.worktrees/megagame-dashboard` (branch `megagame-dashboard`). Never `cd` to the main checkout.
-- `node_modules` was not installed when this plan was written. If it is still missing, stop and report; do not run `pnpm install` yourself.
-- Before writing any page or component code, read the relevant guide in `node_modules/next/dist/docs/` (CLAUDE.md: "This is NOT the Next.js you know"). The existing page uses `connection()` from `next/server` and the global `PageProps<"/route">` type produced by `next typegen`; keep using both.
-- No schema change. No change to the volunteer tool, the picker, or `src/app/backstage/megagame/dashboard/export/[table]/*`.
+- Work only in the worktree `/home/jkop/Code/metagame-2026/.worktrees/megagame-dashboard` (branch `megagame-dashboard`, based on the revised `megagame-volunteer` at commit 5be83f7). Never `cd` to the main checkout.
+- `node_modules` is installed. Reach pnpm as `corepack pnpm` with `PATH="$HOME/.local/node/bin:$PATH"`; every command below is written that way. Do not run `pnpm install`.
+- Before writing any page or component code, read the relevant guide in `node_modules/next/dist/docs/` (CLAUDE.md: "This is NOT the Next.js you know"). The Quest Board page uses `connection()` from `next/server` and the global `PageProps<"/route">` type produced by `next typegen`; the export route uses the global `RouteContext<"/route">`. Keep using all three.
+- No schema change. No change to the Quest Board's sections, the picker, `src/app/backstage/megagame/over-time/*`, `OverTime.tsx` or `data.ts`. The only Quest Board change is the manager-only "Dashboard" link (Task 14).
+- Old file contents are read with `git show 6487c9f:<path>`. When a step says "restore X from 6487c9f", run `git show 6487c9f:<path> > <path>` and then apply the stated changes.
 - `src/lib/megagame-progress.ts` must not import `@/db`, `drizzle-orm`, `server-only`, or `./megagame-store`. It may import `./megagame-levels`, `./megagame-rules` and `./schedule`.
-- Route `/backstage/megagame/dashboard`, gated on `toolAccess("megagame.manage")`. Unpermitted viewers get `<SignIn next={viewHref(view, {})} />` and nothing is loaded.
-- Range presets `2h`, `today`, `con`; bucket sizes from `BUCKET_SIZES` in `src/lib/megagame-rules.ts`. Refresh every 60 s with `AutoRefresh`.
+- Route `/backstage/megagame/dashboard`, gated on `toolAccess("megagame.manage")`. Unpermitted viewers get `<SignIn next={viewHref(view, {})} />` and nothing is loaded. The restored export route `/backstage/megagame/dashboard/export/[table]` is gated on `megagame.manage` too.
+- The page makes four store requests, no more: `liveCompletionLog()`, `liveLevelEventLog()`, `claimedTicketHolderIds()`, then `progressPlayers(ids)`. The level grid is computed from the players in memory; `levelGrid()` is not called.
+- Range presets `2h`, `today`, `con`; bucket sizes from `BUCKET_SIZES` in `src/lib/megagame-rules.ts`. Refresh every 60 s with the dashboard's own `AutoRefresh`.
 - Share thresholds 10, 20 and 50 percent; Gini as the single inequality figure; 25 rows in the most-active table (spec 13).
-- Charts are inline SVG with an `aria-label` and a table fallback; charts carry `hidden sm:block` so phones see only the tables (spec 9). No charting dependency.
+- Charts are inline SVG with an `aria-label` and a table fallback, and they show on phones as well as desktop (spec 9). No `hidden sm:block` wrappers on charts. No charting dependency. The dashboard may import `Legend`, `StackedBars`, `CLASS_COLORS` and `ANY_CLASS_COLOR` from `../over-time/charts` but must not change that file; its own chart components go in `dashboard/charts.tsx`.
+- An empty range (zero buckets, for example "today" at Pacific midnight) renders the page normally; every bucketed view shows an empty-state sentence with no chart and no endpoint labels.
+- Section components and `LevelGrid` are synchronous functions (not `async`), so tests can render them with `renderToStaticMarkup`. Only `page.tsx` is async. Section components do not use `next/link`; links stay in `page.tsx`.
 - Comments: minimal, only for a non-obvious reason (CLAUDE.md).
 - Vitest only picks up `src/**/*.test.ts` (see `vitest.config.ts`). Component tests are `.test.ts` files that render with `createElement` and `renderToStaticMarkup`, following `src/app/(v2)/account/MegagamePanel.test.ts`.
-- Run one test file with `pnpm exec vitest run <path>`. Before each commit, run `pnpm exec prettier --write` on the files the task touched.
-- Each task ends in a commit. End every commit message with the Co-Authored-By line that the executing session's instructions specify.
+- Run one test file with `corepack pnpm exec vitest run <path>`. The pre-commit hook runs lint-staged, which runs Prettier on the staged files, so no separate Prettier step is needed.
+- No commit may leave the test suite red or the typecheck failing. Each task ends with `corepack pnpm typecheck` (which runs `next typegen && tsc --noEmit`) and the tests it touches passing, then a commit. End every commit message with the Co-Authored-By line that the executing session's instructions specify.
 - Times are compared as instants (`getTime()`); "as of t" always means events strictly before t.
 
 ## Decisions this plan makes where the spec is silent
 
-Implementation agents follow these; they are listed here so reviewers can object to them in one place.
+Implementation agents follow these; they are listed here so reviewers can object to them in one place. Items marked "(settled)" were decided after review on 2026-11-03 and are not to be reopened.
 
-1. **What the range picker affects.** The range and bucket pickers drive only the bucketed views: the concentration-over-time series (spec 4.3), the per-bucket class table and the cumulative level bars (spec 5). The headline figures, Lorenz curves, most-active table, level transitions and cohorts use every live row loaded, which is the state as of now. The page says this next to the pickers.
-2. **Deleted accounts.** All rows with a null `user_id` are one pseudo-player keyed `DELETED_PLAYER`. It is included in concentration (spec 4) and in the per-bucket class counts (spec 5). It is excluded from the cumulative level bars (as the old page did, since `liveLevelEventsBefore` dropped null users), from level transitions and current-level medians (its events come from several people, so durations between them mean nothing), and from cohorts.
+1. **What the range picker affects (settled).** The range and bucket pickers drive only the bucketed views: the concentration-over-time series (spec 4.3), the per-bucket class table and the cumulative level bars (spec 5). The headline figures, Lorenz curves, most-active table, level transitions and cohorts use every live row loaded, which is the state as of now. The page says this next to the pickers.
+2. **Deleted accounts.** All rows with a null `user_id` are one pseudo-player keyed `DELETED_PLAYER`. It is included in concentration (spec 4) and in the per-bucket class counts (spec 5). It is excluded from the cumulative level bars (as the old dashboard page did at 6487c9f, since `liveLevelEventsBefore` dropped null users), from level transitions and current-level medians (its events come from several people, so durations between them mean nothing), and from cohorts.
 3. **Unknown quest classes.** A completion whose quest class is null or is not one of `MEGAGAME_CLASSES` counts as any-class: in overall figures and the any-class column only. A level event whose class is not a megagame class, or whose level is outside 1 to `MAX_LEVEL`, is ignored everywhere.
 4. **Quartiles** use linear interpolation between closest ranks (the method numpy calls "linear"): position `p * (m - 1)` in the ascending list of `m` values.
 5. **Transitions.** For each real player and class, take the earliest live event at each level (any source), sort by level, and look at consecutive pairs `(a, b)`. If the later level's event is earlier in time than the lower level's, the pair is ignored. If `b = a + 1` it is a made transition with duration `max(0, t_b - max(t_a, CON_START))`. If `b > a + 1` it is counted once in the `skipped` column of the row for `a -> a+1` and contributes no duration. A gap of more than one level (1 to 4) is also one skip on the row starting at `a`.
-6. **Class activity.** "Distinct players active in that class" counts a completion of a class quest or any live level event in that class, picker joins included. The share of current members can exceed 100 percent (a deleted account, or a player who switched class, is active but not a current member); the page shows the number as computed.
+6. **Class activity (settled).** "Distinct players active in that class" counts a completion of a class quest or a live volunteer level event in that class. Picker joins are not activity, matching the cohort rule. The share of current members can exceed 100 percent (a deleted account, or a player who switched class, is active but not a current member); the page shows the number as computed.
 7. **Totals row** of the class table: completions and level-ups are sums over the range; active players is the distinct count over the whole range, not a sum.
 8. **Most active.** Ranked among players with at least one live completion. First and last activity are the earliest and latest live completion or live volunteer level-up. Ties on completions are broken by earliest first activity, then by player key, so the order is fully deterministic.
 9. **Cohorts.** Rows are every con day (always shown, even when empty) plus any other Pacific day on which some player's first activity fell (for example test data before the con), sorted by day. Retention cells exist only for con days strictly after the cohort day; others are null. "Reached level 2 or higher" uses the player's current level columns. Volunteer level-ups per player are shown as a mean only. A cohort of size 0 has null statistics.
-10. **Claimed-ticket holders.** The "not yet active" count needs the holders' ids, so a new store query `claimedTicketHolderIds()` replaces `claimedTicketHolderCount()`; the level grid's denominator becomes `holderIds.length`. `claimedTicketHolderCount` is then unused and is removed.
-11. **Removal scope.** Removed: `questCompletionCounts`, `distinctCompletingPlayers`, `completionsByVolunteer`, `completionSeries`, `levelEventSeries` (as listed in spec 10), plus `liveLevelEventsBefore`, `claimedTicketHolderCount`, the private `dateBin` helper, their types, `series.ts`, `series.test.ts` and `InlineBar`, all of which only the old page used (checked with grep on 2026-11-03). **Kept:** `recentOverrides`, `recentVoids`, `OverrideRow`, `VoidRow` and their tests. The volunteer branch's pending revision moves the action log off this route and very likely still calls them; deleting them here would merge without a textual conflict and break that page. Decide on them when rebasing onto the revision (Task 15 notes this). `bucketIntervalSql` stays in `megagame-rules.ts` because spec 2 keeps bucket math there.
-12. **Beyond the tool-home link.** The Megagame layout header also links to the dashboard for everyone. Task 14 gates that link on `megagame.manage` as well and updates the two permission descriptions in `src/lib/permissions.ts`. Each is its own commit so either can be dropped.
-13. **Page order.** Title and pickers, level grid, concentration, classes, transitions, cohorts, export.
+10. **Claimed-ticket holders.** The "not yet active" count needs the holders' ids, so a new store query `claimedTicketHolderIds()` replaces `claimedTicketHolderCount()`; the level grid's denominator is `holderIds.length`. A grep on 2026-11-03 found no caller of `claimedTicketHolderCount` outside the store and its test, so it is removed in Task 13.
+11. **Level grid in memory (settled).** `progressPlayers(ids)` already returns every player with a level above 0 in any class, which is every player the grid counts, so the grid is computed from its result by `levelGridOf(players)` in the pure module. `levelGrid()` is not called and is removed in Task 13.
+12. **Removal scope (settled rule, list computed 2026-11-03).** Removed: store queries that nothing outside `megagame-store.ts` and its test calls once the new page is in place, and that were kept only for a later dashboard. A grep after the rebase gives exactly: `levelGrid`, `claimedTicketHolderCount`, `questCompletionCounts` (with `QuestCount`), `distinctCompletingPlayers`, `completionsByVolunteer` (with `VolunteerCount`), `liveLevelEventsBefore`, and `recentOverrides` (with `OverrideRow`; overrides now appear among the Quest Board's recent actions). **Kept:** `completionSeries`, `levelEventSeries`, the private `dateBin`, `recentVoids` and `VoidRow` (the Quest Board's `data.ts` calls them); `exportEventTable` (the restored export route calls it); `listQuests`, `importQuests` and `levelEventsFor`, which are also uncalled after the rebase but belong to quest import and the per-player level view, not to the dashboard (the volunteer spec section 12 keeps the quest import queries for a later script). `bucketIntervalSql` and `BUCKET_ORIGIN` stay in `megagame-rules.ts`.
+13. **Dashboard view, refresh and export (settled).** The dashboard gets its own `dashboard/view.ts` restored from 6487c9f without the `cls` class picker, its own `dashboard/AutoRefresh.tsx` restored from 6487c9f, and the export route and its test restored from 6487c9f with the gate changed from `megagame.verify` to `megagame.manage`. `over-time/view.ts` is not reused because its `viewHref` builds Quest Board URLs.
+14. **Dashboard link (settled).** The Quest Board's `page.tsx` already resolves `manager` with `toolAccess("megagame.manage")`, and the layout has no access check and no nav, so the link goes in `page.tsx`: a right-aligned "Dashboard" link above the quest section, rendered only when `viewer.manager` is true. The `megagame.verify` permission description stops mentioning the dashboard and the `megagame.manage` description mentions it. Each is its own commit.
+15. **Page order.** Title and pickers, level grid, concentration, classes, transitions, cohorts, export.
+16. **Page width.** The Quest Board layout wraps pages in a `max-w-xl` column. The dashboard page widens itself with `w-[min(64rem,calc(100vw-2rem))] self-center`, as the old dashboard page did, and every table sits in an `overflow-x-auto` box.
 
 ---
 
@@ -51,33 +58,30 @@ Implementation agents follow these; they are listed here so reviewers can object
 
 Create:
 
-- `src/lib/megagame-progress.ts`: types and pure computations for spec 4 to 7.
+- `src/lib/megagame-progress.ts`: types and pure computations for spec 4 to 7 and the level grid.
 - `src/lib/megagame-progress.test.ts`
-- `src/app/backstage/megagame/dashboard/chart-geometry.ts`: point and segment math for the SVG charts.
-- `src/app/backstage/megagame/dashboard/chart-geometry.test.ts`
+- `src/app/backstage/megagame/dashboard/view.ts` and `view.test.ts`: restored from 6487c9f without `cls`, plus formatting helpers.
+- `src/app/backstage/megagame/dashboard/chart-geometry.ts` and `chart-geometry.test.ts`: point and segment math for the SVG charts.
+- `src/app/backstage/megagame/dashboard/export/[table]/route.ts` and `route.test.ts`: restored from 6487c9f, gated on `megagame.manage`.
+- `src/app/backstage/megagame/dashboard/AutoRefresh.tsx`: restored from 6487c9f unchanged.
+- `src/app/backstage/megagame/dashboard/page.tsx` and `page.test.ts`
 - `src/app/backstage/megagame/dashboard/styles.ts`: shared table class strings.
+- `src/app/backstage/megagame/dashboard/charts.tsx`: `LorenzPlot`, `LineChart`, `ClassLevelBars`.
 - `src/app/backstage/megagame/dashboard/LevelGrid.tsx`
 - `src/app/backstage/megagame/dashboard/ConcentrationSection.tsx`
 - `src/app/backstage/megagame/dashboard/ClassesSection.tsx`
 - `src/app/backstage/megagame/dashboard/TransitionsSection.tsx`
 - `src/app/backstage/megagame/dashboard/CohortsSection.tsx`
-- `src/app/backstage/megagame/dashboard/sections.test.ts`: render tests for the section components.
+- `src/app/backstage/megagame/dashboard/sections.test.ts`: render tests for `LevelGrid` and the section components.
 
 Modify:
 
-- `src/lib/megagame-store.ts`: add four queries in the "Dashboard" section (lines 873 onward); later remove dead ones.
+- `src/lib/megagame-store.ts`: add four queries in the "Dashboard" section (after the `// ---- Dashboard ----` comment); later remove the dead ones listed in "Decisions" 12.
 - `src/lib/megagame-store.test.ts`: tests for the new queries; remove tests of removed queries.
-- `src/app/backstage/megagame/dashboard/view.ts` and `view.test.ts`: drop the class picker, add formatting helpers.
-- `src/app/backstage/megagame/dashboard/charts.tsx`: keep `CLASS_COLORS`, `ANY_CLASS_COLOR`, `Legend`; add `LorenzPlot`, `LineChart`, `ClassLevelBars`; remove `StackedBars` and `InlineBar` once unused.
-- `src/app/backstage/megagame/dashboard/page.tsx`: rewritten.
-- `src/app/backstage/megagame/pages.test.ts`: new dashboard tests, home link tests, layout test.
-- `src/app/backstage/megagame/page.tsx`: gate the dashboard link.
-- `src/app/backstage/megagame/layout.tsx`: gate the header link (Task 14, droppable).
-- `src/lib/permissions.ts`: descriptions (Task 14, droppable).
+- `src/app/backstage/megagame/page.tsx` and `pages.test.ts`: the manager-only "Dashboard" link.
+- `src/lib/permissions.ts`: the two megagame descriptions.
 
-Delete: `src/app/backstage/megagame/dashboard/series.ts`, `series.test.ts`.
-
-Keep unchanged: `AutoRefresh.tsx`, `export/[table]/*`.
+Read but do not change: `src/app/backstage/megagame/over-time/charts.tsx` (imported), `src/app/backstage/megagame/layout.tsx`, `OverTime.tsx`, `data.ts`.
 
 ---
 
@@ -277,6 +281,8 @@ export type ProgressInput = {
 };
 export type Progress = {
   ends: Date[];
+  /** Players per current level in each class; index = level, index 0 unused. */
+  grid: Record<MegagameClass, number[]>;
   concentration: Concentration;
   classes: ClassTable;
   cumulative: Record<MegagameClass, number[]>[];
@@ -287,6 +293,9 @@ export function activeUserIds(
   completions: readonly ProgressCompletion[],
   levelEvents: readonly ProgressLevelEvent[],
 ): string[];
+export function levelGridOf(
+  players: readonly ProgressPlayer[],
+): Record<MegagameClass, number[]>;
 export function computeProgress(input: ProgressInput): Progress;
 ```
 
@@ -297,10 +306,12 @@ export function computeProgress(input: ProgressInput): Progress;
 ### Task 1: Module skeleton and concentration (spec 4)
 
 **Files:**
+
 - Create: `src/lib/megagame-progress.ts`
 - Create: `src/lib/megagame-progress.test.ts`
 
 **Interfaces:**
+
 - Consumes: `MEGAGAME_CLASSES`, `NO_LEVELS`, `isMegagameClass`, `MegagameClass`, `MegagameLevels` from `src/lib/megagame-levels.ts`; `CONFERENCE_DAYS`, `fromPacificWall` from `src/lib/schedule.ts` (lines 284 and 358).
 - Produces: the base types, `DELETED_PLAYER`, `playerKey`, `CON_START`, `SHARE_PERCENTS`, `MOST_ACTIVE_LIMIT`, `topShare`, `gini`, `shareSummary`, `lorenzPoints`, `rankPlayers`, `concentration`, and the Concentration types, all as in "Shared types".
 
@@ -354,7 +365,11 @@ const ev = (
 const player = (
   id: string,
   levels: Partial<ProgressPlayer["levels"]> = {},
-): ProgressPlayer => ({ id, name: id.toUpperCase(), levels: { ...NO_LEVELS, ...levels } });
+): ProgressPlayer => ({
+  id,
+  name: id.toUpperCase(),
+  levels: { ...NO_LEVELS, ...levels },
+});
 
 describe("constants", () => {
   it("starts the con at midnight Pacific on the first con day", () => {
@@ -536,7 +551,11 @@ describe("concentration", () => {
     });
     expect(u1.firstActivity.toISOString()).toBe("2026-11-06T18:00:00.000Z");
     expect(u1.lastActivity.toISOString()).toBe("2026-11-07T19:00:00.000Z");
-    expect(deleted).toMatchObject({ userId: null, name: null, levels: NO_LEVELS });
+    expect(deleted).toMatchObject({
+      userId: null,
+      name: null,
+      levels: NO_LEVELS,
+    });
   });
 
   it("keeps at most 25 rows", () => {
@@ -558,7 +577,7 @@ describe("concentration", () => {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm exec vitest run src/lib/megagame-progress.test.ts`
+Run: `corepack pnpm exec vitest run src/lib/megagame-progress.test.ts`
 Expected: FAIL, the module does not exist.
 
 - [ ] **Step 3: Write the implementation**
@@ -665,6 +684,12 @@ function bump(map: Map<string, number>, key: string, by = 1) {
   map.set(key, (map.get(key) ?? 0) + by);
 }
 
+const perClassFrom = <T>(f: (cls: MegagameClass) => T) =>
+  Object.fromEntries(MEGAGAME_CLASSES.map((c) => [c, f(c)])) as Record<
+    MegagameClass,
+    T
+  >;
+
 function widen(
   first: Map<string, Date>,
   last: Map<string, Date>,
@@ -751,19 +776,11 @@ export function concentration(
     mostActive,
   };
 }
-
-const perClassFrom = <T>(f: (cls: MegagameClass) => T) =>
-  Object.fromEntries(MEGAGAME_CLASSES.map((c) => [c, f(c)])) as Record<
-    MegagameClass,
-    T
-  >;
 ```
-
-Move `perClassFrom` above its first use if lint's `no-use-before-define` complains (arrow constants are not hoisted at runtime either, but the uses run only after module load, so order only matters for lint).
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `pnpm exec vitest run src/lib/megagame-progress.test.ts`
+Run: `corepack pnpm exec vitest run src/lib/megagame-progress.test.ts`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -776,18 +793,20 @@ git commit -m "feat(megagame): concentration math for the progress dashboard"
 ### Task 2: Classes side by side and cumulative levels (spec 5)
 
 **Files:**
+
 - Modify: `src/lib/megagame-progress.ts`
 - Modify: `src/lib/megagame-progress.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 1's types, `playerKey`, `perClass`, `perClassFrom`, `questClass`, `isLevelUp`; `BUCKET_MINUTES`, `cumulativeLevelDistribution`, `BucketSize` from `src/lib/megagame-rules.ts` (lines 276 and 339).
 - Produces: `bucketEnds`, `classTable`, `cumulativeLevels`, `ClassCell`, `ClassRow`, `ClassTable`.
 
 Rules:
 
-- `bucketEnds`: end of bucket `i` is `min(start_i + BUCKET_MINUTES[size] minutes, to)`. This is the old page's computation (old `page.tsx` lines 139 to 142).
+- `bucketEnds`: end of bucket `i` is `min(start_i + BUCKET_MINUTES[size] minutes, to)`. This is the old dashboard page's computation (`git show 6487c9f:src/app/backstage/megagame/dashboard/page.tsx`, lines 139 to 142).
 - A completion or level event belongs to row `i` when `start_i <= t < end_i`.
-- Per class cell: `completions` counts completions whose quest class is that class; `levelUps` counts volunteer events in that class; `activePlayers` counts distinct player keys with a completion of a class quest or any level event (picker included) in that class; `memberShare = activePlayers / members[cls]`, null when `members[cls]` is 0.
+- Per class cell: `completions` counts completions whose quest class is that class; `levelUps` counts volunteer events in that class; `activePlayers` counts distinct player keys with a completion of a class quest or a volunteer level event in that class (picker joins are not activity, "Decisions" 6); `memberShare = activePlayers / members[cls]`, null when `members[cls]` is 0.
 - `members[cls]`: players in `players` with `levels[cls] >= 1`.
 - `anyClass`: completions whose class is null or not a megagame class.
 - Totals: the same cell computation over `[buckets[0], ends.at(-1))`; with no buckets, zero cells (memberShare 0 or null by the same rule) and `anyClass` 0.
@@ -826,7 +845,10 @@ describe("classTable", () => {
     player("u2", { pirate: 1 }),
     player("u3", { wizard: 1 }),
   ];
-  const buckets = [at("2026-11-06T17:00:00.000Z"), at("2026-11-06T18:00:00.000Z")];
+  const buckets = [
+    at("2026-11-06T17:00:00.000Z"),
+    at("2026-11-06T18:00:00.000Z"),
+  ];
   const ends = [at("2026-11-06T18:00:00.000Z"), at("2026-11-06T18:30:00.000Z")];
   const t = classTable(completions, levelEvents, players, buckets, ends);
 
@@ -839,15 +861,20 @@ describe("classTable", () => {
     expect(t.rows[0].byClass).toEqual({
       wizard: { completions: 0, levelUps: 0, activePlayers: 0, memberShare: 0 },
       pirate: { completions: 1, levelUps: 0, activePlayers: 1, memberShare: 1 },
-      alien: { completions: 0, levelUps: 0, activePlayers: 0, memberShare: null },
+      alien: {
+        completions: 0,
+        levelUps: 0,
+        activePlayers: 0,
+        memberShare: null,
+      },
     });
     expect(t.rows[0].anyClass).toBe(0);
-    // u1 completes and levels up, u3 joins through the picker: two active wizards.
+    // u1 completes and levels up; u3's picker join is not activity: one active wizard of two members.
     expect(t.rows[1].byClass.wizard).toEqual({
       completions: 1,
       levelUps: 1,
-      activePlayers: 2,
-      memberShare: 1,
+      activePlayers: 1,
+      memberShare: 0.5,
     });
     expect(t.rows[1].anyClass).toBe(1);
   });
@@ -856,8 +883,8 @@ describe("classTable", () => {
     expect(t.totals.byClass.wizard).toEqual({
       completions: 1,
       levelUps: 1,
-      activePlayers: 2,
-      memberShare: 1,
+      activePlayers: 1,
+      memberShare: 0.5,
     });
     expect(t.totals.byClass.pirate.completions).toBe(1);
     expect(t.totals.anyClass).toBe(1);
@@ -894,7 +921,7 @@ describe("cumulativeLevels", () => {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm exec vitest run src/lib/megagame-progress.test.ts`
+Run: `corepack pnpm exec vitest run src/lib/megagame-progress.test.ts`
 Expected: FAIL, `bucketEnds` is not exported.
 
 - [ ] **Step 3: Write the implementation**
@@ -940,8 +967,9 @@ function classCells(
     active[cls].add(playerKey(c.userId));
   }
   for (const e of levelEvents) {
-    if (!inWindow(e.awardedAt) || !isMegagameClass(e.class)) continue;
-    if (isLevelUp(e)) counts[e.class].levelUps++;
+    if (!inWindow(e.awardedAt) || !isLevelUp(e) || !isMegagameClass(e.class))
+      continue;
+    counts[e.class].levelUps++;
     active[e.class].add(playerKey(e.userId));
   }
   return {
@@ -964,11 +992,19 @@ export function classTable(
   const members = perClassFrom(
     (cls) => players.filter((p) => p.levels[cls] >= 1).length,
   );
-  const rows = buckets.map((start, i): ClassRow => ({
-    start,
-    end: ends[i],
-    ...classCells(completions, levelEvents, members, start.getTime(), ends[i].getTime()),
-  }));
+  const rows = buckets.map(
+    (start, i): ClassRow => ({
+      start,
+      end: ends[i],
+      ...classCells(
+        completions,
+        levelEvents,
+        members,
+        start.getTime(),
+        ends[i].getTime(),
+      ),
+    }),
+  );
   const totals =
     buckets.length === 0
       ? classCells([], [], members, 0, 0)
@@ -989,7 +1025,14 @@ export function cumulativeLevels(
   const dated: DatedLevelEvent[] = levelEvents.flatMap((e) =>
     e.userId === null
       ? []
-      : [{ userId: e.userId, class: e.class, level: e.level, awardedAt: e.awardedAt }],
+      : [
+          {
+            userId: e.userId,
+            class: e.class,
+            level: e.level,
+            awardedAt: e.awardedAt,
+          },
+        ],
   );
   return cumulativeLevelDistribution(dated, ends);
 }
@@ -997,7 +1040,7 @@ export function cumulativeLevels(
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `pnpm exec vitest run src/lib/megagame-progress.test.ts`
+Run: `corepack pnpm exec vitest run src/lib/megagame-progress.test.ts`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -1010,10 +1053,12 @@ git commit -m "feat(megagame): per-bucket class figures and cumulative levels"
 ### Task 3: Level transitions (spec 6)
 
 **Files:**
+
 - Modify: `src/lib/megagame-progress.ts`
 - Modify: `src/lib/megagame-progress.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 1's types, `CON_START`, `perClass`, `perClassFrom`; `MAX_LEVEL`.
 - Produces: `quantile`, `clampToCon`, `transitions`, `TransitionRow`, `CurrentLevelRow`, `Transitions`.
 
@@ -1098,7 +1143,11 @@ describe("transitions", () => {
       median: 4 * H,
       q75: 5 * H,
     });
-    expect(row("wizard", 2)).toMatchObject({ made: 1, skipped: 0, median: 4 * H });
+    expect(row("wizard", 2)).toMatchObject({
+      made: 1,
+      skipped: 0,
+      median: 4 * H,
+    });
   });
 
   it("leaves empty transitions at zero with null durations", () => {
@@ -1119,14 +1168,29 @@ describe("transitions", () => {
       withEvent: 2,
       medianSince: 5.5 * H,
     });
-    expect(cur("wizard", 3)).toMatchObject({ players: 2, withEvent: 2, medianSince: 7 * H });
-    expect(cur("wizard", 1)).toMatchObject({ players: 0, withEvent: 0, medianSince: null });
+    expect(cur("wizard", 3)).toMatchObject({
+      players: 2,
+      withEvent: 2,
+      medianSince: 7 * H,
+    });
+    expect(cur("wizard", 1)).toMatchObject({
+      players: 0,
+      withEvent: 0,
+      medianSince: null,
+    });
     expect(cur("pirate", 1)).toMatchObject({ players: 1, medianSince: 12 * H });
   });
 
   it("never reports a negative time before the con", () => {
-    const early = transitions(levelEvents, players, at("2026-11-02T00:00:00.000Z"));
-    expect(early.current.find((r) => r.class === "pirate" && r.level === 1)!.medianSince).toBe(0);
+    const early = transitions(
+      levelEvents,
+      players,
+      at("2026-11-02T00:00:00.000Z"),
+    );
+    expect(
+      early.current.find((r) => r.class === "pirate" && r.level === 1)!
+        .medianSince,
+    ).toBe(0);
   });
 });
 ```
@@ -1135,7 +1199,7 @@ The expected numbers: wizard 1 to 2 durations are p1 2h (10:00 minus con start 0
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm exec vitest run src/lib/megagame-progress.test.ts`
+Run: `corepack pnpm exec vitest run src/lib/megagame-progress.test.ts`
 Expected: FAIL, `transitions` is not exported.
 
 - [ ] **Step 3: Write the implementation** (add `MAX_LEVEL` to the `./megagame-levels` import)
@@ -1161,7 +1225,8 @@ function levelTimes(
   const out = new Map<string, Map<number, Date>>();
   for (const e of levelEvents) {
     if (e.userId === null || !isMegagameClass(e.class)) continue;
-    if (!Number.isInteger(e.level) || e.level < 1 || e.level > MAX_LEVEL) continue;
+    if (!Number.isInteger(e.level) || e.level < 1 || e.level > MAX_LEVEL)
+      continue;
     const key = `${e.class}\u0000${e.userId}`;
     const byLevel = out.get(key) ?? new Map<number, Date>();
     const seen = byLevel.get(e.level);
@@ -1237,7 +1302,7 @@ export function transitions(
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `pnpm exec vitest run src/lib/megagame-progress.test.ts`
+Run: `corepack pnpm exec vitest run src/lib/megagame-progress.test.ts`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -1250,12 +1315,14 @@ git commit -m "feat(megagame): level transition durations with the con-start cla
 ### Task 4: Cohorts and the whole-page computation (spec 7)
 
 **Files:**
+
 - Modify: `src/lib/megagame-progress.ts`
 - Modify: `src/lib/megagame-progress.test.ts`
 
 **Interfaces:**
+
 - Consumes: everything from Tasks 1 to 3; `pacificDayKey` from `src/lib/schedule.ts` (line 337; it takes an ISO string).
-- Produces: `cohorts`, `CohortRow`, `CohortTable`, `activeUserIds`, `computeProgress`, `ProgressInput`, `Progress`.
+- Produces: `cohorts`, `CohortRow`, `CohortTable`, `activeUserIds`, `levelGridOf`, `computeProgress`, `ProgressInput`, `Progress`.
 
 Rules (see "Decisions" 2 and 9):
 
@@ -1265,9 +1332,10 @@ Rules (see "Decisions" 2 and 9):
 - Per row: `size`; completions per member (members with no completions count as 0) as mean and median (`quantile(sorted, 0.5)`); volunteer level-ups per member as mean; `reachedLevel2Share` = members whose current `levels` (from `players`; `NO_LEVELS` if missing) have any class at 2 or more, over size; `retention[j]` for `CONFERENCE_DAYS[j]`: null unless that key is greater than the row's day, otherwise members with any activity on that Pacific day, over size. Size 0 gives null for every statistic and every retention cell.
 - `holders = new Set(holderIds).size`; `notYetActive` = holders not among the cohort members; `notYetActiveShare` = `notYetActive / holders`, null when there are no holders.
 - `activeUserIds`: distinct non-null user ids from completions then level events, in first-appearance order.
-- `computeProgress`: `ends = bucketEnds(buckets, size, to)`, then each section function with the arrays as given; `cumulative = cumulativeLevels(levelEvents, ends)`; `transitions(levelEvents, players, now)`.
+- `levelGridOf(players)`: for each class an array of `MAX_LEVEL + 1` zeros; each player with `levels[cls]` between 1 and `MAX_LEVEL` adds 1 at that index. This is the shape the removed `levelGrid()` query returned, computed from the players the page already loads ("Decisions" 11).
+- `computeProgress`: `ends = bucketEnds(buckets, size, to)`, `grid = levelGridOf(players)`, then each section function with the arrays as given; `cumulative = cumulativeLevels(levelEvents, ends)`; `transitions(levelEvents, players, now)`.
 
-- [ ] **Step 1: Write the failing tests** (append; add `activeUserIds`, `cohorts`, `computeProgress` to the import)
+- [ ] **Step 1: Write the failing tests** (append; add `activeUserIds`, `cohorts`, `computeProgress`, `levelGridOf` to the import)
 
 ```ts
 describe("cohorts", () => {
@@ -1331,7 +1399,11 @@ describe("cohorts", () => {
   });
 
   it("counts holders with no activity as not yet active; picker joins do not count", () => {
-    expect(t).toMatchObject({ holders: 4, notYetActive: 2, notYetActiveShare: 0.5 });
+    expect(t).toMatchObject({
+      holders: 4,
+      notYetActive: 2,
+      notYetActiveShare: 0.5,
+    });
   });
 
   it("adds a row for a day outside the con and gives it every con day as retention", () => {
@@ -1341,7 +1413,11 @@ describe("cohorts", () => {
       [],
       [],
     );
-    expect(pre.rows[0]).toMatchObject({ day: "2026-11-05", size: 1, retention: [0, 0, 0] });
+    expect(pre.rows[0]).toMatchObject({
+      day: "2026-11-05",
+      size: 1,
+      retention: [0, 0, 0],
+    });
     expect(pre.notYetActiveShare).toBeNull();
   });
 });
@@ -1350,10 +1426,32 @@ describe("activeUserIds", () => {
   it("lists distinct real users in first-appearance order", () => {
     expect(
       activeUserIds(
-        [done("u2", null, "2026-11-06T18:00:00.000Z"), done(null, null, "2026-11-06T18:00:00.000Z")],
-        [ev("u1", "wizard", 1, "picker", "2026-11-06T09:00:00.000Z"), ev("u2", "wizard", 2, "volunteer", "2026-11-06T19:00:00.000Z")],
+        [
+          done("u2", null, "2026-11-06T18:00:00.000Z"),
+          done(null, null, "2026-11-06T18:00:00.000Z"),
+        ],
+        [
+          ev("u1", "wizard", 1, "picker", "2026-11-06T09:00:00.000Z"),
+          ev("u2", "wizard", 2, "volunteer", "2026-11-06T19:00:00.000Z"),
+        ],
       ),
     ).toEqual(["u2", "u1"]);
+  });
+});
+
+describe("levelGridOf", () => {
+  it("counts players per current level in each class, ignoring level 0", () => {
+    const grid = levelGridOf([
+      player("a", { wizard: 2 }),
+      player("b", { wizard: 2, pirate: 1 }),
+      player("c", { alien: 5 }),
+      player("d"),
+    ]);
+    expect(grid).toEqual({
+      wizard: [0, 0, 2, 0, 0, 0],
+      pirate: [0, 1, 0, 0, 0, 0],
+      alien: [0, 0, 0, 0, 0, 1],
+    });
   });
 });
 
@@ -1369,7 +1467,10 @@ describe("computeProgress", () => {
       to: at("2026-11-06T17:30:00.000Z"),
       now: at("2026-11-06T17:30:00.000Z"),
     });
-    expect(p.ends.map((d) => d.toISOString())).toEqual(["2026-11-06T17:30:00.000Z"]);
+    expect(p.ends.map((d) => d.toISOString())).toEqual([
+      "2026-11-06T17:30:00.000Z",
+    ]);
+    expect(p.grid.wizard).toEqual([0, 0, 0, 0, 0, 0]);
     expect(p.concentration.series).toHaveLength(1);
     expect(p.classes.rows).toHaveLength(1);
     expect(p.cumulative).toHaveLength(1);
@@ -1399,7 +1500,7 @@ describe("computeProgress", () => {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm exec vitest run src/lib/megagame-progress.test.ts`
+Run: `corepack pnpm exec vitest run src/lib/megagame-progress.test.ts`
 Expected: FAIL, `cohorts` is not exported.
 
 - [ ] **Step 3: Write the implementation**
@@ -1409,7 +1510,8 @@ Expected: FAIL, `cohorts` is not exported.
 import { CONFERENCE_DAYS, fromPacificWall, pacificDayKey } from "./schedule";
 
 const dayOf = (d: Date) => pacificDayKey(d.toISOString());
-const mean = (xs: readonly number[]) => (xs.length ? sum(xs) / xs.length : null);
+const mean = (xs: readonly number[]) =>
+  xs.length ? sum(xs) / xs.length : null;
 
 export function cohorts(
   completions: readonly ProgressCompletion[],
@@ -1434,7 +1536,8 @@ export function cohorts(
     touch(c.userId, c.confirmedAt);
   }
   for (const e of levelEvents) {
-    if (e.userId === null || !isLevelUp(e) || !isMegagameClass(e.class)) continue;
+    if (e.userId === null || !isLevelUp(e) || !isMegagameClass(e.class))
+      continue;
     bump(leveled, e.userId);
     touch(e.userId, e.awardedAt);
   }
@@ -1493,11 +1596,24 @@ export function activeUserIds(
   return [...ids];
 }
 
+export function levelGridOf(
+  players: readonly ProgressPlayer[],
+): Record<MegagameClass, number[]> {
+  const grid = perClass(() => new Array<number>(MAX_LEVEL + 1).fill(0));
+  for (const p of players)
+    for (const c of MEGAGAME_CLASSES) {
+      const level = p.levels[c];
+      if (level >= 1 && level <= MAX_LEVEL) grid[c][level]++;
+    }
+  return grid;
+}
+
 export function computeProgress(input: ProgressInput): Progress {
   const { completions, levelEvents, players, buckets } = input;
   const ends = bucketEnds(buckets, input.size, input.to);
   return {
     ends,
+    grid: levelGridOf(players),
     concentration: concentration(completions, levelEvents, players, ends),
     classes: classTable(completions, levelEvents, players, buckets, ends),
     cumulative: cumulativeLevels(levelEvents, ends),
@@ -1509,7 +1625,7 @@ export function computeProgress(input: ProgressInput): Progress {
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `pnpm exec vitest run src/lib/megagame-progress.test.ts`
+Run: `corepack pnpm exec vitest run src/lib/megagame-progress.test.ts`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -1526,10 +1642,12 @@ git commit -m "feat(megagame): join cohorts and the progress computation"
 ### Task 5: Load queries with mocked-DB tests
 
 **Files:**
-- Modify: `src/lib/megagame-store.ts` (Dashboard section, after `claimedTicketHolderCount` at lines 906 to 920)
-- Modify: `src/lib/megagame-store.test.ts` (import list lines 51 to 82; add `describe` blocks after `claimedTicketHolderCount` at line 864)
+
+- Modify: `src/lib/megagame-store.ts` (the Dashboard section, which starts at the `// ---- Dashboard ----` comment after `levelEventsFor`; put the new queries directly under that comment)
+- Modify: `src/lib/megagame-store.test.ts` (the import list from `./megagame-store`, lines 51 to 82; add the `describe` blocks after `describe("recentLevelUps", ...)` and before `describe("levelGrid", ...)`, around line 869)
 
 **Interfaces:**
+
 - Consumes: `ProgressCompletion`, `ProgressLevelEvent`, `ProgressPlayer` types (`import type` from `./megagame-progress`).
 - Produces:
   - `liveCompletionLog(): Promise<ProgressCompletion[]>`
@@ -1537,9 +1655,11 @@ git commit -m "feat(megagame): join cohorts and the progress computation"
   - `progressPlayers(ids: readonly string[]): Promise<ProgressPlayer[]>`
   - `claimedTicketHolderIds(): Promise<string[]>`
 
-The mock in `megagame-store.test.ts` (lines 1 to 98) records each chained call; `chainOf(db.select, i)` gets the i-th select chain, `arg(c, "where")` its `where` argument, and `render`/`dialect.sqlToQuery` turn SQL into text. Follow the existing `levelGrid` and `claimedTicketHolderCount` tests (lines 828 to 864).
+The mock in `megagame-store.test.ts` (lines 1 to 98) records each chained call; `chainOf(db.select, i)` gets the i-th select chain, `arg(c, "where")` its `where` argument, and `render`/`dialect.sqlToQuery` turn SQL into text. Follow the existing `levelGrid` and `claimedTicketHolderCount` tests (lines 869 to 905), which Task 13 later removes.
 
 - [ ] **Step 1: Write the failing tests**
+
+Add `claimedTicketHolderIds`, `liveCompletionLog`, `liveLevelEventLog` and `progressPlayers` to the existing import list, then add:
 
 ```ts
 describe("liveCompletionLog", () => {
@@ -1577,7 +1697,9 @@ describe("progressPlayers", () => {
     expect(await progressPlayers(["u1", "u1", "u2"])).toEqual([
       { id: "u1", name: "Ada", levels: { wizard: 2, pirate: 0, alien: 1 } },
     ]);
-    const where = dialect.sqlToQuery(arg(chainOf(db.select, 0), "where") as SQL);
+    const where = dialect.sqlToQuery(
+      arg(chainOf(db.select, 0), "where") as SQL,
+    );
     expect(where.sql).toContain('"user"."wizard_level" > $');
     expect(where.sql).toContain('"user"."id" in ($');
     expect(where.params).toEqual([0, 0, 0, "u1", "u2"]);
@@ -1608,10 +1730,10 @@ If the rendered `where` for the two log queries is wrapped differently by the Dr
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm exec vitest run src/lib/megagame-store.test.ts`
+Run: `corepack pnpm exec vitest run src/lib/megagame-store.test.ts`
 Expected: FAIL, the four functions are not exported.
 
-- [ ] **Step 3: Write the implementation** (in the Dashboard section of `megagame-store.ts`)
+- [ ] **Step 3: Write the implementation** (the type import goes with the other imports at the top of `megagame-store.ts`; the functions go under `// ---- Dashboard ----`)
 
 ```ts
 import type {
@@ -1696,10 +1818,13 @@ export async function claimedTicketHolderIds(): Promise<string[]> {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [ ] **Step 4: Run the tests and the typecheck**
 
-Run: `pnpm exec vitest run src/lib/megagame-store.test.ts`
+Run: `corepack pnpm exec vitest run src/lib/megagame-store.test.ts`
 Expected: PASS (old tests included; nothing is removed yet).
+
+Run: `corepack pnpm typecheck`
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -1710,19 +1835,22 @@ git commit -m "feat(megagame): load the live event logs for the progress page"
 
 ---
 
-## Milestone C: view helpers
+## Milestone C: view helpers and the export route
 
-### Task 6: Trim view.ts, add formatting helpers and chart geometry
+### Task 6: Restore the dashboard view module, add formatting helpers and chart geometry
 
 **Files:**
-- Modify: `src/app/backstage/megagame/dashboard/view.ts`
-- Modify: `src/app/backstage/megagame/dashboard/view.test.ts`
+
+- Create (restored from 6487c9f): `src/app/backstage/megagame/dashboard/view.ts`
+- Create (restored from 6487c9f): `src/app/backstage/megagame/dashboard/view.test.ts`
 - Create: `src/app/backstage/megagame/dashboard/chart-geometry.ts`
 - Create: `src/app/backstage/megagame/dashboard/chart-geometry.test.ts`
 
 **Interfaces:**
-- Consumes: `when` from `src/app/backstage/megagame/format.ts`; `CONFERENCE_DAYS`, `PACIFIC` from `src/lib/schedule.ts`.
-- Produces (view.ts): `DASHBOARD`, `RANGE_PRESETS`, `RangePreset`, `RANGE_LABELS`, `MAX_BUCKETS`, `DashboardParams`, `DashboardView` (now without `cls`), `dashboardView(sp, now)`, `viewHref(view, change: { range?: RangePreset; bucket?: BucketSize })`, and new:
+
+- Consumes: `when` from `src/app/backstage/megagame/format.ts`; `CONFERENCE_DAYS`, `PACIFIC`, `fromPacificWall`, `pacificDayKey` from `src/lib/schedule.ts`; `BUCKET_MINUTES`, `bucketSeries`, `bucketStart`, `isBucketSize`, `BucketSize` from `src/lib/megagame-rules.ts`.
+- Produces (view.ts): `DASHBOARD`, `RANGE_PRESETS`, `RangePreset`, `RANGE_LABELS`, `MAX_BUCKETS`, `DashboardParams`, `DashboardView` (without `cls`), `dashboardView(sp, now)`, `viewHref(view, change: { range?: RangePreset; bucket?: BucketSize })`, and new:
+  - `EMPTY_RANGE: string`, the sentence the sections show when the range has no buckets
   - `formatDuration(ms: number | null): string`
   - `percent(fraction: number | null): string`
   - `decimal(n: number | null, digits?: number): string` (default 1 digit)
@@ -1735,32 +1863,142 @@ git commit -m "feat(megagame): load the live event logs for the progress page"
   - `seriesPoints(values: readonly number[], max: number): Point[]`
   - `stackSegments(values: readonly number[], max: number, height: number): { y: number; height: number }[]`
 
+`over-time/view.ts` has the same range math, but its `viewHref` builds Quest Board URLs, so the dashboard keeps its own copy ("Decisions" 13). Do not import from or change `over-time/view.ts`.
+
 Formats:
 
 - `formatDuration`: null gives "–"; round to whole minutes; under 60 minutes "45m"; under 24 hours "3h 05m"; otherwise "1d 4h" (minutes dropped).
 - `percent`: null gives "–"; otherwise `Math.round(f * 100)` followed by "%".
 - `decimal`: null gives "–"; otherwise `n.toFixed(digits)`.
 - `bucketLabel`: for "1d", the Pacific day `Intl.DateTimeFormat("en-US", { timeZone: PACIFIC, weekday: "short", month: "short", day: "numeric" })` ("Fri, Nov 6"); otherwise `when(start)`.
-- `endLabel`: for "1d", the day format applied to `end - 1 ms` followed by " (end)"; otherwise `when(end)`. These two are the old page's lines 69 to 82 and 598 to 599.
+- `endLabel`: for "1d", the day format applied to `end - 1 ms` followed by " (end)"; otherwise `when(end)`. These two match the old dashboard page (`git show 6487c9f:src/app/backstage/megagame/dashboard/page.tsx`, lines 69 to 82 and 598 to 599).
 - `dayLabel`: a `CONFERENCE_DAYS` key gives `${name} ${dateLabel}` ("Friday Nov 6"); any other key is returned as is.
 - `polylinePoints`: each point maps to `x * width, height - y * height`, each number rounded to 2 decimals with `Math.round(v * 100) / 100`, joined as "x,y" with spaces.
 - `seriesPoints`: point i has `x = i / (n - 1)` (0.5 when n is 1) and `y = values[i] / max` (0 when max is 0).
 - `stackSegments`: from the bottom; segment j has `height = values[j] / max * height` and `y` = the remaining top edge. `max` 0 gives zero heights at `y = height`.
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **Step 1: Restore the old test and write the new tests**
 
-In `view.test.ts`: remove every `cls` assertion and parameter (lines 17, 54, 56 to 60, 72 to 85), so that the "ignores an unknown range or bucket" test checks `[v.preset, v.size]` equals `["today", "30m"]` and the repeated-parameter test uses `{ bucket: ["1h", "5m"] }` and checks `v.size` is "1h". Change the `viewHref` expectations to `"/backstage/megagame/dashboard?range=con&bucket=1h"` (for `viewHref(v, { bucket: "1h" })` from a `{ range: "con", bucket: "3h" }` view) and `"/backstage/megagame/dashboard?range=2h"` (range change drops the bucket). Then append:
+Run:
+
+```bash
+mkdir -p src/app/backstage/megagame/dashboard
+git show 6487c9f:src/app/backstage/megagame/dashboard/view.test.ts > src/app/backstage/megagame/dashboard/view.test.ts
+```
+
+Then edit `view.test.ts` so that it reads as follows (the `cls` assertions are gone, the `viewHref` expectations have no `cls`, and there are new tests for an empty range and the formatters):
 
 ```ts
+import { describe, expect, it } from "vitest";
+import { when } from "../format";
 import {
+  MAX_BUCKETS,
   bucketLabel,
+  dashboardView,
   dayLabel,
   decimal,
   endLabel,
   formatDuration,
   percent,
+  viewHref,
 } from "./view";
-import { when } from "../format";
+
+const now = new Date("2026-11-07T18:07:00.000Z"); // 10:07 AM Pacific, Saturday
+const iso = (d: Date) => d.toISOString();
+
+describe("dashboardView", () => {
+  it("defaults to today in 30 minute buckets, from Pacific midnight", () => {
+    const v = dashboardView({}, now);
+    expect(v.preset).toBe("today");
+    expect(v.size).toBe("30m");
+    expect(iso(v.from)).toBe("2026-11-07T08:00:00.000Z");
+    expect(iso(v.to)).toBe(iso(now));
+    expect(v.buckets).toHaveLength(21);
+    expect(iso(v.buckets.at(-1)!)).toBe("2026-11-07T18:00:00.000Z");
+    expect(v.tooMany).toBe(false);
+  });
+
+  it("has no buckets for today at Pacific midnight, without flagging too many", () => {
+    const v = dashboardView({}, new Date("2026-11-07T08:00:00.000Z"));
+    expect(v.buckets).toEqual([]);
+    expect(v.tooMany).toBe(false);
+  });
+
+  it("aligns the last 2 hours to the bucket containing its start", () => {
+    const v = dashboardView({ range: "2h" }, now);
+    expect(v.size).toBe("5m");
+    expect(iso(v.from)).toBe("2026-11-07T16:05:00.000Z");
+    expect(v.buckets).toHaveLength(25);
+  });
+
+  it("covers the three con days in Pacific time, ending at Monday midnight", () => {
+    const after = new Date("2026-11-10T18:00:00.000Z");
+    const v = dashboardView({ range: "con", bucket: "1d" }, after);
+    expect(iso(v.from)).toBe("2026-11-06T08:00:00.000Z");
+    expect(iso(v.to)).toBe("2026-11-09T08:00:00.000Z");
+    expect(v.buckets.map(iso)).toEqual([
+      "2026-11-06T08:00:00.000Z",
+      "2026-11-07T08:00:00.000Z",
+      "2026-11-08T08:00:00.000Z",
+    ]);
+  });
+
+  it("ends the whole con range at now while the con is on", () => {
+    const v = dashboardView({ range: "con", bucket: "1h" }, now);
+    expect(iso(v.from)).toBe("2026-11-06T08:00:00.000Z");
+    expect(iso(v.to)).toBe(iso(now));
+    expect(iso(v.buckets.at(-1)!)).toBe("2026-11-07T18:00:00.000Z");
+  });
+
+  it("shows the whole con range before and after the con", () => {
+    for (const at of ["2026-11-01T18:00:00.000Z", "2026-11-12T18:00:00.000Z"]) {
+      const v = dashboardView({ range: "con", bucket: "1d" }, new Date(at));
+      expect(iso(v.from)).toBe("2026-11-06T08:00:00.000Z");
+      expect(iso(v.to)).toBe("2026-11-09T08:00:00.000Z");
+    }
+  });
+
+  it("ignores an unknown range or bucket and a leftover class parameter", () => {
+    const v = dashboardView({ range: "week", bucket: "2h", cls: "bard" }, now);
+    expect([v.preset, v.size]).toEqual(["today", "30m"]);
+    expect(v).not.toHaveProperty("cls");
+  });
+
+  it("takes the first value of a repeated parameter", () => {
+    const v = dashboardView({ bucket: ["1h", "5m"] }, now);
+    expect(v.size).toBe("1h");
+  });
+
+  it("flags a range with too many buckets and returns none", () => {
+    const v = dashboardView({ range: "con", bucket: "5m" }, now);
+    expect(v.tooMany).toBe(true);
+    expect(v.buckets).toEqual([]);
+    expect(MAX_BUCKETS).toBeLessThan(3 * 288);
+  });
+});
+
+describe("viewHref", () => {
+  it("keeps the range when the bucket changes", () => {
+    const v = dashboardView({ range: "con", bucket: "3h" }, now);
+    expect(viewHref(v, { bucket: "1h" })).toBe(
+      "/backstage/megagame/dashboard?range=con&bucket=1h",
+    );
+  });
+
+  it("drops the chosen bucket when the range changes, so the new range's default applies", () => {
+    const v = dashboardView({ range: "con", bucket: "1h" }, now);
+    expect(viewHref(v, { range: "2h" })).toBe(
+      "/backstage/megagame/dashboard?range=2h",
+    );
+  });
+
+  it("keeps both choices for the sign-in link", () => {
+    const v = dashboardView({ range: "con", bucket: "1h" }, now);
+    expect(viewHref(v, {})).toBe(
+      "/backstage/megagame/dashboard?range=con&bucket=1h",
+    );
+  });
+});
 
 describe("formatters", () => {
   it("formats durations by size", () => {
@@ -1854,16 +2092,26 @@ describe("stackSegments", () => {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm exec vitest run src/app/backstage/megagame/dashboard/view.test.ts src/app/backstage/megagame/dashboard/chart-geometry.test.ts`
-Expected: FAIL on the new imports and on the `viewHref` output, which still contains `cls`.
+Run: `corepack pnpm exec vitest run src/app/backstage/megagame/dashboard/view.test.ts src/app/backstage/megagame/dashboard/chart-geometry.test.ts`
+Expected: FAIL; `./view` and `./chart-geometry` do not exist.
 
-- [ ] **Step 3: Write the implementation**
+- [ ] **Step 3: Restore view.ts and write the implementation**
 
-In `view.ts`: delete `cls` from `DashboardView`, `dashboardView` (line 75) and `viewHref` (lines 92 and 100), and the `MEGAGAME_CLASSES`/`MegagameClass` import. Add:
+Run:
+
+```bash
+git show 6487c9f:src/app/backstage/megagame/dashboard/view.ts > src/app/backstage/megagame/dashboard/view.ts
+```
+
+In the restored `view.ts`, line numbers as restored:
+
+- Delete the `MEGAGAME_CLASSES`/`MegagameClass` import (line 1), the `cls` field of `DashboardView` (line 64), the `const cls = ...` line (75), `cls` in the returned object (line 87), the `cls?: MegagameClass` member of `viewHref`'s `change` parameter (line 92), and the `params.set("cls", ...)` line (100).
+- Extend the existing `@/lib/schedule` import (lines 9 to 13) to `CONFERENCE_DAYS, PACIFIC, fromPacificWall, pacificDayKey`. Do not add a second import from `@/lib/schedule`.
+- Add `import { when } from "../format";` with the other imports, then append:
 
 ```ts
-import { when } from "../format";
-import { CONFERENCE_DAYS, PACIFIC, fromPacificWall, pacificDayKey } from "@/lib/schedule";
+export const EMPTY_RANGE =
+  "This range has not started yet, so there are no buckets to show.";
 
 const DAY = new Intl.DateTimeFormat("en-US", {
   timeZone: PACIFIC,
@@ -1891,7 +2139,9 @@ export const bucketLabel = (start: Date, size: BucketSize) =>
   size === "1d" ? DAY.format(start) : when(start);
 
 export const endLabel = (end: Date, size: BucketSize) =>
-  size === "1d" ? `${DAY.format(new Date(end.getTime() - 1))} (end)` : when(end);
+  size === "1d"
+    ? `${DAY.format(new Date(end.getTime() - 1))} (end)`
+    : when(end);
 
 export function dayLabel(key: string): string {
   const day = CONFERENCE_DAYS.find((d) => d.key === key);
@@ -1938,10 +2188,13 @@ export function stackSegments(
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [ ] **Step 4: Run the tests and the typecheck**
 
-Run: `pnpm exec vitest run src/app/backstage/megagame/dashboard/view.test.ts src/app/backstage/megagame/dashboard/chart-geometry.test.ts`
-Expected: PASS. The old `page.tsx` still references `view.cls` and `viewHref(view, { cls })`; it is replaced in Task 7, so do not fix it here, but do not run the typecheck until Task 7 either. If you want this commit to typecheck on its own, fold the two `cls` references in the old page into Task 7's rewrite by doing Tasks 6 and 7 back to back.
+Run: `corepack pnpm exec vitest run src/app/backstage/megagame/dashboard/view.test.ts src/app/backstage/megagame/dashboard/chart-geometry.test.ts`
+Expected: PASS.
+
+Run: `corepack pnpm typecheck`
+Expected: PASS. Nothing imports these modules yet, and the dashboard directory has no page yet, so nothing else is affected.
 
 - [ ] **Step 5: Commit**
 
@@ -1950,26 +2203,103 @@ git add src/app/backstage/megagame/dashboard/view.ts src/app/backstage/megagame/
 git commit -m "feat(megagame): dashboard view helpers for the progress page"
 ```
 
+### Task 7: Restore the CSV export route under megagame.manage
+
+**Files:**
+
+- Create (restored from 6487c9f): `src/app/backstage/megagame/dashboard/export/[table]/route.ts`
+- Create (restored from 6487c9f): `src/app/backstage/megagame/dashboard/export/[table]/route.test.ts`
+
+**Interfaces:**
+
+- Consumes: `toolAccess` from `@/lib/admin-auth`; `toCsv`, `CsvCell` from `@/lib/csv`; `isEventTable` from `@/lib/megagame-rules`; `exportEventTable` from `@/lib/megagame-store`; `pacificDayKey` from `@/lib/schedule`. All of these exist on the branch today.
+- Produces: `GET` at `/backstage/megagame/dashboard/export/[table]`, used by the page's export links in Task 8.
+
+The exports name players by id, so the route takes the page's gate (spec 2). Everything else about the route is unchanged from 6487c9f.
+
+- [ ] **Step 1: Restore the test and change it to the new gate**
+
+Run:
+
+```bash
+mkdir -p "src/app/backstage/megagame/dashboard/export/[table]"
+git show "6487c9f:src/app/backstage/megagame/dashboard/export/[table]/route.test.ts" > "src/app/backstage/megagame/dashboard/export/[table]/route.test.ts"
+```
+
+In the restored test, replace the first `it` block (lines 26 to 32) with these two:
+
+```ts
+it("is a 404 without megagame.manage and reads nothing", async () => {
+  auth.toolAccess.mockResolvedValue(null);
+  const res = await call("level_events");
+  expect(auth.toolAccess).toHaveBeenCalledWith("megagame.manage");
+  expect(res.status).toBe(404);
+  expect(store.exportEventTable).not.toHaveBeenCalled();
+});
+
+it("is a 404 for a volunteer holding only megagame.verify", async () => {
+  auth.toolAccess.mockImplementation(async (p: string) =>
+    p === "megagame.verify" ? { name: "Vol", userId: "v1" } : null,
+  );
+  const res = await call("level_events");
+  expect(res.status).toBe(404);
+  expect(store.exportEventTable).not.toHaveBeenCalled();
+});
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `corepack pnpm exec vitest run "src/app/backstage/megagame/dashboard/export/[table]/route.test.ts"`
+Expected: FAIL, `./route` does not exist.
+
+- [ ] **Step 3: Restore the route and change the gate**
+
+Run:
+
+```bash
+git show "6487c9f:src/app/backstage/megagame/dashboard/export/[table]/route.ts" > "src/app/backstage/megagame/dashboard/export/[table]/route.ts"
+```
+
+In the restored `route.ts`, change `toolAccess("megagame.verify")` to `toolAccess("megagame.manage")`. Change nothing else.
+
+- [ ] **Step 4: Run the test and the typecheck**
+
+Run: `corepack pnpm exec vitest run "src/app/backstage/megagame/dashboard/export/[table]/route.test.ts"`
+Expected: PASS (four tests).
+
+Run: `corepack pnpm typecheck`
+Expected: PASS. `next typegen` generates the `RouteContext<"/backstage/megagame/dashboard/export/[table]">` type for the restored route.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add "src/app/backstage/megagame/dashboard/export/[table]/route.ts" "src/app/backstage/megagame/dashboard/export/[table]/route.test.ts"
+git commit -m "feat(megagame): restore the event CSV export under megagame.manage"
+```
+
 ---
 
 ## Milestone D: the page
 
-All components in this milestone are server components (no `"use client"`), so they can be rendered in tests with `renderToStaticMarkup`. Do not use `next/link` inside section components; links stay in `page.tsx`.
+`page.tsx` is the only async component. `LevelGrid` and the section components are synchronous server components (no `"use client"`, no `async`, no `next/link`), so tests render them with `renderToStaticMarkup`. In `sections.test.ts`, keep all `import` statements together at the top of the file; each task below lists the imports it adds.
 
-### Task 7: Page shell, gating, loads, level grid and export
+### Task 8: Page shell, gating, the four loads, level grid and export links
 
 **Files:**
-- Rewrite: `src/app/backstage/megagame/dashboard/page.tsx`
+
+- Create (restored from 6487c9f, unchanged): `src/app/backstage/megagame/dashboard/AutoRefresh.tsx`
+- Create: `src/app/backstage/megagame/dashboard/page.tsx`
+- Create: `src/app/backstage/megagame/dashboard/page.test.ts`
 - Create: `src/app/backstage/megagame/dashboard/styles.ts`
 - Create: `src/app/backstage/megagame/dashboard/LevelGrid.tsx`
 - Create: `src/app/backstage/megagame/dashboard/sections.test.ts`
-- Modify: `src/app/backstage/megagame/pages.test.ts` (store mock lines 5 to 25; dashboard tests lines 117 to 182)
 
 **Interfaces:**
-- Consumes: Task 4's `computeProgress`, `activeUserIds`; Task 5's four queries; `levelGrid` (existing); Task 6's view helpers; `toolAccess` from `@/lib/admin-auth`; `SignIn` from `../../SignIn`; `Section` from `../Section`; `AutoRefresh` from `./AutoRefresh`; `EVENT_TABLES`, `BUCKET_SIZES` from `@/lib/megagame-rules`.
-- Produces: `styles.ts` constants `TABLE`, `TH`, `THN`, `TD`, `TDN`, `BOX`, `NOTE`, `CHART` used by every section; `LevelGrid({ grid, holders }: { grid: Record<MegagameClass, number[]>; holders: number })`.
 
-`styles.ts` (values copied from the old page lines 56 to 67):
+- Consumes: Task 4's `computeProgress`, `activeUserIds`; Task 5's four queries; Task 6's `dashboardView`, `viewHref`, `RANGE_LABELS`, `RANGE_PRESETS`, `DashboardView`, `percent`; Task 7's export route (linked, not imported); `toolAccess` from `@/lib/admin-auth`; `SignIn` from `../../SignIn`; `Section` from `../Section`; `EVENT_TABLES`, `BUCKET_SIZES` from `@/lib/megagame-rules`; `CLASS_LABELS`, `MAX_LEVEL`, `MEGAGAME_CLASSES` from `@/lib/megagame-levels`.
+- Produces: `styles.ts` constants `TABLE`, `TH`, `THN`, `TD`, `TDN`, `BOX`, `NOTE`, `ALERT` used by every section; `LevelGrid({ grid, holders }: { grid: Record<MegagameClass, number[]>; holders: number })`; the default-exported async `DashboardPage`.
+
+`styles.ts` (the class strings the Quest Board's `OverTime.tsx` and the old dashboard page use):
 
 ```ts
 export const TABLE = "w-full border-collapse text-sm";
@@ -1980,31 +2310,60 @@ export const TD = "border-b border-line px-2 py-1.5 align-top";
 export const TDN = `${TD} text-right tabular-nums`;
 export const BOX = "overflow-x-auto rounded-xl border border-line bg-white p-2";
 export const NOTE = "text-sm text-ink/60";
-/** Charts are hidden on phones; the tables carry every number. */
-export const CHART = "hidden sm:block";
+export const ALERT = "text-sm text-meeple";
 ```
+
+There is no chart-hiding class: charts show on phones (spec 9).
 
 - [ ] **Step 1: Write the failing tests**
 
-In `pages.test.ts`, add to the hoisted `store` mock: `liveCompletionLog`, `liveLevelEventLog`, `progressPlayers`, `claimedTicketHolderIds` (keep the old entries until Task 12). Replace the `describe("dashboard page", ...)` block (lines 117 to 182) with:
+`page.test.ts`:
 
 ```ts
-describe("dashboard page", () => {
-  const noLevels = {
-    wizard: [0, 0, 0, 0, 0, 0],
-    pirate: [0, 0, 0, 0, 0, 0],
-    alien: [0, 0, 0, 0, 0, 0],
-  };
-  const loadEmpty = () => {
-    store.liveCompletionLog.mockResolvedValue([]);
-    store.liveLevelEventLog.mockResolvedValue([]);
-    store.levelGrid.mockResolvedValue(noLevels);
-    store.claimedTicketHolderIds.mockResolvedValue([]);
-    store.progressPlayers.mockResolvedValue([]);
-  };
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const { auth, store } = vi.hoisted(() => ({
+  auth: { toolAccess: vi.fn() },
+  store: {
+    liveCompletionLog: vi.fn(),
+    liveLevelEventLog: vi.fn(),
+    claimedTicketHolderIds: vi.fn(),
+    progressPlayers: vi.fn(),
+  },
+}));
+vi.mock("@/lib/admin-auth", () => auth);
+vi.mock("@/lib/megagame-store", () => store);
+vi.mock("next/server", () => ({ connection: vi.fn() }));
+
+import SignIn from "../../SignIn";
+import DashboardPage from "./page";
+
+const props = (searchParams: Record<string, string>) =>
+  ({
+    params: Promise.resolve({}),
+    searchParams: Promise.resolve(searchParams),
+  }) as never;
+
+const loadEmpty = () => {
+  store.liveCompletionLog.mockResolvedValue([]);
+  store.liveLevelEventLog.mockResolvedValue([]);
+  store.claimedTicketHolderIds.mockResolvedValue([]);
+  store.progressPlayers.mockResolvedValue([]);
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  auth.toolAccess.mockResolvedValue(null);
+});
+
+const expectSignInOnly = (el: unknown, next: string) => {
+  expect(el).toMatchObject({ type: SignIn, props: { next } });
+  for (const fn of Object.values(store)) expect(fn).not.toHaveBeenCalled();
+};
+
+describe("dashboard page", () => {
   it("needs megagame.manage, keeps its choices through sign-in, and loads nothing without it", async () => {
-    const el = await DashboardPage(props({}, { range: "con", bucket: "1h" }));
+    const el = await DashboardPage(props({ range: "con", bucket: "1h" }));
     expect(auth.toolAccess).toHaveBeenCalledWith("megagame.manage");
     expectSignInOnly(el, "/backstage/megagame/dashboard?range=con&bucket=1h");
   });
@@ -2013,23 +2372,42 @@ describe("dashboard page", () => {
     auth.toolAccess.mockImplementation(async (p: string) =>
       p === "megagame.verify" ? { name: "Vol", userId: "v1" } : null,
     );
-    const el = await DashboardPage(props({}, {}));
+    const el = await DashboardPage(props({}));
     expectSignInOnly(el, "/backstage/megagame/dashboard?range=today");
   });
 
-  it("loads each log once and then the players behind them", async () => {
+  it("makes exactly four store requests: both logs, the holder ids, then the players behind them", async () => {
     auth.toolAccess.mockResolvedValue({ name: "Boss", userId: "m1" });
     loadEmpty();
     store.liveCompletionLog.mockResolvedValue([
-      { userId: "u1", class: "wizard", confirmedAt: new Date("2026-11-06T18:00:00.000Z") },
-      { userId: null, class: null, confirmedAt: new Date("2026-11-06T19:00:00.000Z") },
+      {
+        userId: "u1",
+        class: "wizard",
+        confirmedAt: new Date("2026-11-06T18:00:00.000Z"),
+      },
+      {
+        userId: null,
+        class: null,
+        confirmedAt: new Date("2026-11-06T19:00:00.000Z"),
+      },
     ]);
     store.liveLevelEventLog.mockResolvedValue([
-      { userId: "u2", class: "pirate", level: 1, source: "picker", awardedAt: new Date("2026-11-06T09:00:00.000Z") },
+      {
+        userId: "u2",
+        class: "pirate",
+        level: 1,
+        source: "picker",
+        awardedAt: new Date("2026-11-06T09:00:00.000Z"),
+      },
     ]);
-    await DashboardPage(props({}, { range: "con", bucket: "1d" }));
-    expect(store.liveCompletionLog).toHaveBeenCalledTimes(1);
-    expect(store.liveLevelEventLog).toHaveBeenCalledTimes(1);
+    await DashboardPage(props({ range: "con", bucket: "1d" }));
+    expect(Object.keys(store).sort()).toEqual([
+      "claimedTicketHolderIds",
+      "liveCompletionLog",
+      "liveLevelEventLog",
+      "progressPlayers",
+    ]);
+    for (const fn of Object.values(store)) expect(fn).toHaveBeenCalledTimes(1);
     expect(store.progressPlayers).toHaveBeenCalledWith(["u1", "u2"]);
   });
 
@@ -2037,13 +2415,15 @@ describe("dashboard page", () => {
     auth.toolAccess.mockResolvedValue({ name: "Boss", userId: "m1" });
     loadEmpty();
     await expect(
-      DashboardPage(props({}, { range: "con", bucket: "5m" })),
+      DashboardPage(props({ range: "con", bucket: "5m" })),
     ).resolves.toBeTruthy();
   });
 });
 ```
 
-In `sections.test.ts`:
+The store mock lists only the four queries, so if `page.tsx` calls any other store function (for example `levelGrid`), Vitest throws because the mock defines no such export, which is how the test pins "four requests, and these four".
+
+`sections.test.ts`:
 
 ```ts
 import { createElement } from "react";
@@ -2066,13 +2446,17 @@ describe("LevelGrid", () => {
     expect(html).toContain("Wizard");
     expect(html).toContain("(30%)");
     expect(html).toContain("(40%)"); // wizard "In class" row: 4 of 10
-    expect(html).toContain("10");
+    expect(html).toContain("of the 10 accounts");
   });
 
   it("shows a dash instead of a percentage with no holders", () => {
     const html = renderToStaticMarkup(
       createElement(LevelGrid, {
-        grid: { wizard: [0, 1, 0, 0, 0, 0], pirate: [0, 0, 0, 0, 0, 0], alien: [0, 0, 0, 0, 0, 0] },
+        grid: {
+          wizard: [0, 1, 0, 0, 0, 0],
+          pirate: [0, 0, 0, 0, 0, 0],
+          alien: [0, 0, 0, 0, 0, 0],
+        },
         holders: 0,
       }),
     );
@@ -2083,12 +2467,91 @@ describe("LevelGrid", () => {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm exec vitest run src/app/backstage/megagame/pages.test.ts src/app/backstage/megagame/dashboard/sections.test.ts`
-Expected: FAIL; the old page gates on `megagame.verify` and `LevelGrid` does not exist.
+Run: `corepack pnpm exec vitest run src/app/backstage/megagame/dashboard/page.test.ts src/app/backstage/megagame/dashboard/sections.test.ts`
+Expected: FAIL; `./page` and `./LevelGrid` do not exist.
 
 - [ ] **Step 3: Write the implementation**
 
-`LevelGrid.tsx`: move the old page's "Levels" section body (old `page.tsx` lines 169 to 217) into a default-exported component taking `{ grid, holders }`, using `percent(holders > 0 ? n / holders : null)` wrapped in parentheses for the percentages and the styles from `styles.ts`. Keep the explanatory note text from old lines 211 to 216.
+Restore the refresher unchanged:
+
+```bash
+git show 6487c9f:src/app/backstage/megagame/dashboard/AutoRefresh.tsx > src/app/backstage/megagame/dashboard/AutoRefresh.tsx
+```
+
+`LevelGrid.tsx` (the old dashboard page's "Levels" section, lines 169 to 217 at 6487c9f, as a component):
+
+```tsx
+import { BOX, NOTE, TABLE, TD, TDN, TH, THN } from "./styles";
+import { percent } from "./view";
+import {
+  CLASS_LABELS,
+  MAX_LEVEL,
+  MEGAGAME_CLASSES,
+  type MegagameClass,
+} from "@/lib/megagame-levels";
+
+const LEVELS = Array.from({ length: MAX_LEVEL }, (_, i) => i + 1);
+
+export default function LevelGrid({
+  grid,
+  holders,
+}: {
+  grid: Record<MegagameClass, number[]>;
+  holders: number;
+}) {
+  const share = (n: number) => percent(holders > 0 ? n / holders : null);
+  return (
+    <>
+      <div className={BOX}>
+        <table className={TABLE}>
+          <thead>
+            <tr>
+              <th className={TH}>Level</th>
+              {MEGAGAME_CLASSES.map((c) => (
+                <th key={c} className={THN}>
+                  {CLASS_LABELS[c]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {LEVELS.map((level) => (
+              <tr key={level}>
+                <td className={TD}>{level}</td>
+                {MEGAGAME_CLASSES.map((c) => (
+                  <td key={c} className={TDN}>
+                    {grid[c][level]}{" "}
+                    <span className="text-ink/50">
+                      ({share(grid[c][level])})
+                    </span>
+                  </td>
+                ))}
+              </tr>
+            ))}
+            <tr className="font-semibold">
+              <td className={TD}>In class</td>
+              {MEGAGAME_CLASSES.map((c) => {
+                const n = grid[c].reduce((a, b) => a + b, 0);
+                return (
+                  <td key={c} className={TDN}>
+                    {n} <span className="text-ink/50">({share(n)})</span>
+                  </td>
+                );
+              })}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p className={NOTE}>
+        Players at each current level. Percentages are of the {holders} accounts
+        that have claimed a paid ticket. There is no check-in data, so that is
+        not a count of people at the con, and staff without a ticket can push a
+        percentage up.
+      </p>
+    </>
+  );
+}
+```
 
 `page.tsx`:
 
@@ -2112,7 +2575,6 @@ import { activeUserIds, computeProgress } from "@/lib/megagame-progress";
 import { BUCKET_SIZES, EVENT_TABLES } from "@/lib/megagame-rules";
 import {
   claimedTicketHolderIds,
-  levelGrid,
   liveCompletionLog,
   liveLevelEventLog,
   progressPlayers,
@@ -2141,13 +2603,14 @@ export default async function DashboardPage(
   const access = await toolAccess("megagame.manage");
   if (!access) return <SignIn next={viewHref(view, {})} />;
 
-  const [completions, levelEvents, grid, holderIds] = await Promise.all([
+  const [completions, levelEvents, holderIds] = await Promise.all([
     liveCompletionLog(),
     liveLevelEventLog(),
-    levelGrid(),
     claimedTicketHolderIds(),
   ]);
-  const players = await progressPlayers(activeUserIds(completions, levelEvents));
+  const players = await progressPlayers(
+    activeUserIds(completions, levelEvents),
+  );
   const progress = computeProgress({
     completions,
     levelEvents,
@@ -2163,7 +2626,9 @@ export default async function DashboardPage(
     <div className="flex w-[min(64rem,calc(100vw-2rem))] flex-col gap-10 self-center">
       <AutoRefresh seconds={REFRESH_SECONDS} />
       <div className="flex flex-col gap-2">
-        <h1 className="font-bebas text-3xl tracking-wide text-navy">Progress</h1>
+        <h1 className="font-bebas text-3xl tracking-wide text-navy">
+          Progress
+        </h1>
         <p className={NOTE}>
           Updated {TIME.format(now)}. The page refreshes every minute. Voided
           records are left out. Deleted accounts count as one player.
@@ -2176,50 +2641,95 @@ export default async function DashboardPage(
       </div>
 
       <Section title="Levels">
-        <LevelGrid grid={grid} holders={holderIds.length} />
+        <LevelGrid grid={progress.grid} holders={holderIds.length} />
       </Section>
 
-      {/* Tasks 8 to 11 add the concentration, classes, transitions and cohorts sections here, in that order. */}
-
       <Section title="Export">
-        {/* old page.tsx lines 525 to 541, unchanged */}
+        <ul className="flex flex-col gap-2">
+          {EVENT_TABLES.map((t) => (
+            <li key={t}>
+              <a
+                href={`/backstage/megagame/dashboard/export/${t}`}
+                download
+                className="font-semibold text-navy underline underline-offset-2 hover:text-meeple"
+              >
+                {t}.csv
+              </a>
+            </li>
+          ))}
+        </ul>
+        <p className={NOTE}>
+          Every row of each table, voided ones included. People and quests
+          appear as ids.
+        </p>
       </Section>
     </div>
   );
 }
 
 function Pickers({ view }: { view: DashboardView }) {
-  // old page.tsx lines 554 to 585, unchanged
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2" aria-label="Range">
+        {RANGE_PRESETS.map((p) => (
+          <Link
+            key={p}
+            href={viewHref(view, { range: p })}
+            replace
+            scroll={false}
+            className={p === view.preset ? PICK_ON : PICK_OFF}
+          >
+            {RANGE_LABELS[p]}
+          </Link>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2" aria-label="Bucket size">
+        {BUCKET_SIZES.map((s) => (
+          <Link
+            key={s}
+            href={viewHref(view, { bucket: s })}
+            replace
+            scroll={false}
+            className={s === view.size ? PICK_ON : PICK_OFF}
+          >
+            {s}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
 }
 ```
 
-Copy the export list and `Pickers` bodies verbatim from the old page before replacing it. Remove the placeholder comment inside the JSX before committing; it only shows where later tasks insert sections. So that `progress` is used in this commit, render `<p className={NOTE}>{progress.concentration.completions.total} live completions so far.</p>` under the level grid; Task 8 removes that line.
+Tasks 9 to 12 insert their sections between "Levels" and "Export", in the order concentration, classes, transitions, cohorts.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [ ] **Step 4: Run the tests and the typecheck**
 
-Run: `pnpm exec vitest run src/app/backstage/megagame/pages.test.ts src/app/backstage/megagame/dashboard/sections.test.ts`
+Run: `corepack pnpm exec vitest run src/app/backstage/megagame/dashboard src/app/backstage/megagame/pages.test.ts`
 Expected: PASS.
 
-Run: `pnpm typecheck`
-Expected: PASS. The old store queries are now unused but still exported, which typecheck allows.
+Run: `corepack pnpm typecheck`
+Expected: PASS. `next typegen` now generates `PageProps<"/backstage/megagame/dashboard">`. The old dashboard store queries are still exported and unused, which the typecheck allows.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/app/backstage/megagame/dashboard/page.tsx src/app/backstage/megagame/dashboard/styles.ts src/app/backstage/megagame/dashboard/LevelGrid.tsx src/app/backstage/megagame/dashboard/sections.test.ts src/app/backstage/megagame/pages.test.ts
-git commit -m "feat(megagame): progress page shell on the dashboard route"
+git add src/app/backstage/megagame/dashboard/AutoRefresh.tsx src/app/backstage/megagame/dashboard/page.tsx src/app/backstage/megagame/dashboard/page.test.ts src/app/backstage/megagame/dashboard/styles.ts src/app/backstage/megagame/dashboard/LevelGrid.tsx src/app/backstage/megagame/dashboard/sections.test.ts
+git commit -m "feat(megagame): progress page on the dashboard route with the level grid and exports"
 ```
 
-### Task 8: Concentration section with Lorenz plot and line chart
+### Task 9: Concentration section with Lorenz plot and line chart
 
 **Files:**
+
+- Create: `src/app/backstage/megagame/dashboard/charts.tsx` (`LorenzPlot`, `LineChart`)
 - Create: `src/app/backstage/megagame/dashboard/ConcentrationSection.tsx`
-- Modify: `src/app/backstage/megagame/dashboard/charts.tsx` (add `LorenzPlot`, `LineChart`)
 - Modify: `src/app/backstage/megagame/dashboard/page.tsx`
 - Modify: `src/app/backstage/megagame/dashboard/sections.test.ts`
 
 **Interfaces:**
-- Consumes: `Concentration`, `ShareSummary`, `DELETED_PLAYER` from `@/lib/megagame-progress`; `polylinePoints`, `seriesPoints` from `./chart-geometry`; `percent`, `decimal`, `endLabel` from `./view`; `when` from `../format`; `levelsText` from `../format`; `CLASS_COLORS`, `Legend` from `./charts`; styles.
+
+- Consumes: `Concentration`, `LorenzPoint` from `@/lib/megagame-progress`; `polylinePoints`, `seriesPoints` from `./chart-geometry`; `percent`, `decimal`, `endLabel`, `EMPTY_RANGE` from `./view`; `when`, `levelsText` from `../format`; `CLASS_COLORS`, `Legend` from `../over-time/charts` (read only; do not change that file); `CLASS_LABELS`, `MEGAGAME_CLASSES` from `@/lib/megagame-levels`; styles.
 - Produces:
   - `LorenzPlot({ label, lines }: { label: string; lines: { name: string; color: string; points: LorenzPoint[] }[] })`
   - `LineChart({ label, series, first, last }: { label: string; series: { name: string; color: string; values: number[] }[]; first: string; last: string })` with a fixed y range of 0 to 1.
@@ -2228,13 +2738,21 @@ git commit -m "feat(megagame): progress page shell on the dashboard route"
 Content (spec 4):
 
 1. Two headline blocks, "Quest completions" and "Volunteer level-ups", each a `<dl>` with: players (active or leveling), total, top 10%, top 20%, top 50% (via `percent`), Gini (via `decimal(g, 2)`). Below them a sentence: "The top 20% of active players hold {percent(top20)} of completions."
-2. Lorenz: `LorenzPlot` with label "Lorenz curve of completions per player, overall and by class", inside a `figure` with class `CHART`, lines for overall (color `#173059`, name "All quests") and each class (`CLASS_COLORS`), plus `Legend`. Table fallback: rows "All quests" and each class label, columns Players, Completions, Top 20%, Gini, from `data.completions` and `data.byClass`.
-3. Over time: if `tooMany`, the alert from old page lines 337 to 340 (`role="alert"`, text "{rangeLabel} in {size} buckets is too many rows to show. Pick a bigger bucket."). Otherwise `LineChart` (`CHART`) of `top20` and `gini` over `data.series`, labels `endLabel(ends[0], size)` and `endLabel(ends.at(-1), size)`, and a table with columns As of, Players, Completions, Top 20%, Gini.
+2. Lorenz: `LorenzPlot` with label "Lorenz curve of completions per player, overall and by class", inside a `figure`, lines for overall (color `#173059`, name "All quests") and each class (`CLASS_COLORS`), plus `Legend`. Table fallback: rows "All quests" and each class label, columns Players, Completions, Top 20%, Gini, from `data.completions` and `data.byClass`. The Lorenz plot does not depend on the range, so it shows even when the range is empty.
+3. Over time, in this order of cases:
+   - `tooMany`: `<p role="alert" className={ALERT}>{rangeLabel} in {size} buckets is too many rows to show. Pick a bigger bucket.</p>` and nothing else for this part.
+   - `ends.length === 0`: `<p className={NOTE}>{EMPTY_RANGE}</p>` and nothing else for this part: no chart, no endpoint labels, no table.
+   - otherwise: `LineChart` with label "Top 20% share and Gini of completions as of the end of each bucket", series `top20` (color `#173059`, name "Top 20% share") and `gini` (color `#C2410C`, name "Gini") over `data.series`, `first = endLabel(ends[0], size)`, `last = endLabel(ends.at(-1)!, size)`, then a table with columns As of, Players, Completions, Top 20%, Gini.
 4. Most active: table with columns Player, Levels (`levelsText(row.levels)`), Completions, Wizard, Pirate, Alien, Any class, Level-ups, First, Last (`when(...)`). Name is `row.name ?? "Deleted account"`. An empty list shows "No completions yet." in `NOTE`.
 
-`LorenzPlot`:
+Add `ALERT` to the imports from `./styles`. No element in this section uses `hidden sm:block` or any other class that hides it on phones.
+
+`charts.tsx`:
 
 ```tsx
+import { polylinePoints, seriesPoints } from "./chart-geometry";
+import type { LorenzPoint } from "@/lib/megagame-progress";
+
 export function LorenzPlot({
   label,
   lines,
@@ -2247,7 +2765,7 @@ export function LorenzPlot({
       viewBox="0 0 100 100"
       role="img"
       aria-label={label}
-      className="aspect-square w-64 border-b border-l border-ink/30"
+      className="aspect-square w-64 max-w-full border-b border-l border-ink/30"
     >
       <line
         x1="0"
@@ -2276,18 +2794,74 @@ export function LorenzPlot({
     </svg>
   );
 }
+
+const W = 600;
+const H = 120;
+
+/** Lines on a fixed 0 to 1 scale; callers render it only when there is at least one point. */
+export function LineChart({
+  label,
+  series,
+  first,
+  last,
+}: {
+  label: string;
+  series: { name: string; color: string; values: number[] }[];
+  first: string;
+  last: string;
+}) {
+  return (
+    <figure className="flex flex-col gap-1">
+      <div className="flex gap-2">
+        <span className="flex w-10 shrink-0 flex-col justify-between text-right text-xs text-ink/50">
+          <span>100%</span>
+          <span>0%</span>
+        </span>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="none"
+          role="img"
+          aria-label={label}
+          className="h-32 w-full border-b border-l border-ink/30"
+        >
+          {series.map((s) => (
+            <polyline
+              key={s.name}
+              points={polylinePoints(seriesPoints(s.values, 1), W, H)}
+              fill="none"
+              stroke={s.color}
+              strokeWidth="2"
+              vectorEffect="non-scaling-stroke"
+            >
+              <title>{s.name}</title>
+            </polyline>
+          ))}
+        </svg>
+      </div>
+      <figcaption className="ml-12 flex justify-between text-xs text-ink/50">
+        <span>{first}</span>
+        {last !== first && <span>{last}</span>}
+      </figcaption>
+    </figure>
+  );
+}
 ```
 
-`LineChart` follows the old `StackedBars` frame (old `charts.tsx` lines 46 to 107: the y-axis labels column, the 600 by 120 viewBox with `preserveAspectRatio="none"`, and the first and last labels in a `figcaption`), with y labels "100%" and "0%", drawing one `polyline` per series from `polylinePoints(seriesPoints(values, 1), 600, 120)`.
-
-- [ ] **Step 1: Write the failing tests** (append to `sections.test.ts`)
+- [ ] **Step 1: Write the failing tests** (add the imports at the top of `sections.test.ts` and the rest at the end)
 
 ```ts
 import ConcentrationSection from "./ConcentrationSection";
 import { DELETED_PLAYER, type Concentration } from "@/lib/megagame-progress";
 import { NO_LEVELS } from "@/lib/megagame-levels";
+```
 
-const summary = (players: number, total: number, top20: number, gini: number) => ({
+```ts
+const summary = (
+  players: number,
+  total: number,
+  top20: number,
+  gini: number,
+) => ({
   players,
   total,
   top10: top20,
@@ -2304,11 +2878,20 @@ const concentrationData: Concentration = {
   },
   levelUps: summary(2, 3, 2 / 3, 1 / 6),
   lorenz: {
-    overall: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+    overall: [
+      { x: 0, y: 0 },
+      { x: 1, y: 1 },
+    ],
     byClass: { wizard: [], pirate: [], alien: [] },
   },
   series: [
-    { end: new Date("2026-11-07T08:00:00.000Z"), players: 2, completions: 3, top20: 2 / 3, gini: 1 / 6 },
+    {
+      end: new Date("2026-11-07T08:00:00.000Z"),
+      players: 2,
+      completions: 3,
+      top20: 2 / 3,
+      gini: 1 / 6,
+    },
   ],
   mostActive: [
     {
@@ -2325,11 +2908,15 @@ const concentrationData: Concentration = {
     },
   ],
 };
-const renderConcentration = (tooMany: boolean) =>
+const renderConcentration = (
+  tooMany: boolean,
+  ends = [new Date("2026-11-07T08:00:00.000Z")],
+  data = concentrationData,
+) =>
   renderToStaticMarkup(
     createElement(ConcentrationSection, {
-      data: concentrationData,
-      ends: [new Date("2026-11-07T08:00:00.000Z")],
+      data,
+      ends,
       size: "1d",
       tooMany,
       rangeLabel: "Whole con",
@@ -2347,8 +2934,13 @@ describe("ConcentrationSection", () => {
   it("labels the Lorenz plot and the series chart and keeps their tables", () => {
     const html = renderConcentration(false);
     expect(html).toMatch(/aria-label="[^"]*Lorenz/);
+    expect(html).toMatch(/aria-label="Top 20% share and Gini/);
     expect(html).toContain("Fri, Nov 6 (end)");
     expect(html).toContain("0.17");
+  });
+
+  it("does not hide the charts on phones", () => {
+    expect(renderConcentration(false)).not.toContain("hidden sm:block");
   });
 
   it("names deleted accounts in the most-active table", () => {
@@ -2356,59 +2948,95 @@ describe("ConcentrationSection", () => {
   });
 
   it("replaces the series with the too-many-buckets alert", () => {
-    const html = renderConcentration(true);
+    const html = renderConcentration(true, []);
     expect(html).toContain('role="alert"');
     expect(html).not.toContain("Fri, Nov 6 (end)");
+  });
+
+  it("shows an empty state with no series chart or end labels when the range has no buckets", () => {
+    const html = renderConcentration(false, [], {
+      ...concentrationData,
+      series: [],
+    });
+    expect(html).toContain("This range has not started yet");
+    expect(html).not.toMatch(/aria-label="Top 20% share and Gini/);
+    expect(html).not.toContain("(end)");
+    expect(html).not.toContain('role="alert"');
+    expect(html).toMatch(/aria-label="[^"]*Lorenz/);
   });
 });
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm exec vitest run src/app/backstage/megagame/dashboard/sections.test.ts`
+Run: `corepack pnpm exec vitest run src/app/backstage/megagame/dashboard/sections.test.ts`
 Expected: FAIL, `./ConcentrationSection` does not exist.
 
-- [ ] **Step 3: Write the implementation** as specified above, then render `<ConcentrationSection data={progress.concentration} ends={progress.ends} size={view.size} tooMany={view.tooMany} rangeLabel={RANGE_LABELS[view.preset]} />` inside `<Section title="Concentration">` in `page.tsx` after the level grid, and remove Task 7's temporary "live completions so far" line.
+- [ ] **Step 3: Write the implementation** as specified above, then in `page.tsx` add `import ConcentrationSection from "./ConcentrationSection";` and render, after the "Levels" section:
 
-- [ ] **Step 4: Run the tests to verify they pass**
+```tsx
+<Section title="Concentration">
+  <ConcentrationSection
+    data={progress.concentration}
+    ends={progress.ends}
+    size={view.size}
+    tooMany={view.tooMany}
+    rangeLabel={RANGE_LABELS[view.preset]}
+  />
+</Section>
+```
 
-Run: `pnpm exec vitest run src/app/backstage/megagame/dashboard/sections.test.ts src/app/backstage/megagame/pages.test.ts`
+- [ ] **Step 4: Run the tests and the typecheck**
+
+Run: `corepack pnpm exec vitest run src/app/backstage/megagame/dashboard`
+Expected: PASS.
+
+Run: `corepack pnpm typecheck`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/app/backstage/megagame/dashboard/ConcentrationSection.tsx src/app/backstage/megagame/dashboard/charts.tsx src/app/backstage/megagame/dashboard/page.tsx src/app/backstage/megagame/dashboard/sections.test.ts
+git add src/app/backstage/megagame/dashboard/charts.tsx src/app/backstage/megagame/dashboard/ConcentrationSection.tsx src/app/backstage/megagame/dashboard/page.tsx src/app/backstage/megagame/dashboard/sections.test.ts
 git commit -m "feat(megagame): concentration section with Lorenz and series charts"
 ```
 
-### Task 9: Classes section with cumulative level bars
+### Task 10: Classes section with cumulative level bars
 
 **Files:**
+
 - Create: `src/app/backstage/megagame/dashboard/ClassesSection.tsx`
 - Modify: `src/app/backstage/megagame/dashboard/charts.tsx` (add `ClassLevelBars`)
 - Modify: `src/app/backstage/megagame/dashboard/page.tsx`
 - Modify: `src/app/backstage/megagame/dashboard/sections.test.ts`
 
 **Interfaces:**
-- Consumes: `ClassTable` from `@/lib/megagame-progress`; `stackSegments` from `./chart-geometry`; `bucketLabel`, `endLabel`, `percent` from `./view`; `CLASS_LABELS`, `MEGAGAME_CLASSES`, `MAX_LEVEL` from `@/lib/megagame-levels`; `CLASS_COLORS`, `Legend`; styles.
+
+- Consumes: `ClassTable` from `@/lib/megagame-progress`; `stackSegments` from `./chart-geometry`; `bucketLabel`, `endLabel`, `percent`, `EMPTY_RANGE` from `./view`; `CLASS_LABELS`, `MEGAGAME_CLASSES`, `MAX_LEVEL`, `MegagameClass` from `@/lib/megagame-levels`; `CLASS_COLORS`, `Legend` from `../over-time/charts`; styles including `ALERT`.
 - Produces:
-  - `ClassLevelBars({ label, rows }: { label: string; rows: { label: string; byClass: Record<MegagameClass, number[]> }[] })`: per row a slot of width `600 / rows.length` holding three bars (wizard, pirate, alien), each stacked from level 1 at the bottom to level 5, segment fill `CLASS_COLORS[c]` with `fillOpacity` `0.3 + 0.7 * (level / MAX_LEVEL)`; `max` is the largest in-class total across rows and classes (at least 1); each bar has a `<title>` "Wizard: 1: 3, 2: 1, ..." for hover.
-  - `ClassesSection({ table, cumulative, ends, size, tooMany, rangeLabel })` where `table: ClassTable`, `cumulative: Record<MegagameClass, number[]>[]`.
+  - `ClassLevelBars({ label, rows }: { label: string; rows: { label: string; byClass: Record<MegagameClass, number[]> }[] })` in `dashboard/charts.tsx`: a 600 by 120 viewBox with `preserveAspectRatio="none"`, `role="img"`, `aria-label={label}` and class `h-32 w-full`; per row a slot of width `600 / rows.length` holding three bars (wizard, pirate, alien), each stacked with `stackSegments(byClass[c].slice(1), max, 120)` from level 1 at the bottom to level 5, segment fill `CLASS_COLORS[c]` with `fillOpacity` `0.3 + 0.7 * (level / MAX_LEVEL)`; `max` is the largest in-class total across rows and classes (at least 1); each bar has a `<title>` "Wizard: 1: 3, 2: 1, 3: 0, 4: 0, 5: 0" for hover. Callers render it only when `rows.length > 0`.
+  - `ClassesSection({ table, cumulative, ends, size, tooMany, rangeLabel }: { table: ClassTable; cumulative: Record<MegagameClass, number[]>[]; ends: Date[]; size: BucketSize; tooMany: boolean; rangeLabel: string })`.
 
 Content (spec 5):
 
-1. If `tooMany`, the same alert as Task 8 and nothing else.
-2. Per-bucket table: header row 1 "Bucket start" (rowSpan 2), one `colSpan={4}` group per class with the class label, "Any class" (rowSpan 2). Header row 2 per class: Completions, Level-ups, Active, "% of members". Body: one row per `table.rows` entry labelled `bucketLabel(row.start, size)`, cells from `byClass[c]` with `percent(memberShare)`. A bold "Total" row from `table.totals`. Under the table, a `NOTE`: "Active means a completion of one of the class's quests or a level event in the class, faction picks included. Members are players at level 1 or higher in the class now: wizard {n}, pirate {n}, alien {n}. Any-class quests count only in their own column."
-3. Cumulative levels: `Legend` of the three classes, `ClassLevelBars` in a `CHART` figure with label "Players at each level by class as of the end of each bucket", rows labelled `endLabel(ends[i], size)`. Table fallback: column "As of", then per class a cell showing the five level counts as "3 / 1 / 0 / 0 / 0" and an "In class" total per class. Keep the old note (old `page.tsx` lines 467 to 474) about the level log versus the level columns, adjusted to say "players" across all three classes.
+1. If `tooMany`, the same alert as Task 9 and nothing else. If `ends.length === 0`, `<p className={NOTE}>{EMPTY_RANGE}</p>` and nothing else: no table, no chart, no endpoint labels.
+2. Per-bucket table: header row 1 "Bucket start" (rowSpan 2), one `colSpan={4}` group per class with the class label, "Any class" (rowSpan 2). Header row 2 per class: Completions, Level-ups, Active, "% of members". Body: one row per `table.rows` entry labelled `bucketLabel(row.start, size)`, cells from `byClass[c]` with `percent(memberShare)`. A bold "Total" row from `table.totals`. Under the table, a `NOTE`: "Active means a completion of one of the class's quests or a volunteer level-up in the class; faction picks do not count. Members are players at level 1 or higher in the class now: wizard {n}, pirate {n}, alien {n}. Any-class quests count only in their own column."
+3. Cumulative levels: `Legend` of the three classes, `ClassLevelBars` in a `figure` (shown on phones too) with label "Players at each level by class as of the end of each bucket", rows labelled `endLabel(ends[i], size)`, with the first and last labels in a `figcaption` under it. Table fallback: column "As of", then per class a cell showing the five level counts as "3 / 1 / 0 / 0 / 0" and an "In class" total per class. Then this `NOTE`, adapted from the old dashboard page (lines 467 to 474 at 6487c9f) to cover all three classes: "Players at each level as of the end of each bucket, counted from the level-up log rather than the current level columns, so the last row can differ slightly from the level grid at the top. Undone level-ups are left out of every row, so a player who switched class through the picker shows only in the new class, even in rows from before the switch. Faction picks count as level 1 from the time of the pick."
 
-- [ ] **Step 1: Write the failing tests** (append)
+- [ ] **Step 1: Write the failing tests** (imports at the top, the rest at the end)
 
 ```ts
 import ClassesSection from "./ClassesSection";
 import type { ClassTable } from "@/lib/megagame-progress";
+```
 
-const cell = (completions: number, levelUps: number, activePlayers: number, memberShare: number | null) => ({
+```ts
+const cell = (
+  completions: number,
+  levelUps: number,
+  activePlayers: number,
+  memberShare: number | null,
+) => ({
   completions,
   levelUps,
   activePlayers,
@@ -2420,13 +3048,33 @@ const classData: ClassTable = {
     {
       start: new Date("2026-11-06T08:00:00.000Z"),
       end: new Date("2026-11-07T08:00:00.000Z"),
-      byClass: { wizard: cell(1, 1, 2, 1), pirate: cell(1, 0, 1, 1), alien: cell(0, 0, 0, null) },
+      byClass: {
+        wizard: cell(1, 1, 1, 0.5),
+        pirate: cell(1, 0, 1, 1),
+        alien: cell(0, 0, 0, null),
+      },
       anyClass: 4,
     },
   ],
   totals: {
-    byClass: { wizard: cell(1, 1, 2, 1), pirate: cell(1, 0, 1, 1), alien: cell(0, 0, 0, null) },
+    byClass: {
+      wizard: cell(1, 1, 1, 0.5),
+      pirate: cell(1, 0, 1, 1),
+      alien: cell(0, 0, 0, null),
+    },
     anyClass: 4,
+  },
+};
+const emptyClassData: ClassTable = {
+  members: classData.members,
+  rows: [],
+  totals: {
+    byClass: {
+      wizard: cell(0, 0, 0, 0),
+      pirate: cell(0, 0, 0, 0),
+      alien: cell(0, 0, 0, null),
+    },
+    anyClass: 0,
   },
 };
 const renderClasses = (tooMany: boolean) =>
@@ -2452,14 +3100,17 @@ describe("ClassesSection", () => {
     const html = renderClasses(false);
     expect(html).toContain("Fri, Nov 6");
     expect(html).toContain("Total");
-    expect(html).toContain("100%");
+    expect(html).toContain("50%"); // wizard: 1 active of 2 members
+    expect(html).toContain("100%"); // pirate: 1 active of 1 member
     expect(html).toContain("% of members");
+    expect(html).toContain("faction picks do not count");
   });
 
-  it("draws the cumulative bars with a label and a table fallback", () => {
+  it("draws the cumulative bars with a label and a table fallback, also on phones", () => {
     const html = renderClasses(false);
     expect(html).toMatch(/aria-label="Players at each level by class/);
     expect(html).toContain("3 / 1 / 0 / 0 / 0");
+    expect(html).not.toContain("hidden sm:block");
   });
 
   it("shows only the alert when there are too many buckets", () => {
@@ -2467,19 +3118,52 @@ describe("ClassesSection", () => {
     expect(html).toContain('role="alert"');
     expect(html).not.toContain("Total");
   });
+
+  it("shows an empty state with no table, bars or end labels when the range has no buckets", () => {
+    const html = renderToStaticMarkup(
+      createElement(ClassesSection, {
+        table: emptyClassData,
+        cumulative: [],
+        ends: [],
+        size: "1d",
+        tooMany: false,
+        rangeLabel: "Today",
+      }),
+    );
+    expect(html).toContain("This range has not started yet");
+    expect(html).not.toMatch(/aria-label="Players at each level by class/);
+    expect(html).not.toContain("Total");
+    expect(html).not.toContain("(end)");
+  });
 });
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm exec vitest run src/app/backstage/megagame/dashboard/sections.test.ts`
+Run: `corepack pnpm exec vitest run src/app/backstage/megagame/dashboard/sections.test.ts`
 Expected: FAIL, `./ClassesSection` does not exist.
 
-- [ ] **Step 3: Write the implementation** as specified, and render it in `page.tsx` inside `<Section title="Classes">` after the concentration section with `table={progress.classes} cumulative={progress.cumulative} ends={progress.ends}`.
+- [ ] **Step 3: Write the implementation** as specified, and in `page.tsx` import it and render, after the concentration section:
 
-- [ ] **Step 4: Run the tests to verify they pass**
+```tsx
+<Section title="Classes">
+  <ClassesSection
+    table={progress.classes}
+    cumulative={progress.cumulative}
+    ends={progress.ends}
+    size={view.size}
+    tooMany={view.tooMany}
+    rangeLabel={RANGE_LABELS[view.preset]}
+  />
+</Section>
+```
 
-Run: `pnpm exec vitest run src/app/backstage/megagame/dashboard/sections.test.ts src/app/backstage/megagame/pages.test.ts`
+- [ ] **Step 4: Run the tests and the typecheck**
+
+Run: `corepack pnpm exec vitest run src/app/backstage/megagame/dashboard`
+Expected: PASS.
+
+Run: `corepack pnpm typecheck`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -2489,16 +3173,20 @@ git add src/app/backstage/megagame/dashboard/ClassesSection.tsx src/app/backstag
 git commit -m "feat(megagame): classes side by side with cumulative level bars"
 ```
 
-### Task 10: Transitions section
+---
+
+### Task 11: Transitions section
 
 **Files:**
+
 - Create: `src/app/backstage/megagame/dashboard/TransitionsSection.tsx`
 - Modify: `src/app/backstage/megagame/dashboard/page.tsx`
 - Modify: `src/app/backstage/megagame/dashboard/sections.test.ts`
 
 **Interfaces:**
+
 - Consumes: `Transitions` from `@/lib/megagame-progress`; `formatDuration` from `./view`; `CLASS_LABELS`; styles.
-- Produces: `TransitionsSection({ data }: { data: Transitions })`.
+- Produces: `TransitionsSection({ data }: { data: Transitions })`, synchronous.
 
 Content (spec 6):
 
@@ -2506,24 +3194,54 @@ Content (spec 6):
 2. Table "Time at the current level": columns Class, Level, Players, With a level-up record, Median time at level.
 3. `NOTE`: "Times count from the later of the earlier level-up and the start of the con (midnight Pacific, Friday Nov 6), so time at level 1 means time at the con before the first level-up. Skipped past counts players who went from this level straight to a higher one than the next; they are left out of the times. Players whose current level has no level-up record are counted but left out of the median. Deleted accounts are left out."
 
-- [ ] **Step 1: Write the failing tests** (append)
+- [ ] **Step 1: Write the failing tests** (imports at the top, the rest at the end)
 
 ```ts
 import TransitionsSection from "./TransitionsSection";
 import type { Transitions } from "@/lib/megagame-progress";
+```
 
-const H = 3_600_000;
+```ts
+const HOUR = 3_600_000;
 const transitionData: Transitions = {
   rows: [
-    { class: "wizard", from: 1, to: 2, made: 3, skipped: 1, q25: 3 * H, median: 4 * H, q75: 5 * H },
-    { class: "wizard", from: 2, to: 3, made: 0, skipped: 0, q25: null, median: null, q75: null },
+    {
+      class: "wizard",
+      from: 1,
+      to: 2,
+      made: 3,
+      skipped: 1,
+      q25: 3 * HOUR,
+      median: 4 * HOUR,
+      q75: 5 * HOUR,
+    },
+    {
+      class: "wizard",
+      from: 2,
+      to: 3,
+      made: 0,
+      skipped: 0,
+      q25: null,
+      median: null,
+      q75: null,
+    },
   ],
-  current: [{ class: "wizard", level: 2, players: 3, withEvent: 2, medianSince: 5.5 * H }],
+  current: [
+    {
+      class: "wizard",
+      level: 2,
+      players: 3,
+      withEvent: 2,
+      medianSince: 5.5 * HOUR,
+    },
+  ],
 };
 
 describe("TransitionsSection", () => {
   it("shows counts, skips and durations, with a dash where nobody made it", () => {
-    const html = renderToStaticMarkup(createElement(TransitionsSection, { data: transitionData }));
+    const html = renderToStaticMarkup(
+      createElement(TransitionsSection, { data: transitionData }),
+    );
     expect(html).toContain("1 → 2");
     expect(html).toContain("3h 00m");
     expect(html).toContain("4h 00m");
@@ -2535,14 +3253,17 @@ describe("TransitionsSection", () => {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm exec vitest run src/app/backstage/megagame/dashboard/sections.test.ts`
+Run: `corepack pnpm exec vitest run src/app/backstage/megagame/dashboard/sections.test.ts`
 Expected: FAIL, `./TransitionsSection` does not exist.
 
-- [ ] **Step 3: Write the implementation** as specified, and render it in `page.tsx` inside `<Section title="Level transitions">` after the classes section.
+- [ ] **Step 3: Write the implementation** as specified, and in `page.tsx` import it and render `<Section title="Level transitions"><TransitionsSection data={progress.transitions} /></Section>` after the classes section.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [ ] **Step 4: Run the tests and the typecheck**
 
-Run: `pnpm exec vitest run src/app/backstage/megagame/dashboard/sections.test.ts`
+Run: `corepack pnpm exec vitest run src/app/backstage/megagame/dashboard`
+Expected: PASS.
+
+Run: `corepack pnpm typecheck`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -2552,16 +3273,18 @@ git add src/app/backstage/megagame/dashboard/TransitionsSection.tsx src/app/back
 git commit -m "feat(megagame): level transition section"
 ```
 
-### Task 11: Cohorts section
+### Task 12: Cohorts section
 
 **Files:**
+
 - Create: `src/app/backstage/megagame/dashboard/CohortsSection.tsx`
 - Modify: `src/app/backstage/megagame/dashboard/page.tsx`
 - Modify: `src/app/backstage/megagame/dashboard/sections.test.ts`
 
 **Interfaces:**
+
 - Consumes: `CohortTable` from `@/lib/megagame-progress`; `dayLabel`, `percent`, `decimal` from `./view`; styles.
-- Produces: `CohortsSection({ data }: { data: CohortTable })`.
+- Produces: `CohortsSection({ data }: { data: CohortTable })`, synchronous.
 
 Content (spec 7):
 
@@ -2569,12 +3292,14 @@ Content (spec 7):
 2. Below: "{notYetActive} of {holders} claimed-ticket holders have no completions or level-ups yet ({percent(notYetActiveShare)})."
 3. `NOTE`: "A player's cohort is the Pacific day of their first completion or volunteer level-up; faction picks do not count. Cohorts cover the whole con whatever range is picked above. Deleted accounts are left out."
 
-- [ ] **Step 1: Write the failing tests** (append)
+- [ ] **Step 1: Write the failing tests** (imports at the top, the rest at the end)
 
 ```ts
 import CohortsSection from "./CohortsSection";
 import type { CohortTable } from "@/lib/megagame-progress";
+```
 
+```ts
 const cohortData: CohortTable = {
   days: ["2026-11-06", "2026-11-07", "2026-11-08"],
   rows: [
@@ -2595,7 +3320,9 @@ const cohortData: CohortTable = {
 
 describe("CohortsSection", () => {
   it("shows each cohort with retention on later days only", () => {
-    const html = renderToStaticMarkup(createElement(CohortsSection, { data: cohortData }));
+    const html = renderToStaticMarkup(
+      createElement(CohortsSection, { data: cohortData }),
+    );
     expect(html).toContain("Friday Nov 6");
     expect(html).toContain("Active Saturday Nov 7");
     expect(html).toContain("50%");
@@ -2607,14 +3334,17 @@ describe("CohortsSection", () => {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm exec vitest run src/app/backstage/megagame/dashboard/sections.test.ts`
+Run: `corepack pnpm exec vitest run src/app/backstage/megagame/dashboard/sections.test.ts`
 Expected: FAIL, `./CohortsSection` does not exist.
 
-- [ ] **Step 3: Write the implementation** as specified, and render it in `page.tsx` inside `<Section title="Cohorts">` after the transitions section and before Export.
+- [ ] **Step 3: Write the implementation** as specified, and in `page.tsx` import it and render `<Section title="Cohorts"><CohortsSection data={progress.cohorts} /></Section>` after the transitions section and before Export.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [ ] **Step 4: Run the tests and the typecheck**
 
-Run: `pnpm exec vitest run src/app/backstage/megagame/dashboard/sections.test.ts src/app/backstage/megagame/pages.test.ts`
+Run: `corepack pnpm exec vitest run src/app/backstage/megagame/dashboard`
+Expected: PASS.
+
+Run: `corepack pnpm typecheck`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -2628,70 +3358,97 @@ git commit -m "feat(megagame): join cohort section"
 
 ## Milestone E: removal
 
-### Task 12: Remove the old page's dead code
+### Task 13: Remove the store queries nothing calls
 
 **Files:**
+
 - Modify: `src/lib/megagame-store.ts`
 - Modify: `src/lib/megagame-store.test.ts`
-- Modify: `src/app/backstage/megagame/dashboard/charts.tsx`
-- Modify: `src/app/backstage/megagame/pages.test.ts`
-- Delete: `src/app/backstage/megagame/dashboard/series.ts`, `src/app/backstage/megagame/dashboard/series.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing new.
 - Produces: nothing new; removes symbols.
+
+The list below was computed with grep on 2026-11-03, after the rebase onto 5be83f7 ("Decisions" 12). Step 1 checks it again before anything is deleted.
 
 - [ ] **Step 1: Confirm nothing else uses the code to be removed**
 
 Run:
 
 ```bash
-for f in questCompletionCounts distinctCompletingPlayers completionsByVolunteer completionSeries levelEventSeries liveLevelEventsBefore claimedTicketHolderCount CompletionBucket LevelEventBucket QuestCount VolunteerCount fillSeries SeriesRow InlineBar StackedBars; do echo "== $f"; grep -rnw "$f" src | grep -v -e "src/lib/megagame-store.ts" -e "src/lib/megagame-store.test.ts" -e "dashboard/series" -e "dashboard/charts.tsx" -e "megagame/pages.test.ts"; done
+for f in levelGrid claimedTicketHolderCount questCompletionCounts QuestCount distinctCompletingPlayers completionsByVolunteer VolunteerCount liveLevelEventsBefore recentOverrides OverrideRow; do echo "== $f"; grep -rnw "$f" src scripts | grep -v -e "src/lib/megagame-store.ts" -e "src/lib/megagame-store.test.ts"; done
 ```
 
-Expected: no lines under any heading. If something outside those files shows up (for example the volunteer branch has since been merged in), keep that symbol and its test, and note it in the commit message.
+Expected: no lines under any heading. If something shows up, keep that symbol and its test, remove the rest, and say which one was kept and why in the commit message.
+
+Also confirm the kept queries are still called, so the list is not short of anything:
+
+```bash
+for f in completionSeries levelEventSeries recentVoids exportEventTable; do echo "== $f"; grep -rlw "$f" src | grep -v -e "src/lib/megagame-store.ts" -e "src/lib/megagame-store.test.ts"; done
+```
+
+Expected: `data.ts` under the first three (and `data.test.ts` if it mocks them), the export route under `exportEventTable`.
 
 - [ ] **Step 2: Remove the code and its tests**
 
-From `megagame-store.ts`: `QuestCount` and `questCompletionCounts` (lines 922 to 954), `distinctCompletingPlayers` (956 to 966), `VolunteerCount` and `completionsByVolunteer` (968 to 988), `dateBin` and its comment (990 to 993), `CompletionBucket` and `completionSeries` (995 to 1027), `LevelEventBucket` and `levelEventSeries` (1029 to 1062), `liveLevelEventsBefore` (1064 to 1085), `claimedTicketHolderCount` (906 to 920). Line numbers are from before Task 5's insertions; find each by name. Then remove imports that are now unused (likely `BUCKET_ORIGIN`, `bucketIntervalSql`, `DatedLevelEvent`, `SQLWrapper`, and possibly `desc`, `gte`, `lt`); let `pnpm lint` and `pnpm typecheck` say which.
+From `megagame-store.ts`, find each by name in the Dashboard section and delete it with its doc comment: `levelGrid`, `claimedTicketHolderCount`, `QuestCount` and `questCompletionCounts`, `distinctCompletingPlayers`, `VolunteerCount` and `completionsByVolunteer`, `liveLevelEventsBefore`, `OverrideRow` and `recentOverrides`. Keep `dateBin`, `CompletionBucket`, `completionSeries`, `LevelEventBucket`, `levelEventSeries`, `VoidRow`, `recentVoids`, `exportEventTable`, `listQuests`, `importQuests` and `levelEventsFor`.
 
-Keep `recentOverrides`, `recentVoids`, `OverrideRow`, `VoidRow` and their tests ("Decisions" 11).
+Then remove the imports that are now unused. From a grep on 2026-11-03 these are `MEGAGAME_CLASSES` (only `levelGrid` used it) and `type DatedLevelEvent` (only `liveLevelEventsBefore` used it). `gt` stays (Task 5's `progressPlayers` uses it), as do `alias`, `asc`, `desc`, `isNotNull` and `MAX_LEVEL`. Let `corepack pnpm lint` and `corepack pnpm typecheck` confirm.
 
-From `megagame-store.test.ts`: the matching names in the import list and the `describe` blocks `claimedTicketHolderCount`, `questCompletionCounts`, `distinctCompletingPlayers`, `completionsByVolunteer`, `completionSeries`, `levelEventSeries`, `liveLevelEventsBefore`.
-
-From `charts.tsx`: `StackedBars` and `InlineBar` if nothing imports them any more (`LineChart` may have copied the frame; check).
-
-From `pages.test.ts`: the old store mock entries `questCompletionCounts`, `distinctCompletingPlayers`, `completionsByVolunteer`, `completionSeries`, `levelEventSeries`, `liveLevelEventsBefore`, `recentOverrides`, `recentVoids`, `claimedTicketHolderCount` (the new page imports none of them).
-
-Delete `series.ts` and `series.test.ts`.
+From `megagame-store.test.ts`: remove `claimedTicketHolderCount`, `completionsByVolunteer`, `distinctCompletingPlayers`, `levelGrid`, `liveLevelEventsBefore`, `questCompletionCounts` and `recentOverrides` from the import list, and delete their `describe` blocks (`levelGrid`, `claimedTicketHolderCount`, `questCompletionCounts`, `distinctCompletingPlayers`, `completionsByVolunteer`, `liveLevelEventsBefore`, `recentOverrides`). Keep the `completionSeries`, `levelEventSeries`, `recentVoids` and `exportEventTable` blocks.
 
 - [ ] **Step 3: Run the affected tests, lint and typecheck**
 
-Run: `pnpm exec vitest run src/lib/megagame-store.test.ts src/app/backstage/megagame` then `pnpm lint` then `pnpm typecheck`
-Expected: all PASS.
+Run: `corepack pnpm exec vitest run src/lib/megagame-store.test.ts src/app/backstage/megagame`
+Expected: PASS.
+
+Run: `corepack pnpm lint`
+Expected: PASS.
+
+Run: `corepack pnpm typecheck`
+Expected: PASS.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add -A src/lib/megagame-store.ts src/lib/megagame-store.test.ts src/app/backstage/megagame/dashboard src/app/backstage/megagame/pages.test.ts
-git commit -m "refactor(megagame): drop the old dashboard's queries and helpers"
+git add src/lib/megagame-store.ts src/lib/megagame-store.test.ts
+git commit -m "refactor(megagame): drop the store queries the old dashboard left behind"
 ```
 
 ---
 
-## Milestone F: links
+## Milestone F: link and permission text
 
-### Task 13: Gate the tool-home dashboard link on megagame.manage
+### Task 14: Manager-only "Dashboard" link on the Quest Board
 
 **Files:**
-- Modify: `src/app/backstage/megagame/page.tsx` (lines 122 to 127)
+
+- Modify: `src/app/backstage/megagame/page.tsx`
 - Modify: `src/app/backstage/megagame/pages.test.ts`
 
 **Interfaces:**
-- Consumes: the existing `manager` value in `MegagameHome` (line 48, `toolAccess("megagame.manage")`).
+
+- Consumes: the existing `viewer.manager` value in `QuestBoard` (`page.tsx`, from `toolAccess("megagame.manage")`).
 - Produces: nothing new.
 
-- [ ] **Step 1: Write the failing test** (append to `pages.test.ts`)
+The layout (`layout.tsx`) is synchronous, has no nav and does not resolve access, while `page.tsx` already knows whether the viewer is a manager, so the link goes in `page.tsx` ("Decisions" 14). Do not change `layout.tsx`.
+
+- [ ] **Step 1: Write the failing tests**
+
+In `pages.test.ts`, the existing test "renders the four sections in order with the viewer's undo rights" maps every child of the returned fragment to a component name. With the link added, a non-manager's first child is `false`. Change its first two lines to filter that out:
+
+```ts
+const el = (await QuestBoard(props({ quest: "A2C4EF" }))) as {
+  props: { children: unknown[] };
+};
+const sections = el.props.children.filter(Boolean) as {
+  type: unknown;
+  props: Record<string, unknown>;
+}[];
+```
+
+Then add, after the `describe("Quest Board for a volunteer", ...)` block:
 
 ```ts
 const hrefs = (node: unknown): string[] => {
@@ -2704,126 +3461,154 @@ const hrefs = (node: unknown): string[] => {
   ];
 };
 
-describe("megagame home links", () => {
-  beforeEach(() => {
-    data.loadPlayerRows.mockResolvedValue([]);
-    store.recentConfirmations.mockResolvedValue([]);
-  });
-
-  it("hides the dashboard link from a volunteer without megagame.manage", async () => {
+describe("Quest Board dashboard link", () => {
+  it("is hidden from a volunteer without megagame.manage", async () => {
     auth.toolAccess.mockImplementation(async (p: string) =>
-      p === "megagame.manage" ? null : { name: "Vol", userId: "v1" },
+      p === "megagame.verify" ? { name: "Vol", userId: "v1" } : null,
     );
-    const links = hrefs(await MegagameHome(props({}, {})));
-    expect(links).toContain("/backstage/megagame/level");
-    expect(links).not.toContain("/backstage/megagame/dashboard");
+    const el = await QuestBoard(props({}));
+    expect(hrefs(el)).not.toContain("/backstage/megagame/dashboard");
   });
 
-  it("shows it to a manager", async () => {
+  it("is shown to a manager", async () => {
     auth.toolAccess.mockResolvedValue({ name: "Boss", userId: "m1" });
-    const links = hrefs(await MegagameHome(props({}, {})));
-    expect(links).toContain("/backstage/megagame/dashboard");
+    const el = await QuestBoard(props({}));
+    expect(hrefs(el)).toContain("/backstage/megagame/dashboard");
   });
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+`hrefs` walks only element props, so it does not run the section components.
 
-Run: `pnpm exec vitest run src/app/backstage/megagame/pages.test.ts`
-Expected: FAIL on "hides the dashboard link".
+- [ ] **Step 2: Run the tests to verify the new one fails**
 
-- [ ] **Step 3: Implement**: wrap the "Dashboard →" `Link` in `{manager && (...)}`, keeping its position before the quest-import link.
+Run: `corepack pnpm exec vitest run src/app/backstage/megagame/pages.test.ts`
+Expected: FAIL on "is shown to a manager"; the other tests pass.
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [ ] **Step 3: Implement**
 
-Run: `pnpm exec vitest run src/app/backstage/megagame/pages.test.ts`
+In `page.tsx`, add `import Link from "next/link";` and make the returned fragment start with:
+
+```tsx
+{
+  viewer.manager && (
+    <p className="text-right text-sm">
+      <Link
+        href="/backstage/megagame/dashboard"
+        className="text-ink/60 underline underline-offset-2 hover:text-meeple"
+      >
+        Dashboard
+      </Link>
+    </p>
+  );
+}
+```
+
+followed by the four sections unchanged.
+
+- [ ] **Step 4: Run the tests and the typecheck**
+
+Run: `corepack pnpm exec vitest run src/app/backstage/megagame/pages.test.ts`
+Expected: PASS.
+
+Run: `corepack pnpm typecheck`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/app/backstage/megagame/page.tsx src/app/backstage/megagame/pages.test.ts
-git commit -m "feat(megagame): show the dashboard link only to managers"
+git commit -m "feat(megagame): link managers to the progress dashboard from the Quest Board"
 ```
 
-### Task 14: Header link and permission text (droppable, see "Decisions" 12)
+### Task 15: Permission descriptions
 
 **Files:**
-- Modify: `src/app/backstage/megagame/layout.tsx`
-- Modify: `src/app/backstage/megagame/pages.test.ts`
-- Modify: `src/lib/permissions.ts` (lines 200 to 216)
 
-**Interfaces:**
-- Consumes: `toolAccess` from `@/lib/admin-auth`.
-- Produces: `MegagameLayout` becomes `async`.
+- Modify: `src/lib/permissions.ts` (the `megagame.verify` and `megagame.manage` entries, lines 200 to 216)
 
-- [ ] **Step 1: Write the failing test** (append to `pages.test.ts`; add `vi.mock("../ToolLayout", () => ({ default: () => null }));` next to the other mocks and `import MegagameLayout from "./layout";`)
+This is a text-only change; no test pins the descriptions.
 
-```ts
-describe("megagame layout", () => {
-  it("links the dashboard in the header only for managers", async () => {
-    auth.toolAccess.mockResolvedValue(null);
-    const plain = (await MegagameLayout({ children: null })) as { props: { nav: unknown } };
-    expect(hrefs(plain.props.nav)).toEqual(["/backstage/megagame/level"]);
-    auth.toolAccess.mockResolvedValue({ name: "Boss", userId: "m1" });
-    const boss = (await MegagameLayout({ children: null })) as { props: { nav: unknown } };
-    expect(hrefs(boss.props.nav)).toContain("/backstage/megagame/dashboard");
-    expect(auth.toolAccess).toHaveBeenCalledWith("megagame.manage");
-  });
-});
-```
+- [ ] **Step 1: Edit the two descriptions**
 
-- [ ] **Step 2: Run the test to verify it fails**
+`megagame.verify` becomes "Record quest completions and level-ups at /backstage/megagame." `megagame.manage` becomes "Import and edit quests, change level requirements, void anyone's records, and read the progress dashboard at /backstage/megagame/dashboard."
 
-Run: `pnpm exec vitest run src/app/backstage/megagame/pages.test.ts`
-Expected: FAIL; the layout is not async and always shows the link.
+- [ ] **Step 2: Run the permission tests and the typecheck**
 
-- [ ] **Step 3: Implement**: make `MegagameLayout` `async`, call `const manager = await toolAccess("megagame.manage");`, and render the dashboard `Link` only when `manager` is set. Commit this alone:
+Run: `corepack pnpm exec vitest run src/lib/permissions.test.ts`
+Expected: PASS.
 
-```bash
-git add src/app/backstage/megagame/layout.tsx src/app/backstage/megagame/pages.test.ts
-git commit -m "feat(megagame): show the header dashboard link only to managers"
-```
+Run: `corepack pnpm typecheck`
+Expected: PASS.
 
-- [ ] **Step 4: Update the permission descriptions** in `src/lib/permissions.ts`: `megagame.verify` becomes "Record quest completions and level-ups at /backstage/megagame." and `megagame.manage` becomes "Import and edit quests, change level requirements, void anyone's records, and read the progress dashboard." Run `pnpm exec vitest run src/lib/permissions.test.ts` (expected PASS; no test pins the text), then commit alone:
+- [ ] **Step 3: Commit**
 
 ```bash
 git add src/lib/permissions.ts
-git commit -m "docs(megagame): say who reads the progress dashboard in the permission text"
+git commit -m "docs(megagame): say that managers read the progress dashboard in the permission text"
 ```
 
 ---
 
-## Milestone G: verification
+## Milestone G: verification, PR and preview
 
-### Task 15: Full checks
+### Task 16: Full checks, push, draft PR
 
 **Files:** none unless a check fails.
 
 - [ ] **Step 1: Run every check**
 
-Run: `pnpm typecheck && pnpm lint && pnpm format:check && pnpm test`
-Expected: all PASS. If `format:check` fails on files this branch touched, run `pnpm exec prettier --write` on them and commit as "style(megagame): format". Do not reformat files the branch did not touch.
+Run, one at a time:
 
-- [ ] **Step 2: Check the self-review items**
+```bash
+corepack pnpm lint
+corepack pnpm typecheck
+corepack pnpm vitest run
+```
 
-Confirm with grep that `src/lib/megagame-progress.ts` has no import of `@/db`, `drizzle-orm`, `server-only` or `megagame-store`:
+Expected: all PASS. (`corepack pnpm typecheck` is the repo's script for `next typegen && tsc --noEmit`.) If a check fails, fix it in a commit of its own and rerun all three.
+
+- [ ] **Step 2: Check the pure module's imports**
 
 Run: `grep -nE "@/db|drizzle-orm|server-only|megagame-store" src/lib/megagame-progress.ts`
 Expected: no output.
 
-- [ ] **Step 3: Note for the later rebase**
+- [ ] **Step 3: Check the base**
 
-When this branch is rebased onto the volunteer branch's revision (spec 10), resolve conflicts in `dashboard/page.tsx` by taking this branch's page, then re-run the Task 12 Step 1 grep including `recentOverrides` and `recentVoids`. If the revision no longer uses them, remove them and their tests in a separate commit; if it does, keep them.
+Run: `git log --oneline 5be83f7..megagame-volunteer`
+If this lists commits (on 2026-11-03 it listed 5323bb4 and 3545912, two fixes pushed to `fork/megagame-volunteer` after this branch was rebased), rebase onto the current volunteer branch with `git rebase megagame-volunteer` and rerun Step 1. If the rebase conflicts, run `git rebase --abort`, stop, and report the conflicting files.
 
-### Task 16: Preview screenshots (report, do not iterate)
+- [ ] **Step 4: Push to the fork**
+
+Run: `git push -u fork megagame-dashboard`
+If the push is refused with an access-rights or "repository exists" error, stop and report it. That error comes from the SSH keyring prompt, not from missing permissions; the user will unlock the keyring and retry.
+
+- [ ] **Step 5: Open the draft PR**
+
+Write the description to a file in the session's scratchpad directory, with each paragraph and list item on one line (no hard wraps), then run:
+
+```bash
+gh pr create --draft --repo tradingbootcamp/metagame-2026 --base main --head jkopczyn:megagame-dashboard --title "feat(megagame): progress dashboard for the design team" --body-file <scratchpad>/pr-body.md
+```
+
+The description says, in full sentences:
+
+- This PR stacks on https://github.com/tradingbootcamp/metagame-2026/pull/416 (`megagame-volunteer`) and should be merged after it. Its own commits are the ones listed below; everything before them belongs to #416.
+- What the page is: a progress page at `/backstage/megagame/dashboard`, gated on `megagame.manage`, with concentration (shares, Gini, Lorenz curves, most active players), classes side by side with cumulative level bars, level transitions, join cohorts, the level grid and the CSV exports.
+- What else changes: the export route is restored under `megagame.manage`; the Quest Board shows a "Dashboard" link to managers; the permission descriptions are updated; seven unused store queries are removed (list them).
+- The list of this branch's commits, from `git log --reverse --format='- %h %s' megagame-volunteer..HEAD`.
+- If the session has Linear access, a `Fixes META-###` line for the matching issue; otherwise leave it out.
+- End with the attribution line that the executing session's instructions specify for PR descriptions.
+
+Record the PR number and URL for the report.
+
+### Task 17: Preview screenshots (report, do not iterate)
 
 **Files:** none.
 
 - [ ] **Step 1: Find the preview URL**
 
-Run: `gh pr list --repo tradingbootcamp/metagame-2026 --head megagame-dashboard --json number,url`
-If there is a PR, take the Vercel preview URL from the Vercel bot comment (`gh pr view <number> --repo tradingbootcamp/metagame-2026 --comments`). If there is no PR, stop here and report to the controller that a preview needs a pushed branch and a draft PR; pushes go to the `fork` remote and PRs are opened with `--head jkopczyn:megagame-dashboard`, and this branch ships after the volunteer PR, so opening it is the user's call.
+Wait for the Vercel deployment of the PR to finish (`gh pr checks <number> --repo tradingbootcamp/metagame-2026` shows the Vercel check as passing), then take the preview URL from the Vercel bot comment: `gh pr view <number> --repo tradingbootcamp/metagame-2026 --comments`. If the deployment fails, report the failure with its log link and stop.
 
 - [ ] **Step 2: Check the screenshot prerequisites**
 
@@ -2832,12 +3617,13 @@ If there is a PR, take the Vercel preview URL from the Vercel bot comment (`gh p
 - [ ] **Step 3: Take the screenshots**
 
 Run: `node scripts/preview-shot.mjs <preview-url> /backstage/megagame/dashboard "/backstage/megagame/dashboard?range=con&bucket=1d" /backstage/megagame`
-The script signs in as the seed admin, who passes every permission check. Preview data may be empty; say so in the report if the tables are all zeros.
+
+The script signs in as the seed admin, who passes every permission check, and shoots each path at phone and desktop widths. If the script cannot sign in (an error from its sign-in step, or the screenshots show the sign-in form instead of the page), say so and stop; do not try other accounts or change the script.
 
 - [ ] **Step 4: Look at the images and report**
 
-Open each PNG in `preview-shots/` and check: no horizontal overflow (the script also prints a warning), charts hidden on the phone shots and present on desktop, every table readable on the phone (horizontal scroll inside the bordered box is fine), the level grid and export links present. Report what you saw to the user with the screenshot paths. If anything looks wrong, show the screenshots to the user and do not change code on your own.
+Open each PNG in `preview-shots/` and check: no horizontal page overflow (the script also prints a warning), the charts present on both the phone and desktop shots, every table readable on the phone (horizontal scroll inside the bordered box is fine), the level grid and export links present, and the "Dashboard" link on the `/backstage/megagame` shots. Preview data may be empty; say so if the tables are all zeros. Report what you saw with the screenshot paths. If anything looks wrong, report it with the screenshots and do not change code.
 
-- [ ] **Step 5: Clean up**
+- [ ] **Step 5: Clean up after the report**
 
-Run: `rm -rf preview-shots`
+Once the user has seen the screenshots, run `rm -rf preview-shots`.
