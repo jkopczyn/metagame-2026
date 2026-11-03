@@ -1,7 +1,8 @@
 import { BOX, NOTE, TABLE, TD, TDN, TH, THN } from "./styles";
-import { formatDuration } from "./view";
+import { dayLabel, formatDuration } from "./view";
 import { CLASS_LABELS } from "@/lib/megagame-levels";
 import type { Transitions } from "@/lib/megagame-progress";
+import { CONFERENCE_DAYS } from "@/lib/schedule";
 
 export default function TransitionsSection({ data }: { data: Transitions }) {
   return (
@@ -73,11 +74,12 @@ export default function TransitionsSection({ data }: { data: Transitions }) {
       </div>
       <p className={NOTE}>
         Times count from the later of the earlier level-up and the start of the
-        con (midnight Pacific, Friday Nov 6), so time at level 1 means time at
-        the con before the first level-up. Skipped past counts players who went
-        from this level straight to a higher one than the next; they are left
-        out of the times. Players whose current level has no level-up record are
-        counted but left out of the median. Deleted accounts are left out.
+        con (midnight Pacific, {dayLabel(CONFERENCE_DAYS[0].key)}), so time at
+        level 1 means time at the con before the first level-up. Skipped past
+        counts players who went from this level straight to a higher one than
+        the next; they are left out of the times. Players whose current level
+        has no level-up record are counted but left out of the median. Deleted
+        accounts are left out.
       </p>
     </>
   );
