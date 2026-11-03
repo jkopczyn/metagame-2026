@@ -127,17 +127,18 @@ export async function loadRecentActions(
   viewer: Viewer,
 ): Promise<{ actions: RecentAction[]; more: boolean }> {
   const [confirmations, levelUps, voids] = await Promise.all([
-    recentConfirmations(null, limit),
-    recentLevelUps(limit),
-    recentVoids(limit),
+    recentConfirmations(null, limit + 1),
+    recentLevelUps(limit + 1),
+    recentVoids(limit + 1),
   ]);
-  const sources = { confirmations, levelUps, voids };
   const total = confirmations.length + levelUps.length + voids.length;
   return {
-    actions: mergeRecentActions(sources, viewer, limit),
-    more:
-      total > limit ||
-      Object.values(sources).some((rows) => rows.length >= limit),
+    actions: mergeRecentActions(
+      { confirmations, levelUps, voids },
+      viewer,
+      limit,
+    ),
+    more: total > limit,
   };
 }
 

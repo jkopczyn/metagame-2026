@@ -190,21 +190,33 @@ describe("mergeRecentActions", () => {
 });
 
 describe("loadRecentActions", () => {
-  it("asks each source for the limit and reports when there may be more", async () => {
+  it("asks each source for one past the limit and reports when there is more", async () => {
     store.recentConfirmations.mockResolvedValue([confirmation("c1", 5, "v1")]);
     store.recentLevelUps.mockResolvedValue([levelUp("l1", 4, "v1")]);
     store.recentVoids.mockResolvedValue([]);
     const viewer = { userId: "v1", manager: false };
     const few = await loadRecentActions(30, viewer);
-    expect(store.recentConfirmations).toHaveBeenCalledWith(null, 30);
-    expect(store.recentLevelUps).toHaveBeenCalledWith(30);
-    expect(store.recentVoids).toHaveBeenCalledWith(30);
+    expect(store.recentConfirmations).toHaveBeenCalledWith(null, 31);
+    expect(store.recentLevelUps).toHaveBeenCalledWith(31);
+    expect(store.recentVoids).toHaveBeenCalledWith(31);
     expect(few.actions).toHaveLength(2);
     expect(few.more).toBe(false);
 
     const many = await loadRecentActions(1, viewer);
     expect(many.actions.map((a) => a.key)).toEqual(["confirmation-c1"]);
     expect(many.more).toBe(true);
+  });
+
+  it("does not offer more when the actions fill the limit exactly", async () => {
+    store.recentConfirmations.mockResolvedValue([
+      confirmation("c1", 5, "v1"),
+      confirmation("c2", 4, "v1"),
+    ]);
+    store.recentLevelUps.mockResolvedValue([]);
+    store.recentVoids.mockResolvedValue([]);
+    const exact = await loadRecentActions(2, { userId: "v1", manager: false });
+    expect(exact.actions).toHaveLength(2);
+    expect(exact.more).toBe(false);
   });
 });
 

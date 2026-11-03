@@ -35,6 +35,7 @@ export default function ListAdder({ params }: { params: BoardParams }) {
             confirmation: null,
             players: queue.current(ids),
           }),
+          { scroll: false },
         )
       }
     />
