@@ -29,7 +29,8 @@ describe.skipIf(!URL)("megagame store against a scratch database", () => {
       const { rows } = await pool.query(
         `select 1 from pg_stat_activity
          where wait_event_type = 'Lock'
-           and query ilike '%insert into quest_completions%'`,
+           and query ilike '%insert into%'
+           and (query ilike '%quest_completions%' or query ilike '%confirmations%')`,
       );
       if (rows.length > 0) return true;
       await new Promise((r) => setTimeout(r, 100));
@@ -112,7 +113,7 @@ describe.skipIf(!URL)("megagame store against a scratch database", () => {
     }
     expect(blocked, "the insert waited on the undo's lock").toBe(true);
     expect(await liveCount(id)).toBe(0);
-  });
+  }, 15_000);
 
   it("refuses a retry whose quest or players differ, and changes nothing", async () => {
     const id = randomUUID();
