@@ -72,18 +72,30 @@ export function LineChart({
           aria-label={label}
           className="h-32 w-full border-b border-l border-ink/30"
         >
-          {series.map((s) => (
-            <polyline
-              key={s.name}
-              points={polylinePoints(seriesPoints(s.values, 1), W, H)}
-              fill="none"
-              stroke={s.color}
-              strokeWidth="2"
-              vectorEffect="non-scaling-stroke"
-            >
-              <title>{s.name}</title>
-            </polyline>
-          ))}
+          {series.map((s) => {
+            const points = seriesPoints(s.values, 1);
+            return (
+              <g key={s.name}>
+                <title>{s.name}</title>
+                <polyline
+                  points={polylinePoints(points, W, H)}
+                  fill="none"
+                  stroke={s.color}
+                  strokeWidth="2"
+                  vectorEffect="non-scaling-stroke"
+                />
+                {/* A polyline with one point draws nothing, so mark it. */}
+                {points.length === 1 && (
+                  <circle
+                    cx={points[0].x * W}
+                    cy={H - points[0].y * H}
+                    r="3"
+                    fill={s.color}
+                  />
+                )}
+              </g>
+            );
+          })}
         </svg>
       </div>
       <figcaption className="ml-12 flex justify-between text-xs text-ink/50">
