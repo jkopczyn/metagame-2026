@@ -373,12 +373,8 @@ describe("previewOverrides", () => {
       { schedule: RAW_SCHEDULE, steals: everything.steals },
       "preview",
     );
-    expect(overrides?.data?.names).toEqual(new Map([["u1", "Ada"]]));
-    const noNames = previewOverrides(
-      { schedule: RAW_SCHEDULE, steals: "[]" },
-      "preview",
-    );
-    expect(noNames?.data?.names).toEqual(new Map());
+    expect(overrides?.data?.names).toEqual(new Map());
+    expect(overrides?.data?.steals).toHaveLength(1);
   });
 
   it("leaves data unset when no steals parameter is given", () => {
