@@ -21,6 +21,7 @@ describe("describeSchema", () => {
       "bookmarks",
       "budget_ignored_lines",
       "budget_import_runs",
+      "hat_steals",
       "level_events",
       "locations",
       "profiles",
@@ -67,6 +68,8 @@ describe("describeSchema", () => {
       "account",
       "apikey",
       "bookmarks",
+      "hat_steals",
+      "hat_steals",
       "level_events",
       "level_events",
       "level_events",
@@ -220,7 +223,42 @@ describe("describeSchema", () => {
       "quests",
       "quest_progress",
       "level_events",
+      "hat_steals",
       "sign_drafts",
+    ]);
+  });
+
+  it("records hat thefts against the thief and the volunteer", () => {
+    expect(table("hat_steals").columns.map((c) => c.name)).toEqual([
+      "id",
+      "hat_id",
+      "user_id",
+      "stolen_at",
+      "recorded_by",
+      "created_at",
+    ]);
+    expect(column("hat_steals", "id").primary).toBe(true);
+    expect(column("hat_steals", "hat_id").nullable).toBe(false);
+    expect(column("hat_steals", "user_id").nullable).toBe(false);
+    expect(column("hat_steals", "stolen_at").nullable).toBe(false);
+    expect(column("hat_steals", "created_at").nullable).toBe(false);
+    expect(column("hat_steals", "recorded_by").nullable).toBe(true);
+    expect(column("hat_steals", "user_id").references).toEqual({
+      table: "user",
+      column: "id",
+      onDelete: "cascade",
+    });
+    expect(column("hat_steals", "recorded_by").references).toEqual({
+      table: "user",
+      column: "id",
+      onDelete: "set null",
+    });
+    expect(table("hat_steals").indexes).toEqual([
+      {
+        name: "hat_steals_hat_stolen_at_idx",
+        columns: ["hat_id", "stolen_at"],
+        unique: false,
+      },
     ]);
   });
 
