@@ -9,6 +9,8 @@ import ClassesSection from "./ClassesSection";
 import type { ClassTable } from "@/lib/megagame-progress";
 import TransitionsSection from "./TransitionsSection";
 import type { Transitions } from "@/lib/megagame-progress";
+import CohortsSection from "./CohortsSection";
+import type { CohortTable } from "@/lib/megagame-progress";
 
 describe("LevelGrid", () => {
   it("shows players per level with percentages of ticket holders", () => {
@@ -304,5 +306,36 @@ describe("TransitionsSection", () => {
     expect(html).toContain("4h 00m");
     expect(html).toContain("5h 30m");
     expect(html).toContain("–");
+  });
+});
+
+const cohortData: CohortTable = {
+  days: ["2026-11-06", "2026-11-07", "2026-11-08"],
+  rows: [
+    {
+      day: "2026-11-06",
+      size: 2,
+      completionsMean: 1,
+      completionsMedian: 1,
+      levelUpsMean: 0.5,
+      reachedLevel2Share: 1,
+      retention: [null, 0.5, 0],
+    },
+  ],
+  holders: 4,
+  notYetActive: 2,
+  notYetActiveShare: 0.5,
+};
+
+describe("CohortsSection", () => {
+  it("shows each cohort with retention on later days only", () => {
+    const html = renderToStaticMarkup(
+      createElement(CohortsSection, { data: cohortData }),
+    );
+    expect(html).toContain("Friday Nov 6");
+    expect(html).toContain("Active Saturday Nov 7");
+    expect(html).toContain("50%");
+    expect(html).toContain("0.5");
+    expect(html).toContain("2 of 4 claimed-ticket holders");
   });
 });
