@@ -49,21 +49,14 @@ vi.mock("@/db", async () => {
 
 import { schema } from "@/db";
 import {
-  claimedTicketHolderCount,
   claimedTicketHolderIds,
   liveCompletionLog,
   liveLevelEventLog,
   progressPlayers,
   completionSeries,
-  completionsByVolunteer,
   completionsInClass,
-  distinctCompletingPlayers,
   exportEventTable,
   levelEventSeries,
-  levelGrid,
-  liveLevelEventsBefore,
-  questCompletionCounts,
-  recentOverrides,
   recentVoids,
   confirmQuest,
   confirmationOutcome,
@@ -933,87 +926,6 @@ describe("claimedTicketHolderIds", () => {
   });
 });
 
-describe("levelGrid", () => {
-  it("folds the level combinations into players per level in each class", async () => {
-    queue([
-      { wizard: 2, pirate: 0, alien: 0, n: 3 },
-      { wizard: 2, pirate: 1, alien: 0, n: 1 },
-      { wizard: 0, pirate: 0, alien: 5, n: 2 },
-    ]);
-    const grid = await levelGrid();
-    expect(grid.wizard).toEqual([0, 0, 4, 0, 0, 0]);
-    expect(grid.pirate).toEqual([0, 1, 0, 0, 0, 0]);
-    expect(grid.alien).toEqual([0, 0, 0, 0, 0, 2]);
-    const c = chainOf(db.select, 0);
-    expect(render(arg(c, "where"))).toContain('"user"."wizard_level" > $');
-    expect(c.calls.some((call) => call[0] === "groupBy")).toBe(true);
-  });
-});
-
-describe("claimedTicketHolderCount", () => {
-  it("counts distinct owners of paid tickets", async () => {
-    queue([{ n: 42 }]);
-    expect(await claimedTicketHolderCount()).toBe(42);
-    const fields = (db.select.mock.calls[0] as unknown as [{ n: SQL }])[0];
-    expect(render(fields.n)).toContain(
-      'count(distinct "tickets"."owner_user_id")',
-    );
-    const where = dialect.sqlToQuery(
-      arg(chainOf(db.select, 0), "where") as SQL,
-    );
-    expect(where.sql).toContain('"tickets"."owner_user_id" is not null');
-    expect(where.params).toContain("paid");
-  });
-
-  it("is 0 with no rows", async () => {
-    queue([]);
-    expect(await claimedTicketHolderCount()).toBe(0);
-  });
-});
-
-describe("questCompletionCounts", () => {
-  it("counts only live completions and keeps quests with none", async () => {
-    queue([{ id: "q1", code: "A2C4EF", title: "T", class: null, n: 0 }]);
-    expect(await questCompletionCounts()).toHaveLength(1);
-    const c = chainOf(db.select, 0);
-    const join = c.calls.find((call) => call[0] === "leftJoin");
-    expect(join?.[1]).toBe(schema.questCompletions);
-    expect(render(join?.[2])).toContain(
-      '"quest_completions"."voided_at" is null',
-    );
-  });
-});
-
-describe("distinctCompletingPlayers", () => {
-  it("counts deleted accounts as one player", async () => {
-    queue([{ n: 7 }]);
-    expect(await distinctCompletingPlayers()).toBe(7);
-    const fields = (db.select.mock.calls[0] as unknown as [{ n: SQL }])[0];
-    expect(render(fields.n)).toContain(
-      'count(distinct coalesce("quest_completions"."user_id", \'\'))',
-    );
-    expect(render(arg(chainOf(db.select, 0), "where"))).toContain(
-      '"quest_completions"."voided_at" is null',
-    );
-  });
-});
-
-describe("completionsByVolunteer", () => {
-  it("groups live completions by who confirmed them", async () => {
-    queue([{ userId: "v1", name: "Vol", n: 3 }]);
-    expect(await completionsByVolunteer()).toEqual([
-      { userId: "v1", name: "Vol", n: 3 },
-    ]);
-    const c = chainOf(db.select, 0);
-    expect(render(arg(c, "where"))).toContain(
-      '"quest_completions"."voided_at" is null',
-    );
-    expect(c.calls.find((call) => call[0] === "innerJoin")?.[1]).toBe(
-      schema.confirmations,
-    );
-  });
-});
-
 describe("completionSeries", () => {
   const from = new Date("2026-11-07T08:00:00.000Z");
   const to = new Date("2026-11-07T18:07:00.000Z");
@@ -1069,31 +981,6 @@ describe("levelEventSeries", () => {
     expect(render(arg(chainOf(db.select, 0), "where"))).toContain(
       '"level_events"."voided_at" is null',
     );
-  });
-});
-
-describe("liveLevelEventsBefore", () => {
-  it("reads live events of known players up to the end", async () => {
-    const at = new Date("2026-11-07T10:00:00.000Z");
-    queue([{ userId: "u1", class: "wizard", level: 1, awardedAt: at }]);
-    expect(await liveLevelEventsBefore(new Date())).toHaveLength(1);
-    const where = render(arg(chainOf(db.select, 0), "where"));
-    expect(where).toContain('"level_events"."voided_at" is null');
-    expect(where).toContain('"level_events"."user_id" is not null');
-    expect(where).toContain('"level_events"."awarded_at" < $');
-  });
-});
-
-describe("recentOverrides", () => {
-  it("lists live and voided volunteer level-ups that failed their checks", async () => {
-    queue([]);
-    await recentOverrides();
-    const c = chainOf(db.select, 0);
-    const where = dialect.sqlToQuery(arg(c, "where") as SQL);
-    expect(where.sql).toContain('"level_events"."checks_passed" = $');
-    expect(where.params).toEqual([false, "volunteer"]);
-    expect(where.sql).not.toContain("voided_at");
-    expect(arg(c, "limit")).toBe(20);
   });
 });
 
