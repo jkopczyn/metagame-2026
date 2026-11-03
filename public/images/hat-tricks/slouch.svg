@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
+<g id="art">
+<path d="M 300 545 C 190 500 190 300 360 235 C 440 205 500 215 540 190 C 560 178 580 200 600 198 C 760 215 850 370 810 500 C 790 580 740 630 690 610 C 665 598 650 570 640 545" fill="none" stroke="#000" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 560 195 C 540 290 540 400 560 500" fill="none" stroke="#000" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 420 235 C 410 320 400 430 410 520" fill="none" stroke="#000" stroke-width="9.1" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 660 230 C 700 330 740 430 740 560" fill="none" stroke="#000" stroke-width="9.1" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 320 320 C 300 390 300 460 320 520" fill="none" stroke="#000" stroke-width="9.1" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 640 545 C 680 520 740 500 790 480" fill="none" stroke="#000" stroke-width="9.1" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 620 240 C 700 260 760 320 780 390" fill="none" stroke="#000" stroke-width="9.1" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 270 548 C 400 520 520 520 650 548 L 640 592 C 520 568 400 568 280 592 Z" fill="none" stroke="#000" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

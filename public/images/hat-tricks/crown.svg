@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
+<g id="art">
+<path d="M 190 460 C 300 480 700 480 810 460 L 810 580 C 700 610 300 610 190 580 Z" fill="none" stroke="#000" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 190 460 L 215 250 L 260 455 C 270 495 265 495 275 455 L 275 455 L 320 290 L 365 465 C 375 505 375 505 385 465 L 385 465 L 500 150 L 615 465 C 625 505 625 505 635 465 L 635 465 L 680 290 L 725 455 C 735 495 730 495 740 455 L 740 455 L 785 250 L 810 460" fill="none" stroke="#000" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 500 190 L 500 440" fill="none" stroke="#000" stroke-width="9.1" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 180 525 L 240 470 L 300 525 L 240 580 Z" fill="none" stroke="#000" stroke-width="9.1" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 310 525 L 370 470 L 430 525 L 370 580 Z" fill="none" stroke="#000" stroke-width="9.1" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 440 525 L 500 470 L 560 525 L 500 580 Z" fill="none" stroke="#000" stroke-width="9.1" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 570 525 L 630 470 L 690 525 L 630 580 Z" fill="none" stroke="#000" stroke-width="9.1" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 700 525 L 760 470 L 820 525 L 760 580 Z" fill="none" stroke="#000" stroke-width="9.1" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="310" cy="528" rx="24" ry="13" fill="#000"/>
+<ellipse cx="500" cy="528" rx="24" ry="13" fill="#000"/>
+<ellipse cx="690" cy="528" rx="24" ry="13" fill="#000"/>
+</g>
+</svg>
