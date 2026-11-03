@@ -133,6 +133,13 @@ describe("ConcentrationSection", () => {
     expect(html.match(/<circle /g)).toHaveLength(2);
   });
 
+  it("labels the series axis from 0 to 1 and says both lines are fractions of 1", () => {
+    const html = renderConcentration(false);
+    expect(html).not.toContain(">100%<");
+    expect(html).toMatch(/<span>1<\/span><span>0<\/span>/);
+    expect(html).toContain("both fractions of 1");
+  });
+
   it("does not hide the charts on phones", () => {
     expect(renderConcentration(false)).not.toContain("hidden sm:block");
   });
