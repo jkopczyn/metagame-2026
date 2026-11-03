@@ -23,7 +23,7 @@ Two store queries, each one HTTP request, load every live (non-voided) row:
 - completions: `user_id`, quest `class` (null for any-class quests), `confirmed_at`;
 - level events: `user_id`, `class`, `level`, `source`, `awarded_at`.
 
-Plus: the player names for the ids that appear, the current level columns for the level grid, and the claimed-ticket holder count (reusing `claimedTicketHolderCount`). Deleted users (null `user_id`) are grouped as one pseudo-player, as the dashboard does.
+Plus: the player names for the ids that appear, the current level columns for the level grid, and the claimed-ticket holder ids (a new `claimedTicketHolderIds` query, which replaces the old count query; the ids are needed for the "not yet active" count). Deleted users (null `user_id`) are grouped as one pseudo-player, as the dashboard does.
 
 A new pure module, `src/lib/megagame-progress.ts`, takes those arrays plus a range, bucket size and `now`, and returns every table in sections 4 to 7. No SQL aggregates: volumes are hundreds of players and low thousands of events, so one load and in-memory computation is cheaper than one query per metric, every metric is unit-testable with fabricated events, and "as of each bucket end" is uniform across sections. The module must not import the database.
 
@@ -67,7 +67,7 @@ Per cohort: size, completions per player (mean and median), volunteer level-ups 
 
 ## 8. Level grid and export
 
-At the top of the page, the current class x level grid from the user columns, with percentages of claimed-ticket holders, copied from the dashboard. At the bottom, the CSV export links for the event tables, pointing at the existing export route (which stays on the volunteer branch).
+At the top of the page, the current class x level grid from the user columns, with percentages of claimed-ticket holders, copied from the dashboard. At the bottom, the CSV export links for the event tables, pointing at the export route restored under the `megagame.manage` gate (section 2).
 
 ## 9. Charts
 
@@ -75,7 +75,7 @@ Inline SVG only, no charting dependency, matching the dashboard's approach: a Lo
 
 ## 10. Effects on existing code
 
-- No schema change. No change to the volunteer tool, the picker, or the export route.
+- No schema change. No change to the volunteer tool or the picker.
 - New: `src/lib/megagame-progress.ts` with tests; the load queries in `megagame-store.ts` with mocked-DB tests; `src/app/backstage/megagame/dashboard/` (page, view, refresh, export route) with tests following the `over-time/view.test.ts` and `pages.test.ts` patterns; the Quest Board link gated on `megagame.manage`; the `megagame.verify` description in the permission catalog no longer mentions the dashboard.
 - Removed: store queries that the volunteer branch kept only for a later dashboard and that the new page does not use. Anything the Quest Board or `over-time/` still calls stays. The tests of removed code go with it.
 - The level grid is derived in memory from the players query rather than by a separate query, so the page makes four database requests: completions, level events, players, claimed-ticket holder ids.
