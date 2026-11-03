@@ -200,7 +200,11 @@ describe("compare by scheduled", () => {
 });
 
 describe("slotLinkable", () => {
-  const placed = { placed: true, startsAt: "2026-06-12T17:00:00.000Z" };
+  const placed = {
+    placed: true,
+    startsAt: "2026-06-12T17:00:00.000Z",
+    locationId: "room",
+  };
 
   it("links a placed published session", () => {
     expect(slotLinkable(row({ ...placed, status: "published" }), true)).toBe(
@@ -214,6 +218,12 @@ describe("slotLinkable", () => {
 
   it("won't link anything unplaced, or while the schedule is gated", () => {
     expect(slotLinkable(row({ status: "published" }), true)).toBe(false);
+    expect(
+      slotLinkable(
+        row({ ...placed, locationId: null, status: "published" }),
+        true,
+      ),
+    ).toBe(false);
     expect(slotLinkable(row({ ...placed, status: "published" }), false)).toBe(
       false,
     );

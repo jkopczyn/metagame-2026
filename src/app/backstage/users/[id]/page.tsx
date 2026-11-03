@@ -264,7 +264,7 @@ export default async function AdminUserProfilePage(
           sessions={sessions.sessions}
           locations={sessions.locations}
           roles={[...SESSION_ROLES]}
-          linkable={viewer.permissions.has("schedule.preview")}
+          linkable
           emptyLabel="Not hosting, shepherding or attending anything."
         />
       </Section>

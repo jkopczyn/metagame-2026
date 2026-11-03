@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { getDb, schema } from "@/db";
 import { currentSession, getAuth } from "@/lib/auth";
 import { cleanDiscordHandle } from "@/lib/discord-handle";
+import { invalidateSchedule } from "@/lib/schedule-store";
 
 export type FirstSigninState = { error?: string; saved?: boolean };
 
@@ -48,6 +49,7 @@ export async function saveFirstSignin(
       body: { name },
       headers: await headers(),
     });
+    invalidateSchedule();
   }
   revalidatePath("/account");
   return { saved: true };

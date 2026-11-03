@@ -93,6 +93,21 @@ export function ticketMatch(
   );
 }
 
+/**
+ * Why a ticket gets the bring-a-friend swag, or null: it was bought with a
+ * referral (pack admissions count, linked to the pack's first) or referred
+ * someone. Only paid referees count either way.
+ */
+export function swagReason(t: {
+  referredBy: string | null;
+  referrals: number;
+}): string | null {
+  if (t.referredBy !== null) return `Referred by ${t.referredBy}`;
+  if (t.referrals > 0)
+    return `Referred ${t.referrals} ${t.referrals === 1 ? "friend" : "friends"}`;
+  return null;
+}
+
 export type TicketRole = "bought" | "holds" | "claimed";
 
 /** How one account relates to a ticket, for their profile. */

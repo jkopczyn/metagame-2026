@@ -26,7 +26,6 @@ import {
   type SortState,
   type TableMeta,
 } from "./SubmissionTable";
-import { canSeeSchedule } from "@/app/(v2)/schedule/data";
 import { smallButtonClass } from "@/app/backstage/ui";
 import ToolSignIn from "@/components/ToolSignIn";
 import { can } from "@/lib/access";
@@ -122,15 +121,13 @@ export default async function SpeakerCommitteePage(
 
   // The schedule comes along on every tab now: each row names the slot it
   // sits in, which needs the room names.
-  const [rfpSessions, committee, pane, schedule, canLink, grader] =
-    await Promise.all([
-      listRfpSessions(),
-      committeeAccounts(),
-      schedulePaneOn(),
-      loadSchedule(),
-      canSeeSchedule(),
-      can("submissions.grade"),
-    ]);
+  const [rfpSessions, committee, pane, schedule, grader] = await Promise.all([
+    listRfpSessions(),
+    committeeAccounts(),
+    schedulePaneOn(),
+    loadSchedule(),
+    can("submissions.grade"),
+  ]);
   const rows = rfpSessions.map(toRow);
 
   const params = await props.searchParams;
@@ -161,7 +158,7 @@ export default async function SpeakerCommitteePage(
   const meta: TableMeta = {
     options: pipelineOptions(committee.map((a) => a.committeeName)),
     rooms: Object.fromEntries(schedule.locations.map((l) => [l.id, l.name])),
-    linkSessions: canLink,
+    linkSessions: true,
     // The pills save through the grading actions, so a scheduler who can't
     // grade sees them but can't open them.
     editable: grader !== null,

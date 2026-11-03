@@ -48,7 +48,8 @@ async function findSession(slug: string) {
   const { sessions, locations } = await loadPublicSchedule();
   const session = sessions.find((s) => s.slug === slug);
   if (!session) notFound();
-  const room = locations.find((l) => l.id === session.locationId) ?? null;
+  const room = locations.find((l) => l.id === session.locationId);
+  if (!room) notFound();
   return { session, room };
 }
 
@@ -147,7 +148,7 @@ async function AdminDetails({ sessionId }: { sessionId: string }) {
   );
 }
 
-/** Callers must gate on scheduleGate() first. */
+/** The session page body, under the schedule layout or the account modal. */
 export default async function SessionDetails({ slug }: { slug: string }) {
   const [{ session, room }, account, admin] = await Promise.all([
     findSession(slug),
@@ -171,6 +172,7 @@ export default async function SessionDetails({ slug }: { slug: string }) {
   const tags = [
     session.category ? CATEGORY_LABEL[session.category] : null,
     session.ages ? AGES_LABEL[session.ages] : null,
+    session.rsvpIsCommitment ? "Limited spots" : null,
     session.sponsored ? "Sponsor" : null,
   ].filter(Boolean) as string[];
   const cap = session.maxCapacity;
@@ -216,7 +218,7 @@ export default async function SessionDetails({ slug }: { slug: string }) {
           <dt className="sr-only">Where</dt>
           <FaMapMarkerAlt aria-hidden className="shrink-0 text-[#eaa35a]" />
           <dd className="flex items-center gap-2.5">
-            {room?.thumbnailUrl && (
+            {room.thumbnailUrl && (
               // eslint-disable-next-line @next/next/no-img-element -- already thumbnail-sized
               <img
                 src={room.thumbnailUrl}
@@ -225,8 +227,8 @@ export default async function SessionDetails({ slug }: { slug: string }) {
               />
             )}
             <span>
-              {room?.name ?? "Room TBA"}
-              {room?.campusLocation && (
+              {room.name}
+              {room.campusLocation && (
                 <span className="text-[#1b1530]/60">
                   {" "}
                   · {room.campusLocation}
@@ -265,6 +267,7 @@ export default async function SessionDetails({ slug }: { slug: string }) {
           sessionId={session.id}
           capacity={cap}
           commitment={session.rsvpIsCommitment}
+          open={session.rsvpsOpen}
           conflicts={
             viewerId && plans && raw
               ? planConflicts(
@@ -295,11 +298,6 @@ export default async function SessionDetails({ slug }: { slug: string }) {
             </p>
           }
         />
-        {plans && !rsvps.names && (
-          <p className="text-sm text-[#1b1530]/60">
-            Claim your ticket to see who&rsquo;s coming.
-          </p>
-        )}
       </section>
 
       {editor && (

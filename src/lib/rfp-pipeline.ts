@@ -65,11 +65,14 @@ export type Row = {
 /**
  * Whether a row's slot can link to its session page. Placing a proposal from
  * the committee board doesn't publish it, and /schedule/<slug> resolves out of
- * publicSchedule(), which keeps only published sessions — so a placed draft
- * would 404.
+ * publicSchedule(), which keeps only published sessions in a room — so a
+ * placed draft, or a published session without a room, would 404.
  */
 export const slotLinkable = (row: Row, scheduleReachable: boolean) =>
-  scheduleReachable && row.placed && row.status === "published";
+  scheduleReachable &&
+  row.placed &&
+  row.locationId !== null &&
+  row.status === "published";
 
 /** A name worth showing: null when the account only has its email. */
 export const shownName = (name: string) => (name.includes("@") ? null : name);

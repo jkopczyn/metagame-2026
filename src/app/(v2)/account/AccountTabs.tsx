@@ -43,13 +43,9 @@ export default function AccountTabs({
 
   return (
     <Tabs.Root value={tab} onValueChange={select}>
-      {/* Phones have no room for it beside four tabs, so it sits above them. */}
-      {trailing && (
-        <div className="mb-4 flex justify-end sm:hidden">{trailing}</div>
-      )}
       <Tabs.List
         aria-label="Account"
-        className="mb-10 flex max-w-[960px] gap-3 border-b border-line max-sm:[scrollbar-width:none] max-sm:overflow-x-auto sm:gap-6"
+        className="mb-10 flex max-w-[960px] gap-2 border-b border-line max-sm:[scrollbar-width:none] max-sm:overflow-x-auto sm:gap-6"
       >
         {tabs.map((t) => (
           <Tabs.Trigger
@@ -61,9 +57,7 @@ export default function AccountTabs({
           </Tabs.Trigger>
         ))}
         {trailing && (
-          <div className="ml-auto self-center pb-2.5 max-sm:hidden">
-            {trailing}
-          </div>
+          <div className="ml-auto self-center pb-2.5">{trailing}</div>
         )}
       </Tabs.List>
       {tabs.map((t) => (

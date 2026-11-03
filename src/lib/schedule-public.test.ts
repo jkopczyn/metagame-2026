@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildDays,
   cellSessions,
+  hostedSessions,
   NO_ROOM,
   onlySessions,
   publicSchedule,
@@ -27,6 +28,7 @@ const session = (over: Partial<ScheduleSession>): ScheduleSession => ({
   status: "published",
   rsvpIsCommitment: false,
   sponsored: false,
+  rsvpsOpen: true,
   airtableRfpRecordId: "rec1",
   hosts: [{ userId: "u1", name: "Ada", email: "ada@example.com" }],
   shepherd: { userId: "u9", name: "Grace", email: "grace@example.com" },
@@ -93,14 +95,17 @@ describe("publicSchedule", () => {
     expect(sessions[0].hosts).toEqual([{ name: "Ada" }]);
   });
 
-  it("carries the commitment and sponsor flags", () => {
+  it("carries the commitment, sponsor and RSVPs-open flags", () => {
     const { sessions } = publicSchedule({
       locations: [],
-      sessions: [session({ rsvpIsCommitment: true, sponsored: true })],
+      sessions: [
+        session({ rsvpIsCommitment: true, sponsored: true, rsvpsOpen: false }),
+      ],
     });
     expect(sessions[0]).toMatchObject({
       rsvpIsCommitment: true,
       sponsored: true,
+      rsvpsOpen: false,
     });
   });
 
@@ -164,13 +169,18 @@ describe("publicSchedule", () => {
   it("keeps volunteer rooms and their sessions from the public", () => {
     const { locations, sessions } = publicSchedule(levels);
     expect(locations.map((l) => l.id)).toEqual(["open"]);
-    expect(sessions.map((s) => s.id)).toEqual(["a", "c"]);
+    expect(sessions.map((s) => s.id)).toEqual(["a"]);
   });
 
   it("gives volunteers the volunteer rooms too, but not the hidden one", () => {
     const { locations, sessions } = publicSchedule(levels, "volunteer");
     expect(locations.map((l) => l.id)).toEqual(["open", "ops"]);
-    expect(sessions.map((s) => s.id)).toEqual(["a", "b", "c"]);
+    expect(sessions.map((s) => s.id)).toEqual(["a", "b"]);
+  });
+
+  it("drops a roomless session even for the team", () => {
+    const { sessions } = publicSchedule(levels, "team");
+    expect(sessions.map((s) => s.id)).toEqual(["a", "b"]);
   });
 
   it("gives the team every room, used or not", () => {
@@ -257,5 +267,31 @@ describe("onlySessions", () => {
     expect(kept.map((d) => d.key)).toEqual(days.map((d) => d.key));
     expect(kept.map((d) => d.slots)).toEqual(days.map((d) => d.slots));
     expect(kept.flatMap((d) => d.sessions.map((s) => s.id))).toEqual(["b"]);
+  });
+});
+
+describe("hostedSessions", () => {
+  const ada = { userId: "u1", name: "Ada", email: "ada@example.com" };
+  const grace = { userId: "u9", name: "Grace", email: "grace@example.com" };
+  const raw = {
+    sessions: [
+      session({ id: "a", slug: "a", title: "A", hosts: [ada] }),
+      session({ id: "b", slug: "b", title: "B", hosts: [grace, ada] }),
+      session({
+        id: "c",
+        slug: "c",
+        title: "C",
+        hosts: [ada],
+        status: "draft",
+      }),
+    ],
+  };
+  const shown = publicSchedule({ locations: [], ...raw });
+
+  it("lists the shown sessions each account hosts, in order", () => {
+    const got = hostedSessions(raw, shown);
+    expect(got.get("u1")?.map((s) => s.slug)).toEqual(["a", "b"]);
+    expect(got.get("u9")?.map((s) => s.slug)).toEqual(["b"]);
+    expect(got.get("u0")).toBeUndefined();
   });
 });

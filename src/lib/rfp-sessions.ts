@@ -28,6 +28,7 @@ import {
 import {
   accountName,
   assertSlotFree,
+  invalidateSchedule,
   searchAccounts as searchAccountRows,
 } from "./schedule-store";
 
@@ -582,6 +583,7 @@ export async function updateRfpSession(
     .where(eq(sessions.id, sessionId))
     .returning({ id: sessions.id });
   if (!row) throw new Error("That session no longer exists.");
+  invalidateSchedule();
 
   await mirrorSession(
     sessionId,
@@ -823,6 +825,7 @@ export async function placeRfpSession(
     .where(eq(sessions.id, sessionId))
     .returning({ id: sessions.id });
   if (!row) throw new Error("That session no longer exists.");
+  invalidateSchedule();
 }
 
 /**
@@ -836,4 +839,5 @@ export async function unplaceRfpSession(sessionId: string): Promise<void> {
     .where(eq(sessions.id, sessionId))
     .returning({ id: sessions.id });
   if (!row) throw new Error("That session no longer exists.");
+  invalidateSchedule();
 }

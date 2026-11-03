@@ -95,6 +95,11 @@ const SESSION_FIELDS: Field[] = [
     note: "Default false. Tags it Sponsor on the schedule.",
   },
   {
+    name: "rsvpsOpen",
+    type: "boolean",
+    note: "Default true. False greys out the RSVP button as “RSVPs not yet open” and refuses RSVPs.",
+  },
+  {
     name: "hosts",
     type: "{email, name?}[]",
     note: "Lead first. An email with no account needs a name, which creates the account.",
@@ -185,7 +190,7 @@ export const TYPES: { name: string; shape: string }[] = [
   },
   {
     name: "Session",
-    shape: `{ id, slug, title, description, category, startsAt, endsAt, locationId, maxCapacity, minCapacity, ages, needs, status: ${oneOf(STATUSES)}, rsvpIsCommitment, sponsored, airtableRfpRecordId, hosts: Account[], shepherd: Account | null }. startsAt/endsAt are ISO UTC here, null while a draft is unplaced.`,
+    shape: `{ id, slug, title, description, category, startsAt, endsAt, locationId, maxCapacity, minCapacity, ages, needs, status: ${oneOf(STATUSES)}, rsvpIsCommitment, sponsored, rsvpsOpen, airtableRfpRecordId, hosts: Account[], shepherd: Account | null }. startsAt/endsAt are ISO UTC here, null while a draft is unplaced.`,
   },
   {
     name: "RfpSession",

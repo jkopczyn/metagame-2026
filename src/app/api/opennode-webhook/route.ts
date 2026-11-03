@@ -22,7 +22,9 @@ import {
 import { getDayPass } from "@/lib/tickets";
 import { mailingListOptOutUrl } from "@/lib/purchase-buyer";
 import { pickUtm } from "@/lib/utm";
-import { sendAdminErrorEmail, sendTicketConfirmationEmail } from "@/lib/email";
+import { sendTicketConfirmationEmail } from "@/lib/email";
+import { reportError } from "@/lib/error-report";
+import { followUpTicketPurchase } from "@/lib/ticket-followup";
 
 // HMAC verification + the OpenNode key need Node crypto — keep this off the edge.
 export const runtime = "nodejs";
@@ -69,6 +71,13 @@ export async function POST(request: Request) {
   } catch (err) {
     // 500 → OpenNode retries; the fetch (not the record) failed, so retry is safe.
     console.error("[opennode-webhook] getCharge failed:", err);
+    await reportError({
+      source: "OpenNode webhook",
+      summary: "Couldn't fetch the charge; OpenNode will retry",
+      details: { Charge: id },
+      error: err,
+      mention: false,
+    });
     return NextResponse.json({ error: "Processing failed" }, { status: 500 });
   }
 
@@ -104,6 +113,13 @@ export async function POST(request: Request) {
       } catch (err) {
         // 500 → OpenNode retries; the update is idempotent on charge id.
         console.error("[opennode-webhook] self-heal to Failed failed:", err);
+        await reportError({
+          source: "OpenNode webhook",
+          summary: "Couldn't mark a lapsed charge Failed; OpenNode will retry",
+          details: { Charge: charge.id },
+          error: err,
+          mention: false,
+        });
         return NextResponse.json(
           { error: "Processing failed" },
           { status: 500 },
@@ -174,6 +190,12 @@ export async function POST(request: Request) {
   } catch (err) {
     // 500 → OpenNode retries; recordPurchase upserts on ID, so a retry can't dupe.
     console.error("[opennode-webhook] failed to record purchase:", err);
+    await reportError({
+      source: "OpenNode webhook",
+      summary: "Couldn't record a Bitcoin ticket purchase; OpenNode will retry",
+      details: { Charge: charge.id, Buyer: String(meta.email ?? "unknown") },
+      error: err,
+    });
     return NextResponse.json({ error: "Processing failed" }, { status: 500 });
   }
 
@@ -194,11 +216,14 @@ export async function POST(request: Request) {
       }
     } catch (err) {
       console.error("[opennode-webhook] mailing-list signup failed:", err);
-      await sendAdminErrorEmail(
-        `Mailing-list signup failed for ticket buyer ${email} (OpenNode ${charge.id}): ${err instanceof Error ? err.message : String(err)}`,
-      ).catch((adminErr) =>
-        console.error("[opennode-webhook] admin alert failed:", adminErr),
-      );
+      await reportError({
+        source: "OpenNode webhook",
+        summary:
+          "Mailing-list signup failed for a ticket buyer (the ticket itself is fine)",
+        details: { Buyer: email, Charge: charge.id },
+        error: err,
+        mention: false,
+      });
     }
 
     try {
@@ -226,12 +251,23 @@ export async function POST(request: Request) {
       });
     } catch (err) {
       console.error("[opennode-webhook] confirmation email failed:", err);
-      await sendAdminErrorEmail(
-        `Ticket confirmation email failed for ${email} (OpenNode ${charge.id}): ${err instanceof Error ? err.message : String(err)}`,
-      ).catch((adminErr) =>
-        console.error("[opennode-webhook] admin alert failed:", adminErr),
-      );
+      await reportError({
+        source: "OpenNode webhook",
+        summary:
+          "Ticket confirmation email didn't send; the buyer has no ticket code yet",
+        details: { Buyer: email, Charge: charge.id },
+        error: err,
+      });
     }
+
+    await followUpTicketPurchase({
+      to: email,
+      name: meta.name ? String(meta.name) : undefined,
+      ticketType: meta.ticketLabel ? String(meta.ticketLabel) : undefined,
+      paymentId: charge.id,
+      test: meta.test === true || meta.test === "true",
+      source: "OpenNode webhook",
+    });
   }
 
   return NextResponse.json({ received: true });

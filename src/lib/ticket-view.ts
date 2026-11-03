@@ -1,3 +1,4 @@
+import { formatReferralCode } from "@/lib/referral";
 import { formatTicketCode } from "@/lib/ticket-code-format";
 import {
   emailKey,
@@ -18,12 +19,17 @@ export type TicketView = {
   code: string | null;
   /** Bought by the signed-in user, now held by someone else. */
   transferred: boolean;
+  /** The code to invite friends with, once minted for the holder or owner. */
+  referralCode: string | null;
+  /** Who the ticket was bought on a referral from, by name or email. */
+  referredBy: string | null;
 };
 
 export function ticketView(
   t: TicketRow,
   userId: string,
   email: string,
+  referredBy: string | null = null,
 ): TicketView {
   const holds = holdsTicket(t, userId, email);
   const claimed = t.ownerUserId !== null;
@@ -37,5 +43,10 @@ export function ticketView(
     claimed,
     code: holds && !claimed ? formatTicketCode(t.ticketCode) : null,
     transferred: !holds && !mine && t.purchaserEmail === emailKey(email),
+    referralCode:
+      (holds || mine) && t.referralCode !== null
+        ? formatReferralCode(t.referralCode)
+        : null,
+    referredBy,
   };
 }

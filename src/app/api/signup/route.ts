@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { recordSignup } from "@/lib/airtable";
+import { reportError } from "@/lib/error-report";
 import { isInterestValue } from "@/lib/interests";
 
 export async function POST(request: Request) {
@@ -48,6 +49,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, stored: result.stored });
   } catch (err) {
     console.error("[signup] failed to store email:", err);
+    await reportError({
+      source: "Mailing-list signup",
+      summary: "Airtable didn't take the signup; the person saw an error",
+      details: { Email: email.trim() },
+      error: err,
+    });
     return NextResponse.json(
       { error: "Failed to save signup" },
       { status: 500 },

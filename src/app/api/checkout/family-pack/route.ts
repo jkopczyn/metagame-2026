@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { reportError } from "@/lib/error-report";
 import {
   familyPackPriceId,
   packMetadata,
@@ -58,6 +59,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ url: session.url });
   } catch (error) {
     console.error("[checkout/family-pack]", error);
+    await reportError({
+      source: "Family & Friends Pack checkout",
+      summary: "Couldn't start a checkout session; the buyer saw an error",
+      details: { Attendees: attendees.length },
+      error,
+    });
     return NextResponse.json(
       { error: "Couldn't start checkout. Please try again." },
       { status: 502 },

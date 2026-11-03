@@ -22,14 +22,17 @@ export function ticketCode(paymentId: string): string {
   return code;
 }
 
-/** A fresh code for a ticket whose old code must stop working. */
-export function randomTicketCode(): string {
+/** `length` random characters of the ticket alphabet. */
+export function randomCode(length: number): string {
   let code = "";
-  for (let i = 0; i < TICKET_CODE_LENGTH; i++) {
+  for (let i = 0; i < length; i++) {
     code += ALPHABET[randomInt(ALPHABET.length)];
   }
   return code;
 }
+
+/** A fresh code for a ticket whose old code must stop working. */
+export const randomTicketCode = () => randomCode(TICKET_CODE_LENGTH);
 
 // Drizzle wraps the driver's error, so the Postgres code can sit on a cause.
 const isUniqueViolation = (e: unknown): boolean =>

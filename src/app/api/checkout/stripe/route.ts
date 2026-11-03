@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
+import { reportError } from "@/lib/error-report";
 import type Stripe from "stripe";
 import { isEarlyBirdActive } from "@/lib/early-bird";
+import { sendAdminErrorEmail } from "@/lib/email";
+import { REFERRAL_PARAM } from "@/lib/referral";
+import {
+  referralMetadata,
+  resolveDiscount,
+  type Discount,
+  type DiscountParams,
+} from "@/lib/referral-checkout";
 import { getStripe } from "@/lib/stripe";
 import {
   DAY_PASS_TIER,
@@ -85,50 +94,41 @@ function compUtm(promo: Stripe.PromotionCode): Utm {
 }
 
 /**
- * A `promo` on the link (/ticket/CODE) is applied for the buyer, as is the tier's
- * own code during early-bird; Stripe then shows no code box. Otherwise — or on
- * the unlisted `code=own` link, or when the code isn't redeemable — the box is shown.
+ * A `promo` (from the discount modal or a /ticket/CODE link) locks in its
+ * discount so Stripe shows no code box; the tier's own code counts as the
+ * promo during early-bird, except on the unlisted `code=own` link. Without a
+ * live one, the box is shown.
  */
 async function promoParams(
   stripe: Stripe,
   ticket: TicketTier,
   params: URLSearchParams,
-): Promise<{
-  session: Pick<
-    Stripe.Checkout.SessionCreateParams,
-    "discounts" | "allow_promotion_codes"
-  >;
-  utm: Utm;
-}> {
-  const box = { session: { allow_promotion_codes: true }, utm: {} };
+): Promise<{ session: DiscountParams; utm: Utm; discount: Discount | null }> {
   const linked = params.get("promo")?.trim();
   const earlyBird =
     params.get("code") !== "own" && isEarlyBirdActive()
       ? ticket.promoCode
       : undefined;
-  const code = linked || earlyBird;
-  if (!code) return box;
-  const {
-    data: [promo],
-  } = await stripe.promotionCodes.list({ code, active: true, limit: 1 });
-  if (!promo) {
-    console.warn(
-      `[checkout/stripe] no active ${code} promotion code — showing the code box instead`,
-    );
-    return box;
-  }
+  const discount = await resolveDiscount(
+    stripe,
+    linked || earlyBird,
+    ticket.prices.full.usd,
+  );
   return {
-    session: { discounts: [{ promotion_code: promo.id }] },
-    utm: linked ? compUtm(promo) : {},
+    session: discount?.session ?? { allow_promotion_codes: true },
+    utm: linked && discount?.promo ? compUtm(discount.promo) : {},
+    discount,
   };
 }
 
 /**
- * GET /api/checkout/stripe?tier=standard[&code=own | &promo=<code>]
+ * GET /api/checkout/stripe?tier=standard[&code=own | &promo=<code>][&ref=<referral>]
  *   | ?tier=supporter&chip=<usd> | ?tier=day-pass&day=<friday|saturday|sunday>
  *   [&utm_source=…&utm_medium=…&utm_campaign=…&first_visit=…&posthog_id=…&posthog_session_id=…]
- * Creates a hosted Checkout Session and redirects to it. /ticket and /ticket/<code>
- * redirect here (next.config.ts).
+ * Creates a hosted Checkout Session and redirects to it. `ref` is the
+ * referral a visitor arrived with (/invite/<code>), recorded on any tier; the
+ * tickets section links here, and /ticket and /ticket/<code> redirect here
+ * (next.config.ts).
  */
 export async function GET(request: Request) {
   const stripe = getStripe();
@@ -149,27 +149,52 @@ export async function GET(request: Request) {
     const promo = purchase.ticket
       ? await promoParams(stripe, purchase.ticket, params)
       : undefined;
+    const referral = await referralMetadata(
+      params.get(REFERRAL_PARAM),
+      promo?.discount,
+    );
     const utm = pickUtm((k) => params.get(k));
     // UTMs on the link itself win over the ones a comp code implies.
     const tagged = Object.keys(utm).some((k) => k.startsWith("utm_"));
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items: [{ price: purchase.price, quantity: 1 }],
-      ...promo?.session,
-      metadata: {
-        ...purchase.metadata,
-        ...(tagged ? {} : promo?.utm),
-        ...utm,
-      },
-      custom_fields: CUSTOM_FIELDS,
-      name_collection: { individual: { enabled: true, optional: false } },
-      success_url: `${origin}/thanks?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/#tickets`,
-    });
+    const create = (discount: DiscountParams = {}) =>
+      stripe.checkout.sessions.create({
+        mode: "payment",
+        line_items: [{ price: purchase.price, quantity: 1 }],
+        ...discount,
+        metadata: {
+          ...purchase.metadata,
+          ...referral,
+          ...(tagged ? {} : promo?.utm),
+          ...utm,
+        },
+        custom_fields: CUSTOM_FIELDS,
+        name_collection: { individual: { enabled: true, optional: false } },
+        success_url: `${origin}/thanks?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/#tickets`,
+      });
+    let session: Stripe.Checkout.Session;
+    try {
+      session = await create(promo?.session);
+    } catch (err) {
+      // A dead coupon or code mustn't block the sale: open the code box instead.
+      const rejected =
+        (err as { type?: string } | null)?.type === "StripeInvalidRequestError";
+      if (!rejected || !promo?.session.discounts) throw err;
+      console.error("[checkout/stripe] discount rejected, retrying:", err);
+      await sendAdminErrorEmail(
+        `Checkout discount rejected (${JSON.stringify(promo.session.discounts)}); buyer sent to the open code box: ${err instanceof Error ? err.message : String(err)}`,
+      ).catch((e) => console.error("[checkout/stripe] alert failed:", e));
+      session = await create({ allow_promotion_codes: true });
+    }
     if (!session.url) throw new Error(`session ${session.id} has no url`);
     return NextResponse.redirect(session.url, 303);
   } catch (err) {
     console.error("[checkout/stripe] session create failed:", err);
+    await reportError({
+      source: "Stripe checkout",
+      summary: "Couldn't start a checkout session; the buyer saw an error",
+      error: err,
+    });
     return new NextResponse(
       "Couldn't start checkout. Please go back and try again.",
       { status: 502 },

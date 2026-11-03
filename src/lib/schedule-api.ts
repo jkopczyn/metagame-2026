@@ -14,7 +14,7 @@ import {
   ensureAccount,
   explainDbError,
   findAccount,
-  loadSchedule,
+  querySchedule,
 } from "./schedule-store";
 
 export { authorize, error, json, readBody } from "./admin-api";
@@ -111,7 +111,7 @@ function parseHost(entry: unknown): { email: string; name: string } {
 export async function sessionBySlug(
   slug: string,
 ): Promise<ScheduleSession | null> {
-  const { sessions } = await loadSchedule();
+  const { sessions } = await querySchedule();
   return sessions.find((s) => s.slug === slug) ?? null;
 }
 

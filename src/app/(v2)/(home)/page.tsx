@@ -19,14 +19,16 @@ import SpaceInvadersDivider from "@/v2/components/dividers/space-invaders";
 import TetrisDivider from "@/v2/components/dividers/tetris";
 import FaqItem from "@/v2/components/FaqItem";
 import Highlights2025 from "@/v2/components/Highlights2025";
-import PersonCard from "@/v2/components/PersonCard";
 import SectionHeading from "@/v2/components/SectionHeading";
 import SignupForm from "@/v2/components/signup/SignupForm";
 import SiteHero from "@/v2/components/SiteHero";
+import SpeakerCard from "@/v2/components/SpeakerCard";
+import PlayWeb from "@/v2/components/PlayWeb";
+import PublicSchedule from "@/v2/components/schedule/PublicSchedule";
 import {
+  DISPLAY,
   EYEBROW,
   HEADING,
-  NEWSLETTER_LINK,
   SECTION,
   SECTION_ANCHOR,
 } from "@/v2/components/styles";
@@ -56,13 +58,17 @@ import HatImage from "@/v2/hat-trick/HatImage";
 import { HATS } from "@/v2/hat-trick/hats";
 import { SOCIAL_LINKS } from "@/v2/lib/urls";
 import { EARLY_BIRD_DEADLINE, isEarlyBirdActive } from "@/lib/early-bird";
-import lighthavenCutout from "../../../public/images/lighthaven_cutout.png";
-import megagameChess from "../../../public/images/megagame-chess.jpg";
-import nightMarketCooks from "../../../public/images/email/night_market_cooks.jpg";
+import { env } from "@/env";
+import { buildDays, hostedSessions, publicSchedule } from "@/lib/schedule";
+import { loadSchedule } from "@/lib/schedule-store";
+import lighthavenCutout from "../../../../public/images/lighthaven_cutout.png";
+import megagameChess from "../../../../public/images/megagame-chess.jpg";
+import nightMarketCooks from "../../../../public/images/email/night_market_cooks.jpg";
 
 // Re-render hourly so the early-bird gate flips at the deadline and the key
 // dates' "Today" stop advances without a deploy.
-export const revalidate = 3600;
+// Ten minutes, so schedule edits reach the homepage soon; /schedule is live.
+export const revalidate = 600;
 
 export const metadata: Metadata = {
   title: "Metagame — Nov 6-8, 2026",
@@ -261,7 +267,14 @@ const FAQS: {
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  // Public rooms only and no per-viewer state, so the page stays static. CI
+  // prerenders it with no database (Vercel builds have one), so the grid is
+  // skipped rather than failing the build.
+  const raw = env.DATABASE_URL ? await loadSchedule() : null;
+  const schedule = raw && publicSchedule(raw, "public");
+  // The sessions each speaker hosts, for the backs of their cards.
+  const speaking = raw && schedule && hostedSessions(raw, schedule);
   const earlyBird = isEarlyBirdActive();
   return (
     <>
@@ -272,32 +285,28 @@ export default function Home() {
 
       {/* about */}
       <section id="about" className={`${SECTION} md:pt-11 md:pb-12`}>
-        <div className={CONTAINER}>
+        <div
+          className={`${CONTAINER} grid items-center gap-10 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:gap-12`}
+        >
           <div className="max-w-[600px]">
-            <SectionHeading title="Metagame 2026" />
-            <p className={PROSE}>
-              Metagame is a weekend conference devoted to games. We mean games
-              in the broadest sense of the word: any experience that is designed
-              to be played, as opposed to passively consumed. This includes
-              board games, card games, videogames, tabletop games, LARPs,
-              puzzles, rock climbing routes, and more. If building it involves
-              asking the question &ldquo;what would the consumer of this
-              experience choose to do next?&rdquo;, it&apos;s a game.
+            <h2
+              className={`${DISPLAY} text-[clamp(64px,11vw,150px)] leading-[0.84] text-navy`}
+            >
+              Every kind
+              <br />
+              of play<span className="text-meeple">.</span>
+            </h2>
+            <p className={`${PROSE} mt-6`}>
+              Metagame is a weekend conference devoted to games and the people
+              who make and play them. We mean games in the broadest sense of the
+              word: any experience meant to be played or actively experienced.
             </p>
-            <p className={PROSE}>
-              <Link href="/last-year" className={NEWSLETTER_LINK}>
-                See what happened last year &rarr;
-              </Link>
-            </p>
+          </div>
+          <div className="mx-auto w-full max-w-[480px] lg:max-w-none">
+            <PlayWeb />
           </div>
         </div>
       </section>
-
-      {/* Bottom padding matches the next section's top, so the divider sits
-          midway between the photo and the heading. */}
-      <div className="pt-6 pb-8 md:pb-14">
-        <Carousel images={CAROUSEL} />
-      </div>
 
       <CastlingDivider />
 
@@ -310,12 +319,15 @@ export default function Home() {
             {SPEAKERS.map((speaker) => (
               <div
                 key={speaker.name}
-                className="w-[calc(33.333%-0.3334rem)] sm:w-[calc(33.333%-0.8334rem)] lg:w-[calc(25%-0.9375rem)]"
+                className="w-[calc(33.333%-0.3334rem)] sm:w-[calc(33.333%-0.8334rem)] lg:w-[calc(20%-1rem)]"
               >
-                <PersonCard {...speaker} compact />
+                <SpeakerCard
+                  {...speaker}
+                  sessions={speaking?.get(speaker.userId)}
+                />
               </div>
             ))}
-            <div className="w-[calc(33.333%-0.3334rem)] sm:w-[calc(33.333%-0.8334rem)] lg:w-[calc(25%-0.9375rem)]">
+            <div className="w-[calc(33.333%-0.3334rem)] sm:w-[calc(33.333%-0.8334rem)] lg:w-[calc(20%-1rem)]">
               <SpeakerCtaCard href={RFP_FORM_URL} />
             </div>
           </div>
@@ -326,6 +338,33 @@ export default function Home() {
       </section>
 
       <CardSuitsDivider />
+
+      {/* schedule */}
+      <section id="schedule" className={`${SECTION} md:py-14`}>
+        <div className={CONTAINER}>
+          <SectionHeading eyebrow="What’s on?" title="Schedule" />
+          <p className={`${PROSE} max-w-[600px]`}>
+            <Link
+              href="/schedule"
+              className="font-semibold text-navy underline"
+            >
+              Open the full schedule
+            </Link>{" "}
+            to RSVP and bookmark.
+          </p>
+        </div>
+        {schedule && (
+          <div className="mt-10 px-4 sm:px-8">
+            <PublicSchedule
+              days={buildDays(schedule.sessions)}
+              locations={schedule.locations}
+              mine={null}
+            />
+          </div>
+        )}
+      </section>
+
+      <DiceDivider />
 
       {/* get involved */}
       <section id="get-involved" className={`${SECTION} md:py-14`}>
@@ -617,11 +656,6 @@ export default function Home() {
           />
           <Highlights2025 />
           <div className="mt-8 flex flex-wrap justify-center gap-4">
-            <Button asChild variant="default">
-              <a href={RFP_FORM_URL} target="_blank" rel="noopener noreferrer">
-                Propose a session
-              </a>
-            </Button>
             <Button asChild variant="navy">
               <Link href="/last-year">See the full 2025 schedule</Link>
             </Button>
@@ -650,6 +684,12 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Bottom padding matches the next section's top, so the divider sits
+          midway between the photo and the heading. */}
+      <div className="pt-6 pb-8 md:pb-14">
+        <Carousel images={CAROUSEL} />
+      </div>
 
       <SetCardDivider />
 

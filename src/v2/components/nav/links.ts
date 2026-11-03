@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import {
   Award,
+  CalendarDays,
   CircleUserRound,
   HeartHandshake,
   History,
@@ -32,6 +33,12 @@ export type NavLink = {
 export const NAV_LINKS: readonly NavLink[] = [
   { id: "home", label: "Home", href: "/", icon: Mg2Die },
   { id: "tickets", label: "Tickets", href: "/#tickets", icon: Ticket },
+  {
+    id: "schedule",
+    label: "Schedule",
+    href: "/#schedule",
+    icon: CalendarDays,
+  },
   { id: "last-year", label: "Last Year", href: "/last-year", icon: History },
   {
     id: "get-involved",
@@ -73,6 +80,7 @@ export const ACCOUNT_LINK: NavLink = {
 export const HOME_SECTIONS: readonly { id: string; icon: NavIcon }[] = [
   { id: "about", icon: Puzzle },
   { id: "speakers", icon: UserRound },
+  { id: "schedule", icon: CalendarDays },
   { id: "get-involved", icon: HeartHandshake },
   { id: "venue", icon: MapPin },
   { id: "highlights", icon: PartyPopperRight },

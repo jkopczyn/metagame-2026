@@ -18,12 +18,14 @@ import {
   insertSample,
   locationImages,
   moveSessionTo,
+  nextDisplayOrder,
   OverlapError,
   removeLocation,
   removeSample,
   removeSession,
   rsvp,
   searchAccounts,
+  setLocationOrder,
   upsertLocation,
   type RoomImages,
   upsertSession,
@@ -192,6 +194,10 @@ export async function saveLocation(
   if (!parsed.ok) return { field: parsed.field, error: parsed.error };
 
   const id = str(formData, "id") || undefined;
+  // Order comes from dragging the rooms list; a new room joins at the end.
+  const displayOrder = id
+    ? parsed.value.displayOrder
+    : await nextDisplayOrder();
   const previous: RoomImages = (id && (await locationImages(id))) || {
     thumbnailUrl: null,
     imageUrl: null,
@@ -214,11 +220,28 @@ export async function saveLocation(
 
   try {
     await replaceRoomImages(previous, change, async (images) => {
-      await upsertLocation({ id, ...parsed.value, ...images });
+      await upsertLocation({
+        id,
+        ...parsed.value,
+        displayOrder,
+        ...images,
+      });
     });
   } catch (err) {
     if (err instanceof ImageUploadError)
       return { field: "thumbnail", error: err.message };
+    return explainDbError(err);
+  }
+  revalidatePath(PATH);
+  return { ok: true };
+}
+
+/** Every room id, in the order the list now shows them. */
+export async function reorderLocations(ids: string[]): Promise<FormState> {
+  if (!(await requireAccess("schedule.rooms"))) return { error: EXPIRED };
+  try {
+    await setLocationOrder(ids);
+  } catch (err) {
     return explainDbError(err);
   }
   revalidatePath(PATH);

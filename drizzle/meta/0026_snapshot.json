@@ -1,5 +1,5 @@
 {
-  "id": "92bf6a96-fdb7-415c-b019-8900e7b61c78",
+  "id": "d5ea7344-1c7d-471a-b1f0-502117043b12",
   "prevId": "1e650a77-1715-408a-8577-c8c26819d8b1",
   "version": "7",
   "dialect": "postgresql",
@@ -801,6 +801,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "referral_code": {
+          "name": "referral_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "referred_by_payment_id": {
+          "name": "referred_by_payment_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -861,6 +873,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "tickets_referred_by_payment_id_idx": {
+          "name": "tickets_referred_by_payment_id_idx",
+          "columns": [
+            {
+              "expression": "referred_by_payment_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -881,6 +908,15 @@
           "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
+        },
+        "tickets_referred_by_payment_id_tickets_payment_id_fk": {
+          "name": "tickets_referred_by_payment_id_tickets_payment_id_fk",
+          "tableFrom": "tickets",
+          "tableTo": "tickets",
+          "columnsFrom": ["referred_by_payment_id"],
+          "columnsTo": ["payment_id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -889,6 +925,11 @@
           "name": "tickets_ticketCode_unique",
           "nullsNotDistinct": false,
           "columns": ["ticket_code"]
+        },
+        "tickets_referralCode_unique": {
+          "name": "tickets_referralCode_unique",
+          "nullsNotDistinct": false,
+          "columns": ["referral_code"]
         }
       },
       "policies": {},
@@ -2280,709 +2321,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.confirmations": {
-      "name": "confirmations",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "quest_id": {
-          "name": "quest_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "requested_user_ids": {
-          "name": "requested_user_ids",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'"
-        },
-        "confirmed_by": {
-          "name": "confirmed_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "voided_at": {
-          "name": "voided_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "voided_by": {
-          "name": "voided_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "void_reason": {
-          "name": "void_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "confirmations_quest_id_idx": {
-          "name": "confirmations_quest_id_idx",
-          "columns": [
-            {
-              "expression": "quest_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "confirmations_confirmed_by_idx": {
-          "name": "confirmations_confirmed_by_idx",
-          "columns": [
-            {
-              "expression": "confirmed_by",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "confirmations_quest_id_quests_id_fk": {
-          "name": "confirmations_quest_id_quests_id_fk",
-          "tableFrom": "confirmations",
-          "tableTo": "quests",
-          "columnsFrom": ["quest_id"],
-          "columnsTo": ["id"],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "confirmations_confirmed_by_user_id_fk": {
-          "name": "confirmations_confirmed_by_user_id_fk",
-          "tableFrom": "confirmations",
-          "tableTo": "user",
-          "columnsFrom": ["confirmed_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "confirmations_voided_by_user_id_fk": {
-          "name": "confirmations_voided_by_user_id_fk",
-          "tableFrom": "confirmations",
-          "tableTo": "user",
-          "columnsFrom": ["voided_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.level_events": {
-      "name": "level_events",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "class": {
-          "name": "class",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "level": {
-          "name": "level",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source": {
-          "name": "source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "awarded_by": {
-          "name": "awarded_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "awarded_at": {
-          "name": "awarded_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "checks_passed": {
-          "name": "checks_passed",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "override_reason": {
-          "name": "override_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "card_photo_url": {
-          "name": "card_photo_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "voided_at": {
-          "name": "voided_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "voided_by": {
-          "name": "voided_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "void_reason": {
-          "name": "void_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "level_events_live_unique": {
-          "name": "level_events_live_unique",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "class",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "level",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"level_events\".\"voided_at\" is null and \"level_events\".\"user_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "level_events_user_id_idx": {
-          "name": "level_events_user_id_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "level_events_user_id_user_id_fk": {
-          "name": "level_events_user_id_user_id_fk",
-          "tableFrom": "level_events",
-          "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "level_events_awarded_by_user_id_fk": {
-          "name": "level_events_awarded_by_user_id_fk",
-          "tableFrom": "level_events",
-          "tableTo": "user",
-          "columnsFrom": ["awarded_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "level_events_voided_by_user_id_fk": {
-          "name": "level_events_voided_by_user_id_fk",
-          "tableFrom": "level_events",
-          "tableTo": "user",
-          "columnsFrom": ["voided_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "level_events_level_range": {
-          "name": "level_events_level_range",
-          "value": "\"level_events\".\"level\" between 1 and 5"
-        },
-        "level_events_source_known": {
-          "name": "level_events_source_known",
-          "value": "\"level_events\".\"source\" in ('picker', 'volunteer')"
-        },
-        "level_events_card_photo_https": {
-          "name": "level_events_card_photo_https",
-          "value": "\"level_events\".\"card_photo_url\" is null or \"level_events\".\"card_photo_url\" like 'https://%'"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.player_codes": {
-      "name": "player_codes",
-      "schema": "",
-      "columns": {
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "code": {
-          "name": "code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "player_codes_user_id_user_id_fk": {
-          "name": "player_codes_user_id_user_id_fk",
-          "tableFrom": "player_codes",
-          "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "player_codes_code_unique": {
-          "name": "player_codes_code_unique",
-          "nullsNotDistinct": false,
-          "columns": ["code"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.quest_attempts": {
-      "name": "quest_attempts",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "quest_id": {
-          "name": "quest_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "entered_by": {
-          "name": "entered_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "entered_answer": {
-          "name": "entered_answer",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "correct": {
-          "name": "correct",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "at": {
-          "name": "at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "quest_attempts_quest_id_idx": {
-          "name": "quest_attempts_quest_id_idx",
-          "columns": [
-            {
-              "expression": "quest_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "quest_attempts_quest_id_quests_id_fk": {
-          "name": "quest_attempts_quest_id_quests_id_fk",
-          "tableFrom": "quest_attempts",
-          "tableTo": "quests",
-          "columnsFrom": ["quest_id"],
-          "columnsTo": ["id"],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "quest_attempts_entered_by_user_id_fk": {
-          "name": "quest_attempts_entered_by_user_id_fk",
-          "tableFrom": "quest_attempts",
-          "tableTo": "user",
-          "columnsFrom": ["entered_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.quest_completions": {
-      "name": "quest_completions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "confirmation_id": {
-          "name": "confirmation_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "quest_id": {
-          "name": "quest_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "confirmed_at": {
-          "name": "confirmed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "voided_at": {
-          "name": "voided_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "voided_by": {
-          "name": "voided_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "void_reason": {
-          "name": "void_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "quest_completions_live_unique": {
-          "name": "quest_completions_live_unique",
-          "columns": [
-            {
-              "expression": "quest_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"quest_completions\".\"voided_at\" is null and \"quest_completions\".\"user_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "quest_completions_confirmation_id_idx": {
-          "name": "quest_completions_confirmation_id_idx",
-          "columns": [
-            {
-              "expression": "confirmation_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "quest_completions_user_id_idx": {
-          "name": "quest_completions_user_id_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "quest_completions_confirmation_id_confirmations_id_fk": {
-          "name": "quest_completions_confirmation_id_confirmations_id_fk",
-          "tableFrom": "quest_completions",
-          "tableTo": "confirmations",
-          "columnsFrom": ["confirmation_id"],
-          "columnsTo": ["id"],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "quest_completions_quest_id_quests_id_fk": {
-          "name": "quest_completions_quest_id_quests_id_fk",
-          "tableFrom": "quest_completions",
-          "tableTo": "quests",
-          "columnsFrom": ["quest_id"],
-          "columnsTo": ["id"],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "quest_completions_user_id_user_id_fk": {
-          "name": "quest_completions_user_id_user_id_fk",
-          "tableFrom": "quest_completions",
-          "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "quest_completions_voided_by_user_id_fk": {
-          "name": "quest_completions_voided_by_user_id_fk",
-          "tableFrom": "quest_completions",
-          "tableTo": "user",
-          "columnsFrom": ["voided_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.quests": {
-      "name": "quests",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "code": {
-          "name": "code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "class": {
-          "name": "class",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "answers": {
-          "name": "answers",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'"
-        },
-        "evidence": {
-          "name": "evidence",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "hint": {
-          "name": "hint",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "min_level": {
-          "name": "min_level",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "max_level": {
-          "name": "max_level",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "active": {
-          "name": "active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "quests_code_unique": {
-          "name": "quests_code_unique",
-          "nullsNotDistinct": false,
-          "columns": ["code"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "quests_kind_known": {
-          "name": "quests_kind_known",
-          "value": "\"quests\".\"kind\" in ('answer', 'evidence')"
-        },
-        "quests_level_window_needs_class": {
-          "name": "quests_level_window_needs_class",
-          "value": "\"quests\".\"class\" is not null or (\"quests\".\"min_level\" is null and \"quests\".\"max_level\" is null)"
-        }
-      },
       "isRLSEnabled": false
     }
   },

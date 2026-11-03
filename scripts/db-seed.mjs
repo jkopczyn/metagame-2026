@@ -30,6 +30,11 @@
 //                              60 ticketed, 20 signed in with no ticket, 10
 //                              invited (hosts, team, one admin) who never signed
 //                              in, 10 who bought under an email with no account
+//   speaker-<key>@metagame.games
+//                              the homepage's featured speakers, with the ids
+//                              and names in src/v2/data/speaker-accounts.ts
+//                              (placeholder TODO ids skipped), each co-hosting
+//                              one to three published sessions
 // Plus 60 purchases from people with no account at all, and one API key for
 // admin: x-api-key mg_seed_metabot_000000000000000000000000000000000000000000000000000.
 //
@@ -38,6 +43,7 @@
 import { createHash, scryptSync } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { neon } from "@neondatabase/serverless";
+import { SPEAKER_ACCOUNTS } from "../src/v2/data/speaker-accounts.ts";
 
 for (const file of [
   ".env.local",
@@ -237,6 +243,17 @@ const crowd = Array.from({ length: 100 }, (_, i) => {
   };
 });
 const invited = crowd.filter((u) => u.kind === "invited");
+// The featured speakers, under the account ids the homepage cards look up.
+const SPEAKER_EMAIL = "speaker-%@metagame.games";
+const speakers = Object.entries(SPEAKER_ACCOUNTS)
+  .filter(([, { userId }]) => !userId.startsWith("TODO"))
+  .map(([key, { name, userId }], i) => ({
+    id: userId,
+    name,
+    email: SPEAKER_EMAIL.replace("%", key.toLowerCase()),
+    verified: true,
+    i: 200 + i,
+  }));
 const everyone = [
   ...Object.values(users).map((u) => ({
     ...u,
@@ -244,6 +261,7 @@ const everyone = [
     verified: true,
   })),
   ...crowd,
+  ...speakers,
 ];
 // Bought a ticket, never made an account: most purchasers, early on.
 const ghosts = Array.from({ length: 60 }, (_, i) => ({
@@ -279,11 +297,12 @@ const profile = (u) => {
   };
 };
 
-// Lighthaven's rooms, as the schedule shows them; the ones the public can't
-// see stay for placement. Images are Vercel Blob URLs in prod, null here.
+// Lighthaven's rooms, as the schedule shows them, with prod's visibility: the
+// hidden ones are team-only there too and stay for placement. Images are
+// Vercel Blob URLs in prod, null here.
 // prettier-ignore
 const ROOMS = [
-  ["foodtruck", "Food Truck Parking", null, "Behind E", 0],
+  ["foodtruck", "Food Truck Parking", null, "Behind E", 0, "hidden"],
   ["ratpark", "Rat Park", 300, "Outdoors, behind B", 1],
   ["eigen", "Eigen Hall", 40, "Building E, 1st floor", 2],
   ["cantor", "Cantor's Diagonal", 60, "Building C", 3],
@@ -291,14 +310,15 @@ const ROOMS = [
   ["courtyard", "Central Courtyard", 200, "The center of campus", 5],
   ["thingspace", "Thingspace", 20, "Building A, 2nd floor", 6],
   ["attic", "Bayes Attic", 35, "Building B, top floor", 8],
-  ["gardens", "The Gardens", 80, "Outdoors, behind E", 9],
+  ["gardens", "The Gardens", 80, "Outdoors, behind E", 9, "hidden"],
   ["ground", "Bayes Ground", 40, "Building B, 1st floor", 11],
-  ["exobrain", "Exobrain", 30, "Building E, 2nd floor", 12],
-  ["d2", "1D2", null, "Building D, 1st floor", 13],
-  ["caprica", "New Caprica", null, "Building B, 2nd floor", 14],
+  ["exobrain", "Exobrain", 30, "Building E, 2nd floor", 12, "hidden"],
+  ["d2", "1D2", null, "Building D, 1st floor", 13, "hidden"],
+  ["caprica", "New Caprica", null, "Building B, 2nd floor", 14, "hidden"],
   ["d1", "1D1", 6, "Building D, 1st floor", 100, "hidden"],
-  ["gyroscope", "Gyroscope", 30, "Building E, 2nd floor", 100, "volunteer", false],
+  ["gyroscope", "Gyroscope", 30, "Building E, 2nd floor", 100, "hidden", false],
   ["other", "Other", null, null, 100, "hidden", false],
+  ["questboard", "Quest Board", null, null, 100, "volunteer", false],
 ];
 const locations = Object.fromEntries(
   ROOMS.map(
@@ -661,6 +681,18 @@ const crowdHosts = [...program, ...pipeline].flatMap((s, k) => {
   ];
 });
 
+// Each speaker co-hosts one to three program sessions, billed after whoever
+// the crowd already put on them.
+const lastPosition = new Map(crowdHosts.map((h) => [h.session_id, h.position]));
+const speakerHosts = speakers.flatMap((u, i) =>
+  [i, i + 7, i + 14].slice(0, 1 + (i % 3)).map((k) => {
+    const s = program[k % program.length];
+    const position = (lastPosition.get(s.id) ?? -1) + 1;
+    lastPosition.set(s.id, position);
+    return { session_id: s.id, position, user_id: u.id };
+  }),
+);
+
 // Prod's tier names and price points, in roughly prod's proportions: mostly
 // early-bird code, a third comped, a few full price, day passes, a supporter.
 const T_FULL = "Metagame 2026";
@@ -972,35 +1004,36 @@ await sql.query(
   `delete from "user" where id like 'seed-%' and not (id = any($1::text[]))`,
   [pgArray(everyone.map((u) => u.id))],
 );
-
-counts.user = await upsert(
-  "user",
-  ["id"],
-  everyone.map((u) => ({
-    id: u.id,
-    name: u.name,
-    email: u.email,
-    email_verified: u.verified,
-    role: u.role ?? "user",
-    banned: u.banned ?? false,
-    ban_reason: u.ban_reason ?? null,
-    wizard_level: u.levels?.wizard ?? 0,
-    pirate_level: u.levels?.pirate ?? 0,
-    alien_level: u.levels?.alien ?? 0,
-  })),
+// Speaker accounts carry their real ids, so they're found by email instead.
+await sql.query(
+  `delete from "user" where email like $1 and not (id = any($2::text[]))`,
+  [SPEAKER_EMAIL, pgArray(speakers.map((u) => u.id))],
 );
+
+const userRow = (u) => ({
+  id: u.id,
+  name: u.name,
+  email: u.email,
+  email_verified: u.verified,
+  role: u.role ?? "user",
+  banned: u.banned ?? false,
+  ban_reason: u.ban_reason ?? null,
+  wizard_level: u.levels?.wizard ?? 0,
+  pirate_level: u.levels?.pirate ?? 0,
+  alien_level: u.levels?.alien ?? 0,
+});
+const credential = (u) => ({
+  id: `${u.id}-credential`,
+  account_id: u.id,
+  provider_id: "credential",
+  user_id: u.id,
+  password: passwordHash,
+});
+counts.user = await upsert("user", ["id"], everyone.map(userRow));
 counts.account = await upsert(
   "account",
   ["id"],
-  everyone
-    .filter((u) => u.verified)
-    .map((u) => ({
-      id: `${u.id}-credential`,
-      account_id: u.id,
-      provider_id: "credential",
-      user_id: u.id,
-      password: passwordHash,
-    })),
+  everyone.filter((u) => u.verified).map(credential),
 );
 counts.profiles = await upsert("profiles", ["user_id"], everyone.map(profile));
 
@@ -1091,6 +1124,7 @@ counts.session_hosts = await upsert(
     { session_id: uuid(105), position: 0, user_id: users.newcomer.id },
     { session_id: uuid(106), position: 0, user_id: users.grants.id },
     ...crowdHosts,
+    ...speakerHosts,
   ],
 );
 counts.rsvps = await upsertRsvps([

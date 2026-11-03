@@ -11,7 +11,12 @@ import {
   type RfpSessionValues,
 } from "./rfp-intake";
 import { slugify } from "./schedule";
-import { ensureAccount, findAccount, sessionIdBySlug } from "./schedule-store";
+import {
+  ensureAccount,
+  findAccount,
+  invalidateSchedule,
+  sessionIdBySlug,
+} from "./schedule-store";
 
 export type IntakeResult = {
   sessionId: string;
@@ -150,7 +155,9 @@ async function createSession(
     )
     select id, slug from s`);
   const [row] = rows;
-  return row ? { sessionId: row.id, slug: row.slug } : null;
+  if (!row) return null;
+  invalidateSchedule();
+  return { sessionId: row.id, slug: row.slug };
 }
 
 type Existing = RfpSessionValues & { id: string; slug: string };
@@ -190,5 +197,6 @@ async function fillSession(
       filled.push("host");
     }
   }
+  if (filled.length) invalidateSchedule();
   return { sessionId: existing.id, slug: existing.slug, filled };
 }

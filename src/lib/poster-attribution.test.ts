@@ -6,7 +6,7 @@ vi.mock("@/lib/tracking-links", async (importOriginal) => ({
 vi.mock("posthog-js", () => ({ default: { __loaded: false } }));
 import { GET } from "@/app/go/[slug]/route";
 import { resolveTrackingLink, type TrackingLink } from "./tracking-links";
-import { captureUtm, readPromo, readUtm, withPromo } from "./utm";
+import { captureUtm, readPromo, readUtm, setPromo, withCodes } from "./utm";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -81,25 +81,37 @@ it("forwards a promo code through /go and keeps it for Standard checkout", async
   );
   expect(junk.searchParams.has("promo")).toBe(false);
 
-  const values = new Map<string, string>();
-  vi.stubGlobal("localStorage", {
-    getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => values.set(key, value),
-    removeItem: (key: string) => values.delete(key),
-  });
-  expect(withPromo("/api/checkout/stripe?tier=standard&code=own")).toBe(
+  const storage = () => {
+    const values = new Map<string, string>();
+    return {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+    };
+  };
+  vi.stubGlobal("localStorage", storage());
+  vi.stubGlobal("sessionStorage", storage());
+  expect(withCodes("/api/checkout/stripe?tier=standard&code=own")).toBe(
     "/api/checkout/stripe?tier=standard&code=own",
   );
   captureUtm(destination.search);
   expect(readPromo()).toBe("POSTER20");
-  expect(withPromo("/api/checkout/stripe?tier=standard&code=own")).toBe(
+  expect(withCodes("/api/checkout/stripe?tier=standard&code=own")).toBe(
     "/api/checkout/stripe?tier=standard&code=own&promo=POSTER20",
   );
   // A later tracking link without a code leaves it; one with a code replaces it.
   captureUtm("?utm_source=newer");
   expect(readPromo()).toBe("POSTER20");
-  captureUtm("?promo=OTHER");
+  expect(captureUtm("?promo=OTHER")).toBe("OTHER");
   expect(readPromo()).toBe("OTHER");
+  // An invite link stores the friend's code as the discount and keeps the
+  // referral even when the code is swapped out.
+  expect(captureUtm("?ref=abcd-efgh")).toBe("");
+  expect(readPromo()).toBe("ABCD-EFGH");
+  setPromo("POSTER20");
+  expect(withCodes("/api/checkout/stripe?tier=standard&code=own")).toBe(
+    "/api/checkout/stripe?tier=standard&code=own&promo=POSTER20&ref=ABCDEFGH",
+  );
 });
 it("does not mistake the missing-slug homepage fallback for tracked attribution", async () => {
   vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://metagame.games");

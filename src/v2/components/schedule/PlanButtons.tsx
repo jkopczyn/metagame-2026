@@ -68,6 +68,7 @@ export default function PlanButtons({
   bookmarked,
   full,
   commitment = false,
+  open = true,
   conflicts = [],
   ticket,
   onSettled,
@@ -79,6 +80,8 @@ export default function PlanButtons({
   full: boolean;
   /** RSVPing claims a spot people rely on, so it's confirmed first. */
   commitment?: boolean;
+  /** False while the team hasn't opened RSVPs: the button is greyed out. */
+  open?: boolean;
   /** The viewer's other sessions at the same time, warned about first. */
   conflicts?: PlanConflict[];
   /** Without it the server's answer is the only ticket check. */
@@ -184,7 +187,15 @@ export default function PlanButtons({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {plan.status === null ? (
+      {plan.status === null && !open ? (
+        <Button
+          size="sm"
+          disabled
+          title="RSVPs for this session aren’t open yet. Check back later."
+        >
+          RSVPs not yet open
+        </Button>
+      ) : plan.status === null ? (
         <Button
           size="sm"
           onClick={() =>

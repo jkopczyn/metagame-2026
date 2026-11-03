@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import ToolLayout from "../ToolLayout";
 
 export const metadata: Metadata = {
-  title: "Sent Emails — Metagame",
+  title: "Emails — Metagame",
   robots: { index: false, follow: false },
 };
 
@@ -12,7 +12,7 @@ export default function BackstageEmailsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ToolLayout title="Sent Emails" href="/backstage/emails">
+    <ToolLayout title="Emails" href="/backstage/emails">
       {children}
     </ToolLayout>
   );

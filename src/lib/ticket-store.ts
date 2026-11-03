@@ -32,7 +32,7 @@ const { tickets, verification } = schema;
 
 // Sandbox purchases land in the same table; production never shows them.
 // NEXT_PUBLIC_ because deploys go out prebuilt (see src/lib/tickets.ts).
-const visible =
+export const visible =
   process.env.NEXT_PUBLIC_VERCEL_ENV === "production"
     ? eq(tickets.test, false)
     : undefined;
@@ -83,12 +83,27 @@ export function ticketFromPurchase(purchase: PurchaseRecord): Ticket {
 // Upsert on payment id, so a redelivered webhook walks the same row through
 // pending → paid. Blank fields never clobber, and the code, owner and holder
 // are left alone: a retry must never un-claim a ticket or revive an old code.
-export async function recordTicket(purchase: PurchaseRecord): Promise<void> {
+// `referredBy` is the referrer's payment id off the checkout's metadata; it
+// only lands when that ticket exists, so a stale link can't break the write.
+export async function recordTicket(
+  purchase: PurchaseRecord,
+  { referredBy }: { referredBy?: string } = {},
+): Promise<void> {
   if (!env.DATABASE_URL) {
     console.warn(`[tickets] DATABASE_URL not set — not stored: ${purchase.id}`);
     return;
   }
+  const db = getDb();
   const row = ticketFromPurchase(purchase);
+  if (referredBy) {
+    const [referrer] = await db
+      .select({ id: tickets.paymentId })
+      .from(tickets)
+      .where(eq(tickets.paymentId, referredBy))
+      .limit(1);
+    if (referrer) row.referredByPaymentId = referredBy;
+    else console.warn(`[tickets] referrer ${referredBy} not found`);
+  }
   const {
     status,
     test,
@@ -98,6 +113,7 @@ export async function recordTicket(purchase: PurchaseRecord): Promise<void> {
     purchaserEmail,
     purchaserName,
     purchaserDiscord,
+    referredByPaymentId,
   } = row;
   const set = Object.fromEntries(
     Object.entries({
@@ -109,9 +125,10 @@ export async function recordTicket(purchase: PurchaseRecord): Promise<void> {
       purchaserEmail,
       purchaserName,
       purchaserDiscord,
+      referredByPaymentId,
     }).filter(([, v]) => v != null),
   );
-  await getDb()
+  await db
     .insert(schema.tickets)
     .values(row)
     .onConflictDoUpdate({ target: schema.tickets.paymentId, set });

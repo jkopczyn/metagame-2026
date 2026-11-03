@@ -28,6 +28,7 @@ const { db, store } = vi.hoisted(() => {
       email,
     })),
     findAccount: vi.fn<(email: string) => Promise<unknown>>(async () => null),
+    invalidateSchedule: vi.fn(),
     sessionIdBySlug: vi.fn<(slug: string) => Promise<string | null>>(
       async () => null,
     ),
@@ -78,6 +79,7 @@ describe("intakeRfp", () => {
       "Alex Doe",
       "alex@example.com",
     );
+    expect(store.invalidateSchedule).toHaveBeenCalled();
     expect(db.execute).toHaveBeenCalledTimes(1);
     expect(setCalls()).toEqual([{ discordHandle: "alexdoe" }]);
   });

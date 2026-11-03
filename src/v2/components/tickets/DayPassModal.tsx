@@ -2,7 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { FaBitcoin } from "react-icons/fa";
-import { readUtm, withUtm } from "@/lib/utm";
+import { readUtm, withCodes, withUtm } from "@/lib/utm";
 import { dayPasses, stripeCheckoutHref } from "@/v2/lib/tickets";
 import {
   subscribeCurrency,
@@ -198,7 +198,7 @@ export default function DayPassModal({ onClose }: { onClose: () => void }) {
                   day: p.id,
                 });
                 const addUtm = (e: React.MouseEvent<HTMLAnchorElement>) => {
-                  e.currentTarget.href = withUtm(href);
+                  e.currentTarget.href = withCodes(withUtm(href));
                 };
                 return (
                   <Button

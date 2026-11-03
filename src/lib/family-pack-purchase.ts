@@ -13,6 +13,7 @@ import {
 } from "@/lib/family-pack";
 import { capturePurchase } from "@/lib/posthog-server";
 import { ticketCode } from "@/lib/ticket-code";
+import { followUpTicketPurchase } from "@/lib/ticket-followup";
 import { currentTicketCode, recordTicket } from "@/lib/ticket-store";
 import { pickUtm } from "@/lib/utm";
 
@@ -70,7 +71,10 @@ export async function recordFamilyPack(
     const result = await recordPurchase(purchase);
     if (!result.stored)
       throw new Error("Family pack admissions could not be stored.");
-    await recordTicket(purchase);
+    // A pack is a referral: every admission after the first points at the first.
+    await recordTicket(purchase, {
+      referredBy: index > 0 ? tickets[0].id : undefined,
+    });
     await capturePurchase(purchase);
   }
   if (status === "Paid") {
@@ -86,6 +90,18 @@ export async function recordFamilyPack(
       idempotencyKey: `family-pack/${paymentId}`,
       test: !session.livemode,
     });
+    const buyerIsAttendee = tickets.some(
+      (t) => t.email.toLowerCase() === email.toLowerCase(),
+    );
+    if (buyerIsAttendee)
+      await followUpTicketPurchase({
+        to: email,
+        name: session.customer_details?.name ?? undefined,
+        ticketType: `${FAMILY_PACK.label} — Standard`,
+        paymentId: `${paymentId}`,
+        test: !session.livemode,
+        source: "Stripe webhook",
+      });
     for (const [index, ticket] of tickets.entries()) {
       if (ticket.email.toLowerCase() === email.toLowerCase()) continue;
       await sendTicketConfirmationEmail({
@@ -97,6 +113,14 @@ export async function recordFamilyPack(
         ticketCode: ticket.code,
         idempotencyKey: `family-pack/${paymentId}/ticket/${index + 1}`,
         test: !session.livemode,
+      });
+      await followUpTicketPurchase({
+        to: ticket.email,
+        name: ticket.name,
+        ticketType: `${FAMILY_PACK.label} — Standard`,
+        paymentId: `${paymentId}/ticket/${index + 1}`,
+        test: !session.livemode,
+        source: "Stripe webhook",
       });
     }
   }

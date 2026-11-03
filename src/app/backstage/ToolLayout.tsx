@@ -24,9 +24,10 @@ export default function ToolLayout({
   const width = fluid ? "max-w-none" : wide ? "max-w-7xl" : "max-w-5xl";
   return (
     <div className="flex min-h-full flex-1 flex-col bg-cream text-ink">
-      <header className="sticky top-0 z-50 border-b border-line bg-cream/95 backdrop-blur">
+      {/* Below the corner nav (z-40); the left padding is its corner. */}
+      <header className="sticky top-0 z-30 border-b border-line bg-cream/95 backdrop-blur">
         <div
-          className={`mx-auto flex ${width} items-center justify-between gap-3 px-4 py-3`}
+          className={`mx-auto flex ${width} items-center justify-between gap-3 py-3 pr-4 pl-20 md:pl-24`}
         >
           <nav className="flex min-w-0 items-center gap-3 sm:gap-4">
             {href !== "/backstage" && <BackToTools />}
@@ -41,7 +42,10 @@ export default function ToolLayout({
           <SessionBar next={href} />
         </div>
       </header>
-      <main className={`mx-auto w-full ${width} px-4 py-8`}>{children}</main>
+      {/* The site's gutter, so the column clears the nav; fluid tools keep the viewport. */}
+      <main className={`w-full px-4 py-8 ${fluid ? "" : "md:px-20 lg:px-24"}`}>
+        <div className={`mx-auto w-full ${width}`}>{children}</div>
+      </main>
     </div>
   );
 }

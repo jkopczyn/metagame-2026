@@ -4,21 +4,13 @@ import { useRef, useState, useTransition } from "react";
 import { removeAvatar, saveAvatar, type AvatarResult } from "./actions";
 import AvatarCropDialog, { type PickedImage } from "./AvatarCropDialog";
 import { cropImage, type CropArea } from "@/lib/crop-image";
+import Avatar from "@/v2/components/Avatar";
 import { Button } from "@/v2/components/ui/button";
 
 const AVATAR_PX = 512;
 
 const GREY_LINK =
   "text-sm text-ink/55 underline-offset-2 hover:text-ink hover:underline disabled:opacity-60";
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]!.toUpperCase())
-    .join("");
-}
 
 export default function AvatarForm({
   imageUrl,
@@ -73,14 +65,7 @@ export default function AvatarForm({
 
   return (
     <div className="flex items-center gap-5">
-      <div className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-full bg-navy/10 font-grotesk text-2xl font-bold text-navy">
-        {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- already avatar-sized
-          <img src={imageUrl} alt="" className="size-full object-cover" />
-        ) : (
-          <span aria-hidden>{initials(name)}</span>
-        )}
-      </div>
+      <Avatar imageUrl={imageUrl} name={name} className="size-24 text-2xl" />
       <div className="flex flex-col items-start gap-2">
         <div className="flex items-center gap-4">
           <Button

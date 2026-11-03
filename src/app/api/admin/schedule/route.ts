@@ -1,5 +1,5 @@
 import { authorize, json } from "@/lib/schedule-api";
-import { loadRsvpCounts, loadSchedule } from "@/lib/schedule-store";
+import { loadRsvpCounts, querySchedule } from "@/lib/schedule-store";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ export async function GET() {
   const access = await authorize("schedule.view");
   if (access instanceof Response) return access;
   const [{ locations, sessions }, counts] = await Promise.all([
-    loadSchedule(),
+    querySchedule(),
     loadRsvpCounts(),
   ]);
   return json({

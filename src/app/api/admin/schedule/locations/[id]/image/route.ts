@@ -5,7 +5,7 @@ import {
   type ImageChange,
 } from "@/lib/room-images";
 import {
-  loadSchedule,
+  querySchedule,
   locationImages,
   setLocationImages,
   type RoomImages,
@@ -67,6 +67,6 @@ async function write(
     return failed(err);
   }
   done();
-  const { locations } = await loadSchedule();
+  const { locations } = await querySchedule();
   return json({ location: locations.find((l) => l.id === id) });
 }

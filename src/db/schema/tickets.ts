@@ -6,6 +6,7 @@ import {
   pgTable,
   text,
   timestamp,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { timestamps, user } from "./auth";
 
@@ -47,11 +48,21 @@ export const tickets = pgTable(
     ownerUserId: text().references(() => user.id, { onDelete: "set null" }),
     claimedAt: timestamp({ withTimezone: true }),
     holderUserId: text().references(() => user.id, { onDelete: "set null" }),
+    // Minted when the holder first looks for it on /account; a friend's
+    // /invite link carries it.
+    referralCode: text().unique(),
+    // The ticket whose referral code this one was bought with. A fact about
+    // the ticket, so it survives claims and transfers.
+    referredByPaymentId: text().references(
+      (): AnyPgColumn => tickets.paymentId,
+      { onDelete: "set null" },
+    ),
     ...timestamps,
   },
   (t) => [
     index("tickets_purchaser_email_idx").on(t.purchaserEmail),
     index("tickets_owner_user_id_idx").on(t.ownerUserId),
     index("tickets_holder_user_id_idx").on(t.holderUserId),
+    index("tickets_referred_by_payment_id_idx").on(t.referredByPaymentId),
   ],
 );

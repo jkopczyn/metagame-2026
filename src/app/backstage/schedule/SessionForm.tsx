@@ -512,6 +512,15 @@ export default function SessionForm({
               hint="Tagged “Sponsor” on the schedule."
               defaultChecked={session?.sponsored ?? false}
             />
+            {/* Sent even when unticked, so the form can close RSVPs; the
+                checkbox's "on" comes later in the entries and wins. */}
+            <input type="hidden" name="rsvpsOpen" value="" />
+            <Checkbox
+              name="rsvpsOpen"
+              label="RSVPs open"
+              hint="Untick to grey out the RSVP button as “RSVPs not yet open” until you’re ready."
+              defaultChecked={session?.rsvpsOpen ?? true}
+            />
           </div>
 
           <HostPicker

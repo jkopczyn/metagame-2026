@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { reportError } from "@/lib/error-report";
 import { unsubscribeSignup } from "@/lib/airtable";
 import { purchaseBuyer, type PurchaseRef } from "@/lib/purchase-buyer";
 
@@ -46,6 +47,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, stored: result.stored });
   } catch (err) {
     console.error("[opt-out] failed to store opt-out:", err);
+    await reportError({
+      source: "Mailing-list opt-out",
+      summary: "Airtable didn't take the opt-out; the person saw an error",
+      details: {
+        Session: String(sessionId ?? ""),
+        Charge: String(chargeId ?? ""),
+      },
+      error: err,
+      mention: false,
+    });
     return NextResponse.json(
       { error: "Failed to save opt-out" },
       { status: 500 },

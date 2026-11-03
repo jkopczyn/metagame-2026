@@ -173,6 +173,7 @@ const session = (over: Partial<ScheduleSession>): ScheduleSession => ({
   status: "published",
   rsvpIsCommitment: false,
   sponsored: false,
+  rsvpsOpen: true,
   airtableRfpRecordId: "rec1",
   hosts: [],
   shepherd: null,
@@ -340,7 +341,7 @@ describe("userSessions room visibility", () => {
     expect(sessions).toEqual([]);
   });
 
-  it("keeps a session with no room at all", () => {
+  it("hides a session with no room yet, like /schedule does", () => {
     const { sessions } = userSessions(
       "u1",
       {
@@ -353,6 +354,6 @@ describe("userSessions room visibility", () => {
       PUBLIC_AUDIENCE,
       "public",
     );
-    expect(sessions.map((s) => s.id)).toEqual(["s"]);
+    expect(sessions).toEqual([]);
   });
 });

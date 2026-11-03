@@ -8,11 +8,13 @@ import {
   onlySessions,
   openingDayKey,
   selectedDay,
+  sessionHref as href,
   type Day,
   type PublicLocation,
   type PublicSession,
 } from "@/lib/schedule";
-import { LEGEND } from "@/v2/lib/schedule-styles";
+import { readViewCookie, writeViewCookie } from "@/lib/schedule-view";
+import { ScheduleLegend } from "./SessionBits";
 import {
   buildColumns,
   DayTabs,
@@ -29,38 +31,37 @@ import ScheduleSearch from "./ScheduleSearch";
 
 type PublicDay = Day<PublicSession>;
 
-const href = (s: PublicSession) => `/schedule/${encodeURIComponent(s.slug)}`;
-
-export function CategoryLegend() {
-  return (
-    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5">
-      {LEGEND.slice(0, 4).map((entry) => (
-        <span key={entry.label} className="flex items-center gap-1.5 text-xs">
-          <span
-            aria-hidden
-            className="h-3.5 w-3.5 rounded-sm border"
-            style={entry.style}
-          />
-          {entry.label}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 /** The published schedule, a day at a time; every session links to its page. */
 export default function PublicSchedule({
   days,
   locations,
   mine,
+  initialView,
 }: {
   days: PublicDay[];
   locations: PublicLocation[];
   /** Ids of the viewer's own sessions; null when signed out. */
   mine: string[] | null;
+  /** The view cookie as read on the server; undefined where the page is
+   *  cached and the cookie has to be read after mount instead. */
+  initialView?: View;
 }) {
   const [dayKey, setDayKey] = useState(() => openingDayKey(days));
-  const [view, setView] = useState<View>("grid");
+  const [view, setView] = useState<View>(initialView ?? "grid");
+  const selectView = (v: View) => {
+    setView(v);
+    writeViewCookie(v);
+  };
+
+  // Without a server-read view, pick up the one stored in the browser;
+  // deferred so server and first client render match.
+  useEffect(() => {
+    if (initialView) return;
+    const stored = readViewCookie();
+    if (!stored) return;
+    const t = setTimeout(() => setView(stored), 0);
+    return () => clearTimeout(t);
+  }, [initialView]);
   const [onlyMine, setOnlyMine] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -79,13 +80,6 @@ export default function PublicSchedule({
     if (found) setDayKey(found.key);
   }
 
-  // Phones start on moments; deferred so server and first client render match.
-  useEffect(() => {
-    if (!window.matchMedia("(max-width: 767px)").matches) return;
-    const t = setTimeout(() => setView("moments"), 0);
-    return () => clearTimeout(t);
-  }, []);
-
   // The layout isn't re-rendered when a session modal closes, so an RSVP or
   // bookmark made in one wouldn't reach `mine` without this.
   useEffect(() => {
@@ -97,21 +91,22 @@ export default function PublicSchedule({
     [days, mine, onlyMine],
   );
 
-  const columns = buildColumns(
-    locations,
-    days.some((d) => d.sessions.some((s) => s.locationId === null)),
-  );
+  const columns = buildColumns(locations);
   const roomName = (id: string | null) =>
     locations.find((l) => l.id === id)?.name ?? null;
   const day = selectedDay(shownDays, dayKey);
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-center gap-3">
+      {/* On a phone the view toggle shares this row as icons, and the My
+          sessions button keeps only its star; both get their words back from
+          the sm breakpoint. */}
+      <div className="flex items-center gap-2 sm:gap-3">
         <ScheduleSearch
           sessions={days.flatMap((d) => d.sessions)}
           roomName={(s) => roomName(s.locationId)}
           onPick={(s) => router.push(href(s), { scroll: false })}
+          className="min-w-0"
         />
         {mine && (
           <button
@@ -126,31 +121,41 @@ export default function PublicSchedule({
                 { id: "schedule-filter" },
               );
             }}
+            title="Only my sessions"
             className={`${TOGGLE} ml-auto shrink-0 items-center gap-2 px-3 py-2.5 text-xs tracking-[0.12em] uppercase transition-colors ${toggleButton(onlyMine, 0)}`}
           >
             <FaStar size={12} />
-            My sessions
+            <span className="sr-only sm:not-sr-only">My sessions</span>
           </button>
-        )}
-      </div>
-      <div className="flex flex-wrap items-center justify-center gap-3">
-        {view !== "moments" && (
-          <DayTabs days={days} selected={day.key} onSelect={setDayKey} />
         )}
         <ViewToggle
           view={view}
-          onSelect={setView}
+          onSelect={selectView}
           views={["grid", "list", "moments"]}
+          iconsOnly
+          className={`${mine ? "" : "ml-auto"} shrink-0 sm:hidden`}
         />
       </div>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <DayTabs days={days} selected={day.key} onSelect={setDayKey} />
+        <div className="hidden sm:block">
+          <ViewToggle
+            view={view}
+            onSelect={selectView}
+            views={["grid", "list", "moments"]}
+          />
+        </div>
+      </div>
 
-      <CategoryLegend />
+      <ScheduleLegend />
 
       {view === "moments" ? (
         <ScheduleMoments
           days={shownDays}
           columns={columns}
           onOpen={(s) => router.push(href(s), { scroll: false })}
+          dayKey={day.key}
+          onDayChange={setDayKey}
         />
       ) : onlyMine && day.sessions.length === 0 ? (
         <EmptyPanel>

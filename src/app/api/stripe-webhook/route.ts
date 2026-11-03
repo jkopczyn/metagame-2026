@@ -9,7 +9,9 @@ import {
   type PurchaseRecord,
   type PurchaseStatus,
 } from "@/lib/airtable";
-import { sendAdminErrorEmail, sendTicketConfirmationEmail } from "@/lib/email";
+import { sendTicketConfirmationEmail } from "@/lib/email";
+import { reportError } from "@/lib/error-report";
+import { followUpTicketPurchase } from "@/lib/ticket-followup";
 import { getStripe } from "@/lib/stripe";
 import { capturePurchase } from "@/lib/posthog-server";
 import { ticketCode } from "@/lib/ticket-code";
@@ -104,6 +106,13 @@ export async function POST(request: Request) {
     } catch (err) {
       // 500 → Stripe retries; recordDiscountCode upserts, so a retry can't duplicate.
       console.error("[stripe-webhook] failed to record discount code:", err);
+      await reportError({
+        source: "Stripe webhook",
+        summary: "Couldn't record a promotion code; Stripe will retry",
+        details: { Code: promo.code, Event: event.id },
+        error: err,
+        mention: false,
+      });
       return NextResponse.json({ error: "Processing failed" }, { status: 500 });
     }
 
@@ -156,11 +165,17 @@ export async function POST(request: Request) {
       } catch (err) {
         // Still rethrown so Stripe retries (fulfillment is idempotent), which
         // means a persistent failure alerts once per retry.
-        await sendAdminErrorEmail(
-          `Family & Friends Pack fulfillment failed (session ${full.id}, buyer ${full.customer_details?.email ?? "unknown"}, status ${status}): ${err instanceof Error ? err.message : String(err)}`,
-        ).catch((adminErr) =>
-          console.error("[stripe-webhook] admin alert failed:", adminErr),
-        );
+        await reportError({
+          source: "Stripe webhook",
+          summary:
+            "Family & Friends Pack fulfillment failed; Stripe will retry",
+          details: {
+            Session: full.id,
+            Buyer: full.customer_details?.email ?? "unknown",
+            Status: status,
+          },
+          error: err,
+        });
         throw err;
       }
       return NextResponse.json({ received: true });
@@ -194,7 +209,7 @@ export async function POST(request: Request) {
     const promo = expanded<Stripe.PromotionCode>(
       full.discounts?.[0]?.promotion_code,
     );
-    const couponCode = promo?.code;
+    const couponCode = promo?.code ?? full.metadata?.referral_code;
 
     // Total knocked off the order (cents → dollars); omitted when nothing applied.
     const amountDiscount = full.total_details?.amount_discount
@@ -241,6 +256,8 @@ export async function POST(request: Request) {
       amountDiscount,
       receiptUrl: charge?.receipt_url ?? undefined,
       discordHandle: discord ?? undefined,
+      // Checkout puts the referrer on the session whatever code was used.
+      notes: full.metadata?.referred_by ? "Referred by a friend." : undefined,
       utm: pickUtm((key) => full.metadata?.[key]),
       status,
       paymentMethod: "stripe",
@@ -249,7 +266,9 @@ export async function POST(request: Request) {
       test: !event.livemode || isTestCoupon,
     };
     await recordPurchase(purchase);
-    await recordTicket(purchase);
+    await recordTicket(purchase, {
+      referredBy: full.metadata?.referred_by || undefined,
+    });
     await capturePurchase(purchase);
 
     // Confirmation email once the money is settled (or none was owed): card
@@ -271,11 +290,14 @@ export async function POST(request: Request) {
         }
       } catch (err) {
         console.error("[stripe-webhook] mailing-list signup failed:", err);
-        await sendAdminErrorEmail(
-          `Mailing-list signup failed for ticket buyer ${email} (session ${full.id}): ${err instanceof Error ? err.message : String(err)}`,
-        ).catch((adminErr) =>
-          console.error("[stripe-webhook] admin alert failed:", adminErr),
-        );
+        await reportError({
+          source: "Stripe webhook",
+          summary:
+            "Mailing-list signup failed for a ticket buyer (the ticket itself is fine)",
+          details: { Buyer: email, Session: full.id },
+          error: err,
+          mention: false,
+        });
       }
 
       try {
@@ -303,16 +325,37 @@ export async function POST(request: Request) {
         });
       } catch (err) {
         console.error("[stripe-webhook] confirmation email failed:", err);
-        await sendAdminErrorEmail(
-          `Ticket confirmation email failed for ${email} (session ${full.id}): ${err instanceof Error ? err.message : String(err)}`,
-        ).catch((adminErr) =>
-          console.error("[stripe-webhook] admin alert failed:", adminErr),
-        );
+        await reportError({
+          source: "Stripe webhook",
+          summary:
+            "Ticket confirmation email didn't send; the buyer has no ticket code yet",
+          details: { Buyer: email, Session: full.id },
+          error: err,
+        });
       }
+
+      await followUpTicketPurchase({
+        to: email,
+        name: preferredName ?? full.customer_details?.name ?? undefined,
+        ticketType,
+        paymentId: paymentIntent?.id ?? full.id,
+        test: !event.livemode || isTestCoupon,
+        source: "Stripe webhook",
+      });
     }
   } catch (err) {
     // 500 → Stripe retries; recordPurchase upserts, so a retry can't duplicate.
     console.error("[stripe-webhook] failed to record purchase:", err);
+    await reportError({
+      source: "Stripe webhook",
+      summary: "Couldn't record a ticket purchase; Stripe will retry",
+      details: {
+        Session: session.id,
+        Buyer: session.customer_details?.email ?? "unknown",
+        Event: event.id,
+      },
+      error: err,
+    });
     return NextResponse.json({ error: "Processing failed" }, { status: 500 });
   }
 

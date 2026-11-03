@@ -15,6 +15,7 @@ import {
   recordPickerJoin,
   setMegagameLevels,
 } from "@/lib/megagame-store";
+import { invalidateSchedule } from "@/lib/schedule-store";
 import {
   claimOwnTicket,
   claimTicket,
@@ -59,6 +60,7 @@ export async function updateProfile(
       body: { name },
       headers: await headers(),
     });
+    invalidateSchedule();
   }
   const { profiles } = schema;
   await getDb()
@@ -297,4 +299,9 @@ export async function chooseMegagameClass(
 export async function signOut(): Promise<void> {
   await getAuth().api.signOut({ headers: await headers() });
   redirect("/");
+}
+
+/** Signs out without redirecting; the nav menu reloads the page itself. */
+export async function signOutInPlace(): Promise<void> {
+  await getAuth().api.signOut({ headers: await headers() });
 }

@@ -206,7 +206,7 @@ export default function LocationForm({
           {location ? "Edit room" : "New room"}
         </DialogTitle>
         <DialogDescription className="mt-1 mb-5 text-sm text-ink/60">
-          Rooms are the grid’s columns, left to right by display order.
+          Rooms are the grid’s columns; drag them in the rooms list to reorder.
         </DialogDescription>
 
         <form
@@ -222,7 +222,16 @@ export default function LocationForm({
           }}
           className="grid gap-4"
         >
-          {location && <input type="hidden" name="id" value={location.id} />}
+          {location && (
+            <>
+              <input type="hidden" name="id" value={location.id} />
+              <input
+                type="hidden"
+                name="displayOrder"
+                value={location.displayOrder}
+              />
+            </>
+          )}
 
           <Field label="Name" name="name" state={state}>
             <input
@@ -252,24 +261,14 @@ export default function LocationForm({
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Capacity" name="capacity" state={state}>
-              <input
-                name="capacity"
-                inputMode="numeric"
-                defaultValue={location?.capacity ?? ""}
-                className={fieldClass}
-              />
-            </Field>
-            <Field label="Display order" name="displayOrder" state={state}>
-              <input
-                name="displayOrder"
-                inputMode="numeric"
-                defaultValue={location?.displayOrder ?? 100}
-                className={fieldClass}
-              />
-            </Field>
-          </div>
+          <Field label="Capacity" name="capacity" state={state}>
+            <input
+              name="capacity"
+              inputMode="numeric"
+              defaultValue={location?.capacity ?? ""}
+              className={fieldClass}
+            />
+          </Field>
 
           <ThumbnailPicker
             value={thumbnail}

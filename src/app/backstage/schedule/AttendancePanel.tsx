@@ -90,6 +90,7 @@ export default function AttendancePanel({
           bookmarked={viewer.bookmarks.includes(session.id)}
           full={cap !== null && going.length >= cap}
           commitment={session.rsvpIsCommitment}
+          open={session.rsvpsOpen}
           conflicts={conflicts}
           onSettled={() => router.refresh()}
         />

@@ -1,5 +1,5 @@
 import { can } from "@/lib/access";
-import { isEmailVariant, previewEmail, readSentEmail } from "@/lib/sent-emails";
+import { isEmailVariant, previewEmail, readEmail } from "@/lib/sent-emails";
 
 export const runtime = "nodejs";
 
@@ -20,7 +20,7 @@ export async function GET(
   const { slug } = await ctx.params;
   const v = new URL(request.url).searchParams.get("v");
   const variant = isEmailVariant(v) ? v : "html";
-  const source = await readSentEmail(slug, variant);
+  const source = await readEmail(slug, variant);
   if (source == null)
     return new Response("Not found", { status: 404, headers });
 

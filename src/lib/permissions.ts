@@ -66,14 +66,16 @@ export const PERMISSIONS = {
     group: "Schedule",
     level: "view",
     label: "Preview schedule",
-    description: "See the public schedule before it opens.",
+    description:
+      "Saw the schedule before it opened to everyone; gates nothing now.",
   },
   "schedule.rsvps": {
     audience: "attendee",
     group: "Schedule",
     level: "view",
     label: "RSVP names",
-    description: "RSVP names on a session page, not just the counts.",
+    description:
+      "RSVP names on every session page, not just the counts; hosts see them on their own sessions regardless.",
   },
   "schedule.volunteer_rooms": {
     audience: "attendee",
@@ -100,6 +102,16 @@ export const PERMISSIONS = {
     label: "Edit schedule",
     description: "On the admin grid and over the API.",
     implies: ["schedule.view"],
+  },
+  // Kept off schedule.manage: column order is one shared view, so only
+  // people who know that should move it.
+  "schedule.rooms": {
+    audience: "team",
+    group: "Schedule",
+    level: "edit",
+    label: "Arrange rooms",
+    description: "Drag rooms to reorder the grid's columns for everyone.",
+    implies: ["schedule.manage"],
   },
   "promo.view": {
     audience: "team",

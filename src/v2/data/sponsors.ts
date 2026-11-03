@@ -67,6 +67,7 @@ export const PATRON_SPONSORS: Sponsor[] = [
     name: "Outside the Asylum",
     url: "https://outsidetheasylum.blog/",
     logo: outsideTheAsylum,
-    logoClass: "h-10 md:h-12",
+    // Square mark: a bit taller so it carries the same weight as the wide ones.
+    logoClass: "h-16 md:h-20",
   },
 ];

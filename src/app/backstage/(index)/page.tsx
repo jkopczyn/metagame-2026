@@ -40,8 +40,9 @@ const TOOLS: {
   {
     href: "/backstage/emails",
     icon: MailIcon,
-    name: "Sent emails",
-    blurb: "The announcements and other emails we've sent, to read back.",
+    name: "Emails",
+    blurb:
+      "The announcements and other emails we've sent, plus drafts in progress.",
     perm: "emails.view",
   },
   {

@@ -130,6 +130,8 @@ export const sessions = pgTable(
     // An RSVP takes a limited spot others rely on, not just a show of interest.
     rsvpIsCommitment: boolean().notNull().default(false),
     sponsored: boolean().notNull().default(false),
+    // Off until the team opens RSVPs; the public button is greyed out meanwhile.
+    rsvpsOpen: boolean().notNull().default(true),
     // The accepted RFP this came from, for the Airtable sync.
     airtableRfpRecordId: text().unique(),
     // The committee member who shepherds it through review.

@@ -23,8 +23,9 @@ vi.mock("@/lib/auth", () => ({
 }));
 vi.mock("@/db", () => ({ getDb: vi.fn(), schema: {} }));
 vi.mock("@/lib/blob", () => ({ deleteImage: vi.fn(), uploadImage: vi.fn() }));
-vi.mock("@/lib/ticket-store", () => ({}));
+vi.mock("@/lib/ticket-store", () => ({ hasClaimedTicket: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/schedule-store", () => ({ invalidateSchedule: vi.fn() }));
 vi.mock("next/headers", () => ({ headers: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 

@@ -16,6 +16,7 @@ import {
   PAGE_SIZES,
   personLabel,
   sortTicketRows,
+  swagReason,
   ticketMatch,
   type SortDir,
   type TicketPeople,
@@ -37,6 +38,11 @@ export type AdminTicket = {
     source: string;
     amountCents: number | null;
     couponCode: string | null;
+    referralCode: string | null;
+    /** The referrer's ticket code, when bought with a referral. */
+    referredBy: string | null;
+    /** Paid tickets bought with this one's code. */
+    referrals: number;
   };
   people: TicketPeople;
 };
@@ -173,6 +179,11 @@ export default function TicketsTable({
                       Code <span className="font-mono">{t.code}</span>
                     </span>
                   </div>
+                  {swagReason(t) && (
+                    <div className="mt-1 text-xs text-meeple">
+                      Swag · {swagReason(t)}
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-2 tabular-nums">
                   <div className="whitespace-nowrap">
@@ -429,6 +440,16 @@ function TicketDetail({ ticket: { t, people } }: { ticket: AdminTicket }) {
         </Field>
         <Field label="Source">
           <span className="capitalize">{t.source}</span>
+        </Field>
+        <Field label="Referral code">
+          {t.referralCode ? (
+            <span className="font-mono">{t.referralCode}</span>
+          ) : (
+            <span className="text-cream/40">—</span>
+          )}
+        </Field>
+        <Field label="Swag">
+          {swagReason(t) ?? <span className="text-cream/40">—</span>}
         </Field>
       </dl>
     </>

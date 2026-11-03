@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { attachFile, createFormRow } from "@/lib/airtable-forms";
 import { sendFormBackupEmail } from "@/lib/email";
+import { reportError } from "@/lib/error-report";
 import { pickUtm } from "@/lib/utm";
 import { FORMS } from "@/v2/forms";
 import {
@@ -89,7 +90,20 @@ export async function POST(
     row = await createFormRow(def.tableId, fields);
   } catch (err) {
     console.error(`[forms] ${def.slug}: failed to store:`, err);
-    if (await backUp(String(err))) return backedUp();
+    const emailed = await backUp(String(err));
+    await reportError({
+      source: `${def.name} form`,
+      summary: emailed
+        ? "Airtable didn't take the row; the answers went to the team inbox instead"
+        : "Airtable didn't take the row and the backup email failed too, so the answers are lost",
+      details: {
+        Form: def.slug,
+        Table: def.tableId,
+        From: answeredEmail(def, answers),
+      },
+      error: err,
+    });
+    if (emailed) return backedUp();
     return NextResponse.json(
       { error: "Couldn't save your answers" },
       { status: 500 },
@@ -100,7 +114,15 @@ export async function POST(
     if (process.env.NODE_ENV !== "production")
       return NextResponse.json({ ok: true, stored: false, preview: fields });
     console.error(`[forms] Airtable not configured in production`);
-    if (await backUp("The site has no AIRTABLE_API_KEY.")) return backedUp();
+    const emailed = await backUp("The site has no AIRTABLE_API_KEY.");
+    await reportError({
+      source: `${def.name} form`,
+      summary: emailed
+        ? "The site has no AIRTABLE_API_KEY; the answers went to the team inbox instead"
+        : "The site has no AIRTABLE_API_KEY and the backup email failed too, so the answers are lost",
+      details: { Form: def.slug, From: answeredEmail(def, answers) },
+    });
+    if (emailed) return backedUp();
     return NextResponse.json(
       { error: "Submissions are temporarily unavailable" },
       { status: 503 },
@@ -117,7 +139,22 @@ export async function POST(
       console.error(`[forms] ${def.slug}: attachment failed:`, err);
     }
   }
-  if (!attached)
-    await backUp(`The row saved (${row.id}), but its picture didn't upload.`);
+  if (!attached) {
+    const emailed = await backUp(
+      `The row saved (${row.id}), but its picture didn't upload.`,
+    );
+    await reportError({
+      source: `${def.name} form`,
+      summary: emailed
+        ? "The row saved but its picture didn't upload; the picture went to the team inbox"
+        : "The row saved but its picture didn't upload, and the backup email failed too",
+      details: {
+        Form: def.slug,
+        Row: row.id,
+        From: answeredEmail(def, answers),
+      },
+      mention: false,
+    });
+  }
   return NextResponse.json({ ok: true, stored: true, attached });
 }

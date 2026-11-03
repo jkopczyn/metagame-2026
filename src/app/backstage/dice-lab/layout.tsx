@@ -18,7 +18,7 @@ export default function DiceLabLayout({
   return (
     <div className="flex min-h-full flex-1 flex-col bg-cream text-ink">
       <header className="sticky top-0 z-10 border-b border-line bg-cream/95 backdrop-blur">
-        <div className="flex h-14 items-center justify-between gap-4 px-4">
+        <div className="flex h-14 items-center justify-between gap-4 pr-4 pl-20 md:pl-24">
           <nav className="flex items-center gap-4">
             <BackToTools />
             <Link

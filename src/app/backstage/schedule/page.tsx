@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import SignIn from "../SignIn";
 import ScheduleTool from "./ScheduleTool";
 import { toolAccess } from "@/lib/admin-auth";
+import { can } from "@/lib/access";
 import {
   loadAttendance,
   loadSchedule,
@@ -19,10 +20,11 @@ export default async function AdminSchedulePage(
   if (!access) return <SignIn next="/backstage/schedule" />;
 
   const { edit } = await props.searchParams;
-  const [schedule, attendance, plans] = await Promise.all([
+  const [schedule, attendance, plans, canReorder] = await Promise.all([
     loadSchedule(),
     loadAttendance(),
     loadViewerPlans(access.userId),
+    can("schedule.rooms").then(Boolean),
   ]);
   const viewer = { ...plans, userId: access.userId };
   // Mirrors the guard in actions.ts: sample data only against a local database.
@@ -33,6 +35,7 @@ export default async function AdminSchedulePage(
       attendance={attendance}
       viewer={viewer}
       canSeed={canSeed}
+      canReorder={canReorder}
       initialEdit={typeof edit === "string" ? edit : null}
     />
   );

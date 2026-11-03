@@ -16,6 +16,8 @@ import {
 } from "@/lib/admin-tickets";
 import { ticketAccounts } from "@/lib/admin-store";
 import { can } from "@/lib/access";
+import { formatReferralCode } from "@/lib/referral";
+import { referralFacts } from "@/lib/referral-store";
 import { formatTicketCode } from "@/lib/ticket-code-format";
 import { allTickets, ticketLabel, ticketsForUser } from "@/lib/ticket-store";
 
@@ -72,22 +74,31 @@ export default async function AdminTicketsPage(
       ? await ticketsForUser(forUser.id, forUser.email)
       : []
     : await allTickets();
-  const { accounts, byEmail } = await ticketAccounts(rows);
-  const tickets: AdminTicket[] = rows.map((t) => ({
-    t: {
-      id: t.paymentId,
-      createdAt: t.createdAt,
-      claimedAt: t.claimedAt,
-      tier: ticketLabel(t.tier),
-      status: t.status,
-      test: t.test,
-      code: formatTicketCode(t.ticketCode),
-      source: t.source,
-      amountCents: t.amountCents,
-      couponCode: t.couponCode,
-    },
-    people: ticketPeople(t, accounts, byEmail),
-  }));
+  const [{ accounts, byEmail }, { referredBy, referrals }] = await Promise.all([
+    ticketAccounts(rows),
+    referralFacts(rows),
+  ]);
+  const tickets: AdminTicket[] = rows.map((t) => {
+    const referrer = referredBy.get(t.paymentId);
+    return {
+      t: {
+        id: t.paymentId,
+        createdAt: t.createdAt,
+        claimedAt: t.claimedAt,
+        tier: ticketLabel(t.tier),
+        status: t.status,
+        test: t.test,
+        code: formatTicketCode(t.ticketCode),
+        source: t.source,
+        amountCents: t.amountCents,
+        couponCode: t.couponCode,
+        referralCode: t.referralCode && formatReferralCode(t.referralCode),
+        referredBy: referrer ? formatTicketCode(referrer) : null,
+        referrals: referrals.get(t.paymentId) ?? 0,
+      },
+      people: ticketPeople(t, accounts, byEmail),
+    };
+  });
 
   return (
     <div className="space-y-4">

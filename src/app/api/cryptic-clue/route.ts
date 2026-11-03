@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { reportError } from "@/lib/error-report";
 import { addCrypticClueContact, recordCrypticClue } from "@/lib/airtable";
 
 // Two steps: POST the clue (returns the new record id), then an optional PATCH
@@ -45,6 +46,12 @@ export async function POST(request: Request) {
     );
   } catch (err) {
     console.error("[clue] failed to store clue:", err);
+    await reportError({
+      source: "Cryptic clue form",
+      summary: "Airtable didn't take the clue; the person saw an error",
+      error: err,
+      mention: false,
+    });
     return NextResponse.json({ error: "Failed to save clue" }, { status: 500 });
   }
 }
@@ -78,6 +85,13 @@ export async function PATCH(request: Request) {
     );
   } catch (err) {
     console.error("[clue] failed to store contact:", err);
+    await reportError({
+      source: "Cryptic clue form",
+      summary:
+        "Airtable didn't take the contact details; the person saw an error",
+      error: err,
+      mention: false,
+    });
     return NextResponse.json(
       { error: "Failed to save contact" },
       { status: 500 },

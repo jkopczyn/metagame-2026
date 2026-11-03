@@ -2,7 +2,9 @@
 
 Hand-pasted EmailOctopus templates. The app only reads them to list them on
 `/backstage/emails` (`src/lib/sent-emails.ts`; the `.min.html` and `.txt`
-variants hang off their `.html`); sending is still manual. After editing one,
+variants hang off their `.html`); sending is still manual. Unsent emails live
+in `emails/drafts/`; `git mv` one (with its variants) to the top level once
+it's been sent, which is what marks it sent in the tool. After editing one,
 paste it into EmailOctopus again (the `.min.html` variant for the
 announcements, which sit near Gmail's ~102 KB clipping limit).
 

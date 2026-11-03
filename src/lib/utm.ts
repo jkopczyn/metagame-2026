@@ -1,4 +1,9 @@
 import posthog from "posthog-js";
+import {
+  formatReferralCode,
+  REFERRAL_PARAM,
+  referralCodeOf,
+} from "@/lib/referral";
 import { PROMO_PARAM, promoCode } from "@/lib/tracking-links";
 
 // Last-touch attribution: the UTMs from the most recent tracking link a visitor
@@ -27,9 +32,12 @@ const STORAGE_KEY = "last-touch-utm";
 // we have for them until they arrive through another tracking link.
 const LEGACY_STORAGE_KEY = "first-touch-utm";
 const FIRST_VISIT_KEY = "first-visit";
-// A promo code from the landing URL (a poster QR, /go/<slug>?promo=CODE). Kept
-// until a later link sets another; it's applied to Standard checkout.
+// The discount code from the landing URL (a poster QR, /go/<slug>?promo=CODE,
+// or a friend's /invite/<code>), and the referral itself, which counts on any
+// ticket whatever code ends up used. Session-scoped: a code from a link months
+// ago shouldn't still be applied.
 const PROMO_STORAGE_KEY = "promo-code";
+const REFERRAL_STORAGE_KEY = "referral-code";
 const MAX_LEN = 200;
 
 /** The UTM values `get` returns, trimmed and capped; blanks and non-strings dropped. */
@@ -56,8 +64,10 @@ export function pickUtm(
 /**
  * Record the first visit time, and store the landing URL's UTMs over any earlier
  * set so the latest tracking link wins. A URL without UTMs leaves the set alone.
+ * Returns the code a `?promo=` link carried, so the visitor can be told it was
+ * saved; a referral's own code isn't announced.
  */
-export function captureUtm(search: string): void {
+export function captureUtm(search: string): string {
   try {
     if (!localStorage.getItem(FIRST_VISIT_KEY)) {
       localStorage.setItem(FIRST_VISIT_KEY, new Date().toISOString());
@@ -68,22 +78,27 @@ export function captureUtm(search: string): void {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(utm));
       localStorage.removeItem(LEGACY_STORAGE_KEY);
     }
-    const promo = promoCode(params.get(PROMO_PARAM));
-    if (promo) localStorage.setItem(PROMO_STORAGE_KEY, promo);
+    const ref = referralCodeOf(params.get(REFERRAL_PARAM));
+    if (ref) sessionStorage.setItem(REFERRAL_STORAGE_KEY, ref);
+    const linked = promoCode(params.get(PROMO_PARAM));
+    const promo = linked || (ref && formatReferralCode(ref));
+    if (promo) sessionStorage.setItem(PROMO_STORAGE_KEY, promo);
+    return linked;
   } catch {
     // Storage blocked — attribution is best-effort.
+    return "";
   }
 }
 
 /**
- * Drop utm_* and promo from the address bar once they've been read. PostHog
+ * Drop utm_*, promo and ref from the address bar once they've been read. PostHog
  * captured them at init, and in history_change mode it only re-fires a pageview
  * when the pathname changes, so a query-only replaceState is silent.
  */
 export function stripUtmFromUrl(): void {
   const url = new URL(window.location.href);
   const had = [...url.searchParams.keys()].filter(
-    (k) => k.startsWith("utm_") || k === PROMO_PARAM,
+    (k) => k.startsWith("utm_") || k === PROMO_PARAM || k === REFERRAL_PARAM,
   );
   if (had.length === 0) return;
   for (const k of had) url.searchParams.delete(k);
@@ -132,17 +147,32 @@ export function withUtm(href: string): string {
 
 export function readPromo(): string {
   try {
-    return promoCode(localStorage.getItem(PROMO_STORAGE_KEY));
+    return promoCode(sessionStorage.getItem(PROMO_STORAGE_KEY));
   } catch {
     return "";
   }
 }
 
-/** `href` with the stored promo code set, so checkout pre-applies it. Client-only. */
-export function withPromo(href: string): string {
-  const promo = readPromo();
-  if (!promo) return href;
+/** Replace the stored discount code; blank clears it. */
+export function setPromo(code: string): void {
+  try {
+    const promo = promoCode(code.replace(/\s+/g, ""));
+    if (promo) sessionStorage.setItem(PROMO_STORAGE_KEY, promo);
+    else sessionStorage.removeItem(PROMO_STORAGE_KEY);
+  } catch {}
+}
+
+/**
+ * `href` with the stored discount code and referral set, so checkout applies
+ * the code and records the referral. Client-only.
+ */
+export function withCodes(href: string): string {
   const url = new URL(href, "http://localhost");
-  url.searchParams.set(PROMO_PARAM, promo);
+  const promo = readPromo();
+  if (promo) url.searchParams.set(PROMO_PARAM, promo);
+  try {
+    const ref = referralCodeOf(sessionStorage.getItem(REFERRAL_STORAGE_KEY));
+    if (ref) url.searchParams.set(REFERRAL_PARAM, ref);
+  } catch {}
   return url.pathname + url.search + url.hash;
 }

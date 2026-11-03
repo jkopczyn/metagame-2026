@@ -6,4 +6,6 @@ Imported from the existing September 28, 2026 kit. Updated October 15, 2026 to a
 
 The Spire was added as a Patron sponsor on October 28, 2026 using the unchanged supplied SVG. See [source and usage](Metagame_2026_Brand_Kit/sponsors/spire/README.md). The editable kit README records this addition; the PDF guide retains its October 15 sponsor snapshot.
 
+The Outside the Asylum mark was replaced November 2, 2026 with the sponsor's own square logo (the earlier wide lockup was our invention); the PDF guide sponsor page carries the new mark.
+
 The ZIP mirrors the editable folder. Keep linked images alongside the SVG templates when using them.

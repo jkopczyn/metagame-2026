@@ -38,6 +38,7 @@ export type SessionFields = {
   status: Status;
   rsvpIsCommitment: boolean;
   sponsored: boolean;
+  rsvpsOpen: boolean;
   /** Undefined when the input doesn't mention it, so it's left as stored. */
   airtableRfpRecordId?: string | null;
   /** Undefined when the input doesn't mention it, so it's left as stored. */
@@ -233,6 +234,11 @@ export function parseSessionFields(raw: Raw): Parsed<SessionFields> {
   const sponsored = flag(raw, "sponsored");
   if (sponsored === null)
     return { ok: false, field: "sponsored", error: "true or false." };
+  // Defaults on, unlike the other flags, so JSON that omits it leaves RSVPs
+  // open; the form pairs the box with a hidden "" so unticked closes them.
+  const rsvpsOpen = "rsvpsOpen" in raw ? flag(raw, "rsvpsOpen") : true;
+  if (rsvpsOpen === null)
+    return { ok: false, field: "rsvpsOpen", error: "true or false." };
 
   let airtableRfpRecordId: string | null | undefined;
   if ("airtableRfpRecordId" in raw) {
@@ -279,6 +285,7 @@ export function parseSessionFields(raw: Raw): Parsed<SessionFields> {
       status: status ?? "draft",
       rsvpIsCommitment,
       sponsored,
+      rsvpsOpen,
       airtableRfpRecordId,
       shepherdUserId,
     },

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sendContactEmail } from "@/lib/email";
+import { reportError } from "@/lib/error-report";
 import { resolveRecipient } from "@/lib/contact-recipients";
 import { TEAM_EMAIL } from "@/v2/lib/links";
 
@@ -59,6 +60,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, sent });
   } catch (err) {
     console.error("[contact] failed to send:", err);
+    await reportError({
+      source: "Contact form",
+      summary: "The message didn't send; the person saw an error",
+      details: { To: to, From: `${name} <${email}>`, Subject: subject },
+      error: err,
+    });
     return NextResponse.json(
       { error: "Failed to send message" },
       { status: 500 },

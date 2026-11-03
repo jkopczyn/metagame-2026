@@ -10,7 +10,7 @@ export const VOLUNTEER_APPLY_PATH = "/volunteer/apply";
 // Short link to the volunteer journey for tracking links: it passes utm_*
 // through to the page, which stores them for the application.
 export const VOLUNTEER_FORM_PATH = "/volunteer-form";
-// Required for every attending child (childcare or not), due October 15.
+// Required for every attending child (childcare or not).
 export const CHILD_REGISTRATION_FORM_URL = "/childcare/register";
 export const JOIN_TEAM_FORM_URL = "/team/join";
 export const SPONSOR_FORM_URL = "/sponsor/interest";

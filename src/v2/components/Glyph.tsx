@@ -123,6 +123,13 @@ const PATHS = {
       <circle cx="24" cy="22.5" r="1.4" fill="currentColor" stroke="none" />
     </>
   ),
+  // Not in the brand guide's set: drawn to match it.
+  dance: (
+    <>
+      <circle cx="27" cy="9" r="4" />
+      <path d="M26 15 L22 28 M25 18 L16 13 L11 6 M25 18 L33 21 L38 15 M22 28 L15 34 L17 42 M22 28 L30 33 L36 40" />
+    </>
+  ),
   // And for the session proposal's categories.
   trophy: (
     <>
@@ -198,6 +205,7 @@ export const GLYPH_LABELS: Record<GlyphName, string> = {
   megagame: "The Megagame",
   "party-games": "Party games",
   trivia: "Trivia",
+  dance: "Dance",
   physical: "Physical challenges",
   treasure: "Scavenger hunts",
   trophy: "Competitions",

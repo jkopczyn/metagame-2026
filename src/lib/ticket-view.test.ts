@@ -17,6 +17,8 @@ const row = (over: Partial<TicketRow> = {}): TicketRow => ({
   ownerUserId: null,
   claimedAt: null,
   holderUserId: null,
+  referralCode: null,
+  referredByPaymentId: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   ...over,
@@ -35,7 +37,22 @@ describe("ticketView", () => {
       claimed: false,
       code: "A2C-4EF",
       transferred: false,
+      referralCode: null,
+      referredBy: null,
     });
+  });
+
+  it("shows the referral code to the holder and the owner, nobody else", () => {
+    const r = row({ referralCode: "ABCDEFGH", referredByPaymentId: "pi_0" });
+    expect(ticketView(r, ...ada)).toMatchObject({
+      referralCode: "ABCD-EFGH",
+    });
+    expect(
+      ticketView({ ...r, ownerUserId: "u2" }, "u2", "bob@example.com"),
+    ).toMatchObject({ referralCode: "ABCD-EFGH" });
+    expect(
+      ticketView({ ...r, holderUserId: "u2" }, ...ada).referralCode,
+    ).toBeNull();
   });
 
   it("hides a claimed ticket's code, even from its holder", () => {

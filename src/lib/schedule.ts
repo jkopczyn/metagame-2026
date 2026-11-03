@@ -52,6 +52,8 @@ export type ScheduleSession = {
   /** An RSVP claims a limited spot people rely on, not just interest. */
   rsvpIsCommitment: boolean;
   sponsored: boolean;
+  /** False until the team opens RSVPs; the button is greyed out meanwhile. */
+  rsvpsOpen: boolean;
   /** The Airtable RFP Submissions row this came from. */
   airtableRfpRecordId: string | null;
   /** Billing order, lead first. */
@@ -506,6 +508,19 @@ export function isPlaced<S extends Timed>(s: S): s is Placed<S> {
   return s.startsAt !== null && s.endsAt !== null;
 }
 
+type Listable = Timed & Pick<ScheduleSession, "status" | "locationId">;
+
+/**
+ * Published, timed and in a room: the one test for whether attendees get a
+ * session at all. Anything linking to /schedule/<slug> must pass it, since the
+ * session page resolves out of publicSchedule().
+ */
+export function isListed<S extends Listable>(
+  s: S,
+): s is Placed<S> & { locationId: string } {
+  return s.status === "published" && isPlaced(s) && s.locationId !== null;
+}
+
 export function offsetPx(session: Placed<Timed>, slotStart: number): number {
   return Math.max(0, pacificMinutes(session.startsAt) - slotStart) * PX_PER_MIN;
 }
@@ -527,6 +542,26 @@ export function nowLinePx(
 export function heightPx(session: Placed<Timed>): number {
   const dur = pacificMinutes(session.endsAt) - pacificMinutes(session.startsAt);
   return Math.max(SLOT_PX, dur * PX_PER_MIN);
+}
+
+// A block's text metrics: p-1.5 padding, 13px/tight title lines, one
+// 11px/tight host line kept clear below the title, and the Sponsor tag's row
+// above it when there is one.
+const BLOCK_PADDING_PX = 12;
+const TITLE_LINE_PX = 16;
+const HOST_LINE_PX = 16;
+const TAG_ROW_PX = 18;
+
+/** Title lines a block has room for before the hosts line; three at least. */
+export function titleLines(
+  session: Placed<Timed> & { sponsored?: boolean },
+): number {
+  const room =
+    heightPx(session) -
+    BLOCK_PADDING_PX -
+    HOST_LINE_PX -
+    (session.sponsored ? TAG_ROW_PX : 0);
+  return Math.max(3, Math.floor(room / TITLE_LINE_PX));
 }
 
 export function startsInSlot(
@@ -791,6 +826,7 @@ export type PublicSession = Pick<
   | "ages"
   | "rsvpIsCommitment"
   | "sponsored"
+  | "rsvpsOpen"
 > & { startsAt: string; endsAt: string; hosts: { name: string }[] };
 
 export type PublicLocation = Pick<
@@ -822,7 +858,8 @@ export function roomVisible(
  * The published, placed sessions and the rooms to show them in, as much of
  * each as this viewer may see (see ScheduleLocation.visibility). A session in
  * a room the viewer can't see is dropped with it, so nothing leaks through
- * the list view or a session page.
+ * the list view or a session page. A session with no room yet is unscheduled
+ * as far as attendees are concerned, so it is dropped too (see isListed).
  */
 export function publicSchedule(
   schedule: {
@@ -831,13 +868,11 @@ export function publicSchedule(
   },
   viewer: ScheduleViewer = "public",
 ): { locations: PublicLocation[]; sessions: PublicSession[] } {
-  const placed = schedule.sessions
-    .filter((s) => s.status === "published")
-    .filter(isPlaced);
   const rooms = schedule.locations.filter((l) => roomVisible(l, viewer));
   const shown = new Set(rooms.map((l) => l.id));
-  const sessions: PublicSession[] = placed
-    .filter((s) => s.locationId === null || shown.has(s.locationId))
+  const sessions: PublicSession[] = schedule.sessions
+    .filter(isListed)
+    .filter((s) => shown.has(s.locationId))
     .map((s) => ({
       id: s.id,
       slug: s.slug,
@@ -851,6 +886,7 @@ export function publicSchedule(
       ages: s.ages,
       rsvpIsCommitment: s.rsvpIsCommitment,
       sponsored: s.sponsored,
+      rsvpsOpen: s.rsvpsOpen,
       hosts: s.hosts.map((h) => ({ name: publicAccountName(h) })),
     }));
   const locations = rooms.map((l) => ({
@@ -862,6 +898,42 @@ export function publicSchedule(
     imageUrl: l.imageUrl,
   }));
   return { locations, sessions };
+}
+
+/** The session's own page, under /schedule. */
+export function sessionHref(session: { slug: string }): string {
+  return `/schedule/${encodeURIComponent(session.slug)}`;
+}
+
+export type HostedSession = Pick<
+  PublicSession,
+  "slug" | "title" | "category" | "startsAt"
+>;
+
+/**
+ * The shown sessions each account hosts, by account id, in schedule order.
+ * `shown` is the public schedule; `schedule` the raw one, which has the
+ * hosts' ids.
+ */
+export function hostedSessions(
+  schedule: { sessions: ScheduleSession[] },
+  shown: { sessions: PublicSession[] },
+): Map<string, HostedSession[]> {
+  const hosts = new Map(schedule.sessions.map((s) => [s.id, s.hosts]));
+  const out = new Map<string, HostedSession[]>();
+  for (const s of shown.sessions) {
+    for (const h of hosts.get(s.id) ?? []) {
+      let mine = out.get(h.userId);
+      if (!mine) out.set(h.userId, (mine = []));
+      mine.push({
+        slug: s.slug,
+        title: s.title,
+        category: s.category,
+        startsAt: s.startsAt,
+      });
+    }
+  }
+  return out;
 }
 
 /**

@@ -32,9 +32,15 @@ export default function FriendSwagModal({
           Get a Family &amp; Friends pack
         </Button>
         <p className="text-center text-sm text-cream/70">
-          Already bought a ticket? Don&apos;t worry, we&apos;re adding a
-          referral code you&apos;ll be able to use to invite friends to receive
-          the bring-a-friend reward.
+          Already have a ticket? Your{" "}
+          <a
+            href="/account?tab=tickets"
+            className="font-bold text-tan underline underline-offset-2"
+          >
+            account page
+          </a>{" "}
+          has a referral code: friends who buy with it pay the Family &amp;
+          Friends price, and you both get the bring-a-friend reward.
         </p>
       </DialogContent>
     </Dialog>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { FaBitcoin } from "react-icons/fa";
-import { readUtm, withUtm } from "@/lib/utm";
+import { readUtm, withCodes, withUtm } from "@/lib/utm";
 import { stripeCheckoutHref, supporterTier } from "@/v2/lib/tickets";
 import {
   subscribeCurrency,
@@ -133,7 +133,9 @@ export default function SupporterModal({ onClose }: { onClose: () => void }) {
 
   function checkoutAtStripe() {
     window.open(
-      withUtm(stripeCheckoutHref({ tier: "supporter", chip: chip.usd })),
+      withCodes(
+        withUtm(stripeCheckoutHref({ tier: "supporter", chip: chip.usd })),
+      ),
       "_blank",
       "noopener,noreferrer",
     );

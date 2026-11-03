@@ -1,44 +1,44 @@
 import type { Metadata } from "next";
-import {
-  Bebas_Neue,
-  Inter,
-  Roboto,
-  Space_Grotesk,
-  Space_Mono,
-} from "next/font/google";
+import localFont from "next/font/local";
 import BootSync from "@/v2/components/BootSync";
 import UtmCapture from "@/v2/components/UtmCapture";
 import { Toaster } from "@/v2/components/ui/sonner";
 import { PUZZLE_BOOT_SCRIPT } from "@/v2/puzzle/boot";
 import "./globals.css";
 
-const bebasNeue = Bebas_Neue({
+// Self-hosted latin subsets from Google Fonts (see src/app/fonts). The
+// Turbopack build fetches next/font/google at build time and fails outright
+// when that fetch is flaky in CI.
+const bebasNeue = localFont({
+  src: "./fonts/BebasNeue-400.woff2",
   weight: "400",
-  subsets: ["latin"],
   variable: "--font-bebas",
 });
 
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
+const spaceGrotesk = localFont({
+  src: "./fonts/SpaceGrotesk-300-700.woff2",
+  weight: "300 700",
   variable: "--font-space-grotesk",
 });
 
-const inter = Inter({
-  weight: ["400", "500", "600"],
-  subsets: ["latin"],
+const inter = localFont({
+  src: "./fonts/Inter-400-600.woff2",
+  weight: "400 600",
   variable: "--font-inter",
 });
 
-const spaceMono = Space_Mono({
-  weight: ["400", "700"],
-  subsets: ["latin"],
+const spaceMono = localFont({
+  src: [
+    { path: "./fonts/SpaceMono-400.woff2", weight: "400" },
+    { path: "./fonts/SpaceMono-700.woff2", weight: "700" },
+  ],
   variable: "--font-space-mono",
 });
 
 // Button label font (baked into the shared shadcn Button base classes).
-const roboto = Roboto({
-  weight: ["500", "600", "700"],
-  subsets: ["latin"],
+const roboto = localFont({
+  src: "./fonts/Roboto-500-700.woff2",
+  weight: "500 700",
   variable: "--font-roboto",
 });
 

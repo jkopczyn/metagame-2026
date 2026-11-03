@@ -30,10 +30,13 @@ const nextConfig: NextConfig = {
       "./assets/posters/overlays/*.png",
       "./assets/posters/fonts/*.ttf",
     ],
-    // The sent-email catalog reads emails/ at request time. Keys are globs,
-    // so `[slug]` can't be spelled out.
-    "/backstage/emails": ["./emails/*"],
-    "/backstage/emails/**": ["./emails/*"],
+    // The email catalog reads emails/ (sent) and emails/drafts/ at request
+    // time. Keys are globs, so `[slug]` can't be spelled out.
+    "/backstage/emails": ["./emails/*", "./emails/drafts/*"],
+    "/backstage/emails/**": ["./emails/*", "./emails/drafts/*"],
+    // Ticket webhooks send the one-week-out email from the same files.
+    "/api/stripe-webhook": ["./emails/*", "./emails/drafts/*"],
+    "/api/opennode-webhook": ["./emails/*", "./emails/drafts/*"],
   },
   // public/ files are served max-age=0 by default, so the hero backdrop
   // revalidated on every visit. Filenames are stable; bump them if the
@@ -70,9 +73,13 @@ const nextConfig: NextConfig = {
     },
     // Key dates used to be its own page, then a home-page section; now gone.
     { source: "/key-dates", destination: "/", permanent: true },
-    // /buy/<code> hands its code to the home page, which stores it for Standard checkout.
-    { source: "/buy", destination: "/", permanent: false },
-    { source: "/buy/:promo", destination: "/?promo=:promo", permanent: false },
+    // /buy/<code> hands its code to the tickets section, which stores it for Standard checkout.
+    { source: "/buy", destination: "/#tickets", permanent: false },
+    {
+      source: "/buy/:promo",
+      destination: "/?promo=:promo#tickets",
+      permanent: false,
+    },
     // Short links into Standard checkout; /ticket/<code> pre-applies a promo code.
     {
       source: "/:path(ticket|tickets)",
@@ -82,6 +89,12 @@ const nextConfig: NextConfig = {
     {
       source: "/:path(ticket|tickets)/:promo",
       destination: "/api/checkout/stripe?tier=standard&promo=:promo",
+      permanent: false,
+    },
+    // A friend's referral link: the tickets section with their code filled in.
+    {
+      source: "/invite/:ref",
+      destination: "/?ref=:ref#tickets",
       permanent: false,
     },
     // Shareable short links to the Partiful RSVPs.

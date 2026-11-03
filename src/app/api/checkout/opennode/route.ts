@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { reportError } from "@/lib/error-report";
 import { NextResponse } from "next/server";
 import { getDayPass, getTicket, supporterTier } from "@/lib/tickets";
 import { countCodeRedemptions, lookupDiscountCode } from "@/lib/discount-codes";
@@ -171,6 +172,12 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     console.error("[opennode] createCharge failed:", err);
+    await reportError({
+      source: "Bitcoin checkout",
+      summary: "Couldn't create the OpenNode charge; the buyer saw an error",
+      details: { Ticket: String(ticketId), Buyer: String(email) },
+      error: err,
+    });
     return NextResponse.json(
       { error: "Could not create Bitcoin charge" },
       { status: 502 },

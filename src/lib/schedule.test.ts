@@ -21,6 +21,7 @@ import {
   planConflicts,
   rsvpPrompt,
   slotLabel,
+  titleLines,
   type PlanConflict,
   type LocationVisibility,
   type ScheduleSession,
@@ -42,6 +43,7 @@ const session = (over: Partial<ScheduleSession>): ScheduleSession => ({
   status: "draft",
   rsvpIsCommitment: false,
   sponsored: false,
+  rsvpsOpen: true,
   airtableRfpRecordId: null,
   hosts: [],
   shepherd: null,
@@ -49,6 +51,25 @@ const session = (over: Partial<ScheduleSession>): ScheduleSession => ({
 });
 
 const at = (iso: string) => new Date(iso);
+
+describe("titleLines", () => {
+  const timed = (minutes: number) => ({
+    startsAt: "2026-11-07T20:00:00.000Z",
+    endsAt: new Date(Date.UTC(2026, 10, 7, 20, minutes)).toISOString(),
+  });
+  it("keeps three lines on the shortest blocks", () => {
+    expect(titleLines(timed(30))).toBe(3);
+    expect(titleLines(timed(45))).toBe(3);
+  });
+  it("grows with the block, leaving room for the hosts", () => {
+    expect(titleLines(timed(60))).toBe(5);
+    expect(titleLines(timed(120))).toBe(12);
+  });
+  it("gives a line up to the Sponsor tag", () => {
+    expect(titleLines({ ...timed(60), sponsored: true })).toBe(4);
+    expect(titleLines({ ...timed(30), sponsored: true })).toBe(3);
+  });
+});
 
 describe("slotLabel", () => {
   it("includes the period by default", () => {

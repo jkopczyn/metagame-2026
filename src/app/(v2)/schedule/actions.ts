@@ -64,6 +64,15 @@ export async function rsvpTo(sessionId: string): Promise<PlanResult> {
         needsTicket: ticket.claimable,
       };
     }
+    // The button is greyed out, but a stale page could still submit.
+    const [row] = await getDb()
+      .select({ open: schema.sessions.rsvpsOpen })
+      .from(schema.sessions)
+      .where(eq(schema.sessions.id, sessionId))
+      .limit(1);
+    if (row && !row.open) {
+      return { error: "RSVPs for this session aren’t open yet." };
+    }
     const status = await rsvp(sessionId, userId);
     return { status, rsvps: await loadSessionRsvps(sessionId) };
   });

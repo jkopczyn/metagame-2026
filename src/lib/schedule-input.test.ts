@@ -216,6 +216,28 @@ describe("session flags", () => {
     expect(blamed(parseSessionFields({ ...base, rsvpIsCommitment: 1 }))).toBe(
       "rsvpIsCommitment",
     );
+    expect(blamed(parseSessionFields({ ...base, rsvpsOpen: "maybe" }))).toBe(
+      "rsvpsOpen",
+    );
+  });
+  it("leave RSVPs open unless the input closes them", () => {
+    expect(parseSessionFields(base)).toMatchObject({
+      ok: true,
+      value: { rsvpsOpen: true },
+    });
+    // The form always sends the field, so an unticked box arrives as "".
+    expect(parseSessionFields({ ...base, rsvpsOpen: "" })).toMatchObject({
+      ok: true,
+      value: { rsvpsOpen: false },
+    });
+    expect(parseSessionFields({ ...base, rsvpsOpen: false })).toMatchObject({
+      ok: true,
+      value: { rsvpsOpen: false },
+    });
+    expect(parseSessionFields({ ...base, rsvpsOpen: "on" })).toMatchObject({
+      ok: true,
+      value: { rsvpsOpen: true },
+    });
   });
 });
 

@@ -8,7 +8,7 @@ import {
   type ClaimState,
   type UnclaimState,
 } from "./actions";
-import { CheckIcon, CopyIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, LinkIcon } from "lucide-react";
 import { Button } from "@/v2/components/ui/button";
 import PinInput from "@/v2/components/auth/PinInput";
 import {
@@ -34,23 +34,55 @@ function badge(t: TicketView): { text: string; tone: string } {
 
 /** The holder's code, to copy and pass on to whoever's attending. */
 function ShareCode({ code }: { code: string }) {
-  const { status, copy } = useCopy();
-  const Icon = status === "copied" ? CheckIcon : CopyIcon;
   return (
     <span className="flex items-center gap-1.5 text-sm text-ink/70">
       Share code to transfer:
       <span className="font-mono text-ink">{code}</span>
-      <button
-        type="button"
-        onClick={() => copy(code)}
-        aria-label={status === "copied" ? "Copied" : "Copy code"}
-        title={status === "failed" ? "Couldn't copy" : "Copy code"}
-        className="rounded p-1 text-navy/70 hover:bg-navy/10 hover:text-navy"
-      >
-        <Icon
-          className={`size-4 ${status === "failed" ? "text-meeple" : ""}`}
-        />
-      </button>
+      <CopyButton text={() => code} label="Copy code" Icon={CopyIcon} />
+    </span>
+  );
+}
+
+/** A small icon button that reports its copy state. */
+function CopyButton({
+  text,
+  label,
+  Icon,
+}: {
+  text: () => string;
+  label: string;
+  Icon: typeof CopyIcon;
+}) {
+  const { status, copy } = useCopy();
+  const Shown = status === "copied" ? CheckIcon : Icon;
+  return (
+    <button
+      type="button"
+      onClick={() => copy(text())}
+      aria-label={status === "copied" ? "Copied" : label}
+      title={status === "failed" ? "Couldn't copy" : label}
+      className="rounded p-1 text-navy/70 hover:bg-navy/10 hover:text-navy"
+    >
+      <Shown className={`size-4 ${status === "failed" ? "text-meeple" : ""}`} />
+    </button>
+  );
+}
+
+/**
+ * The ticket's referral code and invite link. A friend who buys with it pays
+ * the Family & Friends price, and both tickets count for the swag.
+ */
+function InviteCode({ code }: { code: string }) {
+  const href = `/invite/${code}`;
+  return (
+    <span className="flex basis-full flex-wrap items-center gap-x-1.5 gap-y-1 pt-1 text-sm text-ink/70">
+      Invite a friend:
+      <span className="font-mono text-ink">{href}</span>
+      <CopyButton
+        text={() => `${window.location.origin}${href}`}
+        label="Copy invite link"
+        Icon={LinkIcon}
+      />
     </span>
   );
 }
@@ -162,6 +194,14 @@ export default function TicketsPanel({ tickets }: { tickets: TicketView[] }) {
                     </button>
                   </span>
                 )}
+                {t.referredBy && (
+                  <span className="basis-full text-sm text-ink/60">
+                    Referred by {t.referredBy}
+                  </span>
+                )}
+                {t.referralCode && t.status === "paid" && (
+                  <InviteCode code={t.referralCode} />
+                )}
               </li>
             );
           })}
@@ -189,11 +229,7 @@ export default function TicketsPanel({ tickets }: { tickets: TicketView[] }) {
           )}
         </p>
       )}
-      {holdsOne ? (
-        <p className="text-sm text-ink/70">
-          You&apos;re all set: you have a ticket.
-        </p>
-      ) : (
+      {!holdsOne && (
         <form action={action} className="flex flex-col gap-2">
           <label
             id="code-label"

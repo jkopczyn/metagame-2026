@@ -7,7 +7,7 @@ import {
   readBody,
 } from "@/lib/schedule-api";
 import { parseLocationFields } from "@/lib/schedule-input";
-import { loadSchedule, upsertLocation } from "@/lib/schedule-store";
+import { querySchedule, upsertLocation } from "@/lib/schedule-store";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,7 @@ export async function PATCH(request: Request, ctx: Ctx) {
   const body = await readBody(request);
   if (body instanceof Response) return body;
   const { id } = await ctx.params;
-  const current = (await loadSchedule()).locations.find((l) => l.id === id);
+  const current = (await querySchedule()).locations.find((l) => l.id === id);
   if (!current) return error("No such location.", 404);
   const parsed = parseLocationFields({ ...current, ...body });
   if (!parsed.ok) return error(parsed.error, 400, parsed.field);
@@ -35,6 +35,6 @@ export async function PATCH(request: Request, ctx: Ctx) {
     return failed(err);
   }
   done();
-  const { locations } = await loadSchedule();
+  const { locations } = await querySchedule();
   return json({ location: locations.find((l) => l.id === id) });
 }

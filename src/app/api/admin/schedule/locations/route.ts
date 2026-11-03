@@ -7,7 +7,7 @@ import {
   readBody,
 } from "@/lib/schedule-api";
 import { parseLocationFields } from "@/lib/schedule-input";
-import { loadSchedule, upsertLocation } from "@/lib/schedule-store";
+import { querySchedule, upsertLocation } from "@/lib/schedule-store";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +30,6 @@ export async function POST(request: Request) {
     return failed(err);
   }
   done();
-  const { locations } = await loadSchedule();
+  const { locations } = await querySchedule();
   return json({ location: locations.find((l) => l.id === id) }, 201);
 }

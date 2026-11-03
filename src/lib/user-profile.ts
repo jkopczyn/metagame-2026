@@ -3,7 +3,7 @@
 // database imports, so the client components can use the types.
 
 import {
-  isPlaced,
+  isListed,
   publicAccountName,
   roomVisible,
   type Ages,
@@ -148,6 +148,7 @@ export type UserSession = {
   title: string;
   category: Category | null;
   ages: Ages | null;
+  rsvpIsCommitment: boolean;
   sponsored: boolean;
   /** Null only for an unplaced draft, which the public view never sees. */
   startsAt: string | null;
@@ -225,8 +226,7 @@ export function userSessions(
   );
   const sessions: UserSession[] = [];
   for (const s of schedule.sessions) {
-    if (!audience.drafts && !(s.status === "published" && isPlaced(s)))
-      continue;
+    if (!audience.drafts && !isListed(s)) continue;
     if (s.locationId !== null && !rooms.has(s.locationId)) continue;
     const hostIndex = s.hosts.findIndex((h) => h.userId === userId);
     const roles: UserSessionRole[] = [];
@@ -241,6 +241,7 @@ export function userSessions(
       title: s.title,
       category: s.category,
       ages: s.ages,
+      rsvpIsCommitment: s.rsvpIsCommitment,
       sponsored: s.sponsored,
       startsAt: s.startsAt,
       endsAt: s.endsAt,

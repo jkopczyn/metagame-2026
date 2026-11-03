@@ -1,0 +1,1 @@
+ALTER TABLE "sessions" ADD COLUMN "rsvps_open" boolean DEFAULT true NOT NULL;

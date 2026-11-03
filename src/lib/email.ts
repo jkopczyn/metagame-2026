@@ -9,7 +9,7 @@ let cached: Resend | null = null;
  * Resend client, or null when RESEND_API_KEY isn't set so email sends no-op in
  * local dev (mirroring the Airtable graceful-degrade).
  */
-function getResend(): Resend | null {
+export function getResend(): Resend | null {
   if (cached) return cached;
   const key = env.RESEND_API_KEY;
   if (!key) return null;
@@ -17,10 +17,10 @@ function getResend(): Resend | null {
   return cached;
 }
 
-const FROM = "Metagame 2026 <tickets@metagame.games>";
+export const FROM = "Metagame 2026 <tickets@metagame.games>";
 const NO_REPLY = "Metagame 2026 <no-reply@metagame.games>";
 const TEAM = "team@metagame.games";
-const CORE = "core@metagame.games";
+export const CORE = "core@metagame.games";
 // Email clients load images over the network, so assets must point at the
 // deployed site regardless of which environment sent the email.
 const SITE = "https://metagame.games";
@@ -272,7 +272,7 @@ export async function sendAdminErrorEmail(errorMessage: string) {
   });
 }
 
-const escapeHtml = (s: string) =>
+export const escapeHtml = (s: string) =>
   s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

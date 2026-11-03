@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Schedule — Metagame 2026",
-  robots: { index: false },
 };
 
 // The layout renders the schedule, and gates it.

@@ -390,10 +390,10 @@ function CopyButtons({
       <button
         type="button"
         onClick={() => urlCopy.copy(codeUrl(origin, "buy", code))}
-        title="Lands on the home page with the code saved for checkout"
+        title="Lands on the site's tickets section with the code saved for checkout"
         className={smallButtonClass}
       >
-        {label(urlCopy.status, "Copy link")}
+        {label(urlCopy.status, "Copy site link")}
       </button>
       {checkout && (
         <button
@@ -403,7 +403,7 @@ function CopyButtons({
           className={`${smallButtonClass} inline-flex items-center gap-1.5`}
         >
           <FaStripeS aria-hidden className="text-[#635BFF]" />
-          {label(checkoutCopy.status, "Copy checkout link")}
+          {label(checkoutCopy.status, "Copy Stripe checkout link")}
         </button>
       )}
     </>
@@ -445,13 +445,21 @@ function Result({ minted, origin }: { minted: MintResult; origin: string }) {
       <p className="my-2 font-mono text-2xl break-all text-navy select-all">
         {minted.code}
       </p>
+      <p className="text-xs text-ink/60">
+        Site link · tickets section with the code saved for checkout
+      </p>
       <p className="font-mono text-sm break-all text-ink/70 select-all">
         {codeUrl(origin, "buy", minted.code)}
       </p>
       {checkout && (
-        <p className="font-mono text-sm break-all text-ink/70 select-all">
-          {codeUrl(origin, "ticket", minted.code)}
-        </p>
+        <>
+          <p className="mt-2 text-xs text-ink/60">
+            Checkout link · straight to Stripe with the code applied
+          </p>
+          <p className="font-mono text-sm break-all text-ink/70 select-all">
+            {codeUrl(origin, "ticket", minted.code)}
+          </p>
+        </>
       )}
       <div className="mt-2 flex flex-wrap gap-2">
         <CopyButtons code={minted.code} origin={origin} checkout={checkout} />

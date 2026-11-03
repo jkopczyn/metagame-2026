@@ -50,7 +50,7 @@ for (const [name, variant] of Object.entries(variants)) {
       ${logo("goodhart", gold * 0.74, y(32), (chess ? 76 : 102) * g, (chess ? 23 : 25) * f)}
       ${logo("dmodel", gold + (w - gold) * 0.25, y(32), (chess ? 40 : 60) * g, (chess ? 13 : 16) * f)}
       ${logo("walrus", gold + (w - gold) * 0.75, y(32), (chess ? 40 : 60) * g, (chess ? 13 : 16) * f)}
-      ${["arbor", "francisco", "manifund", "asylum", "spire"].map((key, i) => logo(key, patronWidth * (i + 0.5), y(chess ? 62 : 67), patronWidth - (chess ? 7 : 12), (chess ? 16 : 18) * f * (key === "spire" ? 1.4 : 1))).join("")}
+      ${["arbor", "francisco", "manifund", "asylum", "spire"].map((key, i) => logo(key, patronWidth * (i + 0.5), y(chess ? 62 : 67), patronWidth - (chess ? 7 : 12), (chess ? 16 : 18) * f * (key === "spire" || key === "asylum" ? 1.4 : 1))).join("")}
     </g>
   </svg>`;
   const page = await browser.newPage({

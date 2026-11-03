@@ -52,6 +52,10 @@ type Props<S extends MomentSession> = {
   now?: Moment | null;
   /** Leave out rooms with nothing on at the moment shown. */
   hideQuiet?: boolean;
+  /** The day to show, chosen outside the board; the board's own day buttons
+   * go away and `onDayChange` reports when playback or the clock moves on. */
+  dayKey?: string;
+  onDayChange?: (key: string) => void;
 };
 
 // How far the clock moves per tick of playback, and how often it ticks.
@@ -103,6 +107,13 @@ function busiest(spans: Span<MomentSession>[]): Moment {
     }
   });
   return { day: best.day, t: best.t };
+}
+
+// Where the board opens: the busiest moment of the chosen day, or of the weekend.
+function opening(spans: Span<MomentSession>[], dayKey?: string): Moment {
+  const day = spans.findIndex((x) => x.day.key === dayKey);
+  if (day < 0) return busiest(spans);
+  return { day, t: busiest([spans[day]]).t };
 }
 
 type State = Moment & { playing: boolean };
@@ -166,6 +177,8 @@ function Board<S extends MomentSession>({
   startAt,
   now,
   hideQuiet = false,
+  dayKey,
+  onDayChange,
   spans,
 }: Props<S> & { spans: Span<S>[] }) {
   const { reducer, atEnd } = useMemo(
@@ -173,7 +186,7 @@ function Board<S extends MomentSession>({
     [spans],
   );
   const [stored, dispatchStored] = useReducer(reducer, null, () => ({
-    ...(startAt ?? busiest(spans as Span<MomentSession>[])),
+    ...(startAt ?? opening(spans as Span<MomentSession>[], dayKey)),
     playing: false,
   }));
   const [following, setFollowing] = useState(true);
@@ -189,6 +202,19 @@ function Board<S extends MomentSession>({
   };
   const day = Math.min(state.day, spans.length - 1);
   const { t, playing } = state;
+
+  // A day picked outside moves the board there, adjusted during render so
+  // the first paint is already on it.
+  const [seenDayKey, setSeenDayKey] = useState(dayKey);
+  if (dayKey !== seenDayKey) {
+    setSeenDayKey(dayKey);
+    const to = spans.findIndex((x) => x.day.key === dayKey);
+    if (to >= 0 && to !== day) dispatch({ type: "day", day: to });
+  }
+  const shownKey = spans[day].day.key;
+  useEffect(() => {
+    onDayChange?.(shownKey);
+  }, [onDayChange, shownKey]);
 
   useEffect(() => {
     if (!playing) return;
@@ -234,8 +260,16 @@ function Board<S extends MomentSession>({
   return (
     <div>
       {/* Play on the left, the day in the middle, the clock on the right; on
-          a phone the clock takes its own row above. */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+          a phone the clock takes its own row above. With the day chosen
+          outside the board it's just play and the clock, which drops to its
+          own row only when the two don't fit. */}
+      <div
+        className={`items-center ${
+          dayKey === undefined
+            ? "grid grid-cols-[1fr_auto_1fr] gap-3"
+            : "flex flex-wrap gap-x-3 gap-y-2"
+        }`}
+      >
         <div className="flex items-center gap-2 justify-self-start">
           <button
             type="button"
@@ -265,27 +299,33 @@ function Board<S extends MomentSession>({
             </button>
           )}
         </div>
-        <div
-          role="group"
-          aria-label="Day"
-          className="flex divide-x divide-navy/30 border-2 border-navy"
-        >
-          {spans.map((x, i) => (
-            <button
-              key={x.name}
-              type="button"
-              aria-pressed={i === day}
-              onClick={() => dispatch({ type: "day", day: i })}
-              className={`${DISPLAY} px-3.5 py-2 text-[20px] leading-none tracking-[0.04em] transition-colors sm:px-5 ${
-                i === day ? "bg-navy text-cream" : "text-navy hover:bg-sky"
-              }`}
-            >
-              {x.name.slice(0, 3)}
-            </button>
-          ))}
-        </div>
+        {dayKey === undefined && (
+          <div
+            role="group"
+            aria-label="Day"
+            className="flex divide-x divide-navy/30 border-2 border-navy"
+          >
+            {spans.map((x, i) => (
+              <button
+                key={x.name}
+                type="button"
+                aria-pressed={i === day}
+                onClick={() => dispatch({ type: "day", day: i })}
+                className={`${DISPLAY} px-3.5 py-2 text-[20px] leading-none tracking-[0.04em] transition-colors sm:px-5 ${
+                  i === day ? "bg-navy text-cream" : "text-navy hover:bg-sky"
+                }`}
+              >
+                {x.name.slice(0, 3)}
+              </button>
+            ))}
+          </div>
+        )}
         <p
-          className={`${DISPLAY} order-first col-span-3 justify-self-end text-[clamp(30px,4vw,44px)] leading-none text-navy sm:order-none sm:col-span-1`}
+          className={`${DISPLAY} justify-self-end text-[clamp(30px,4vw,44px)] leading-none text-navy ${
+            dayKey === undefined
+              ? "order-first col-span-3 sm:order-none sm:col-span-1"
+              : "ml-auto whitespace-nowrap"
+          }`}
         >
           {d.name} · {slotLabel(t)}
         </p>

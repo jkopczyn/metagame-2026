@@ -14,6 +14,8 @@ const {
 vi.mock("@/lib/airtable", () => ({ recordPurchase }));
 vi.mock("@/lib/posthog-server", () => ({ capturePurchase }));
 vi.mock("@/lib/email", () => ({ sendTicketConfirmationEmail }));
+vi.mock("@/lib/ticket-followup", () => ({ followUpTicketPurchase: vi.fn() }));
+vi.mock("@/lib/error-report", () => ({ reportError: vi.fn() }));
 vi.mock("@/lib/ticket-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./ticket-store")>()),
   recordTicket,
@@ -114,6 +116,12 @@ describe("family pack fulfillment", () => {
     );
     expect(rows.map((r) => r.ticketCode)).toEqual(
       recordPurchase.mock.calls.map(([p]) => p.ticketCode),
+    );
+  });
+  it("records every admission after the first as referred by the first", async () => {
+    await recordFamilyPack(session(3), "Paid");
+    expect(recordTicket.mock.calls.map(([, opts]) => opts?.referredBy)).toEqual(
+      [undefined, "pi_pack:ticket:1", "pi_pack:ticket:1"],
     );
   });
   it("retains admission identities through pending, paid and replay events", async () => {
