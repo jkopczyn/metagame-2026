@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import LevelGrid from "./LevelGrid";
 import ConcentrationSection from "./ConcentrationSection";
 import { DELETED_PLAYER, type Concentration } from "@/lib/megagame-progress";
@@ -316,5 +316,25 @@ describe("TransitionsSection", () => {
     expect(html).toContain("4h 00m");
     expect(html).toContain("5h 30m");
     expect(html).toContain("–");
+  });
+
+  it("names the first con day in the note from CONFERENCE_DAYS", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/schedule", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("@/lib/schedule")>()),
+      CONFERENCE_DAYS: [
+        { key: "2027-01-01", name: "Friday", dateLabel: "Jan 1" },
+      ],
+    }));
+    try {
+      const { default: Section } = await import("./TransitionsSection");
+      const html = renderToStaticMarkup(
+        createElement(Section, { data: transitionData }),
+      );
+      expect(html).toContain("midnight Pacific, Friday Jan 1");
+    } finally {
+      vi.doUnmock("@/lib/schedule");
+      vi.resetModules();
+    }
   });
 });
