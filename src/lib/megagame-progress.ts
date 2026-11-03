@@ -108,6 +108,29 @@ export type ClassTable = {
   totals: { byClass: Record<MegagameClass, ClassCell>; anyClass: number };
 };
 
+export type TransitionRow = {
+  class: MegagameClass;
+  from: number;
+  to: number;
+  made: number;
+  skipped: number;
+  /** Durations in milliseconds; null when made is 0. */
+  q25: number | null;
+  median: number | null;
+  q75: number | null;
+};
+
+export type CurrentLevelRow = {
+  class: MegagameClass;
+  level: number;
+  players: number;
+  withEvent: number;
+  /** Milliseconds; null when withEvent is 0. */
+  medianSince: number | null;
+};
+
+export type Transitions = { rows: TransitionRow[]; current: CurrentLevelRow[] };
+
 export const DELETED_PLAYER = "\u0000deleted";
 export const playerKey = (userId: string | null): string =>
   userId ?? DELETED_PLAYER;
@@ -392,4 +415,95 @@ export function cumulativeLevels(
         ],
   );
   return cumulativeLevelDistribution(dated, ends);
+}
+
+export function quantile(sorted: readonly number[], p: number): number | null {
+  if (sorted.length === 0) return null;
+  const pos = p * (sorted.length - 1);
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+
+export const clampToCon = (at: Date): number =>
+  Math.max(at.getTime(), CON_START.getTime());
+
+const LEVELS = Array.from({ length: MAX_LEVEL }, (_, i) => i + 1);
+
+/** Earliest live event time per real player and class, by level. */
+function levelTimes(
+  levelEvents: readonly ProgressLevelEvent[],
+): Map<string, Map<number, Date>> {
+  const out = new Map<string, Map<number, Date>>();
+  for (const e of levelEvents) {
+    if (e.userId === null || !isMegagameClass(e.class)) continue;
+    if (!inLevelRange(e.level)) continue;
+    const key = `${e.class}\u0000${e.userId}`;
+    const byLevel = out.get(key) ?? new Map<number, Date>();
+    const seen = byLevel.get(e.level);
+    if (!seen || e.awardedAt < seen) byLevel.set(e.level, e.awardedAt);
+    out.set(key, byLevel);
+  }
+  return out;
+}
+
+export function transitions(
+  levelEvents: readonly ProgressLevelEvent[],
+  players: readonly ProgressPlayer[],
+  now: Date,
+): Transitions {
+  const times = levelTimes(levelEvents);
+  const durations = perClass(() => [0, ...LEVELS].map((): number[] => []));
+  const skipped = perClass(() => [0, ...LEVELS].map(() => 0));
+  for (const [key, byLevel] of times) {
+    const cls = key.split("\u0000")[0] as MegagameClass;
+    const levels = [...byLevel.keys()].sort((a, b) => a - b);
+    for (let i = 0; i + 1 < levels.length; i++) {
+      const a = levels[i];
+      const b = levels[i + 1];
+      const ta = byLevel.get(a)!;
+      const tb = byLevel.get(b)!;
+      if (tb < ta) continue;
+      if (b === a + 1)
+        durations[cls][a].push(Math.max(0, tb.getTime() - clampToCon(ta)));
+      else skipped[cls][a]++;
+    }
+  }
+
+  const rows: TransitionRow[] = MEGAGAME_CLASSES.flatMap((cls) =>
+    LEVELS.slice(0, -1).map((from) => {
+      const sorted = [...durations[cls][from]].sort((x, y) => x - y);
+      return {
+        class: cls,
+        from,
+        to: from + 1,
+        made: sorted.length,
+        skipped: skipped[cls][from],
+        q25: quantile(sorted, 0.25),
+        median: quantile(sorted, 0.5),
+        q75: quantile(sorted, 0.75),
+      };
+    }),
+  );
+
+  const current: CurrentLevelRow[] = MEGAGAME_CLASSES.flatMap((cls) =>
+    LEVELS.map((level) => {
+      const at = players.filter((p) => p.levels[cls] === level);
+      const since = at
+        .flatMap((p) => {
+          const t = times.get(`${cls}\u0000${p.id}`)?.get(level);
+          return t ? [Math.max(0, now.getTime() - clampToCon(t))] : [];
+        })
+        .sort((x, y) => x - y);
+      return {
+        class: cls,
+        level,
+        players: at.length,
+        withEvent: since.length,
+        medianSince: quantile(since, 0.5),
+      };
+    }),
+  );
+
+  return { rows, current };
 }
