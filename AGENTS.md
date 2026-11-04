@@ -24,9 +24,9 @@ Neon Postgres via Drizzle. Schema is `src/db/schema/`, queries go through
 `getDb()` in `src/db/index.ts`, and migrations are the SQL files in `drizzle/`.
 After changing the schema run `pnpm db:generate` and commit what it writes;
 never hand-edit a generated migration. Deploys apply migrations before the
-code goes live (see the Vercel workflows). `/admin/schema` iframes a Liam ERD
+code goes live (see the Vercel workflows). `/backstage/schema` iframes a Liam ERD
 site that `next build` generates from the migrations into `public/schema-erd`;
-`/admin/schema/list` renders the same schema column-by-column from the Drizzle
+`/backstage/schema/list` renders the same schema column-by-column from the Drizzle
 objects. Airtable stays the ops view for
 purchases and RFPs; Postgres is the source of truth for accounts, ticket
 ownership, and the schedule.
@@ -50,16 +50,14 @@ sign-in is refused on unverified accounts. `currentSession()` is the server-side
 read; `src/proxy.ts` only redirects, so every protected page and action calls it
 again.
 
-Team tools (`/admin/*`, `/grade`) each gate on a permission from the catalog
+Team tools (`/backstage/*`, `/grade`) each gate on a permission from the catalog
 in `src/lib/permissions.ts`; `can(permission)` in `src/lib/access.ts` is the
-one check, resolving roles (`/admin/roles`) and per-user grants
-(`/admin/users/[id]`) per request. `user.role = 'admin'` (Better Auth's admin
+one check, resolving roles (`/backstage/roles`) and per-user grants
+(`/backstage/users/[id]`) per request. `user.role = 'admin'` (Better Auth's admin
 plugin) bypasses it all and is only set by SQL or by another admin on
-`/admin/users`; the first admin is bootstrapped by hand in the Neon console:
+`/backstage/users`; the first admin is bootstrapped by hand in the Neon console:
 `update "user" set role = 'admin' where email = '…'`. `toolAccess()` /
 `requireAccess()` (`src/lib/admin-auth.ts`) wrap `can()` for `/backstage`.
-Every team tool now takes accounts only; the shared-password fallbacks are
-gone.
 
 The speaker committee works at `/backstage/speaker-committee`
 (`schedule.manage`), which `/grade` redirects to; `/grade/<id>` is still the

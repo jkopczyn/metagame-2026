@@ -22,7 +22,7 @@ export type TeamAccess = {
  * The signed-in account with its effective permissions, or null when there
  * is no account, it's banned, or it holds no permission at all. Reads the
  * database, not the cookie cache, so a revoke or ban applies at once; and
- * never throws, so the password fallback survives a database outage.
+ * never throws: a database outage reads as signed out.
  */
 export const teamAccess = cache(async (): Promise<TeamAccess | null> => {
   if (!accountsConfigured()) return null;

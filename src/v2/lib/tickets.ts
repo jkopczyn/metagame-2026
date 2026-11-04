@@ -1,3 +1,5 @@
+// Display copy of the prices in src/lib/tickets.ts; tickets.test.ts pins them equal.
+//
 // USD tiles link to /api/checkout/stripe, which creates the Stripe Checkout
 // Session (Price IDs, promo, test vs live) server-side — see src/lib/tickets.ts.
 //

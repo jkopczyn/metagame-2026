@@ -3,8 +3,8 @@ import SignIn from "../SignIn";
 import { toolAccess } from "@/lib/admin-auth";
 
 // Liam ERD static site, generated into public/schema-erd at build time
-// (scripts/build-erd.mjs). The files under public/ are fetchable without the
-// password, like arbiter's; the schema is also in the public repo, so this gate
+// (scripts/build-erd.mjs). The files under public/ are fetchable without
+// signing in, like arbiter's; the schema is also in the public repo, so this gate
 // is about keeping the tool off search engines, not secrecy.
 export default async function AdminSchemaPage() {
   await connection();
