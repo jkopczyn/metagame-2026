@@ -7,7 +7,10 @@ export function Toaster() {
     <Sonner
       position="top-center"
       richColors
-      toastOptions={{ className: "font-[family-name:var(--font-inter)]" }}
+      // An open Radix dialog sets pointer-events: none on the body.
+      toastOptions={{
+        className: "pointer-events-auto font-[family-name:var(--font-inter)]",
+      }}
     />
   );
 }

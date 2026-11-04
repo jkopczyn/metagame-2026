@@ -20,6 +20,7 @@ import {
   linkedSession,
   onGuestList,
   planConflicts,
+  viewerSessionIds,
   type Ages,
   type Category,
 } from "@/lib/schedule";
@@ -176,10 +177,15 @@ export default async function SessionDetails({ slug }: { slug: string }) {
   ]);
   // Only sessions this viewer can see, as loadMySessionIds does.
   const visible = new Set(shown?.sessions.map((s) => s.id));
+  const rawSession = raw?.sessions.find((s) => s.id === session.id);
+  const ownSession =
+    !!viewerId &&
+    !!rawSession &&
+    viewerSessionIds(viewerId, [rawSession], { rsvps: {}, bookmarks: [] })
+      .length > 0;
   // The guest list stays server-side; the page only learns whether the
   // viewer is on it.
-  const guests =
-    raw?.sessions.find((s) => s.id === session.id)?.inviteEmails ?? null;
+  const guests = rawSession?.inviteEmails ?? null;
   const invited =
     !session.inviteOnly ||
     (!!account &&
@@ -311,6 +317,7 @@ export default async function SessionDetails({ slug }: { slug: string }) {
               bookmarked: plans.bookmarks.includes(session.id),
             }
           }
+          ownSession={ownSession}
           signIn={<SessionSignIn />}
         />
       </section>

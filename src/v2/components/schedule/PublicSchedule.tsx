@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FaStar } from "react-icons/fa";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ import {
 import { SESSION_PARAM, sessionPageSlug } from "@/lib/session-link";
 import type { BoardData } from "@/lib/unconference";
 import { readViewCookie, writeViewCookie } from "@/lib/schedule-view";
+import { onPlanChange, withPlanChange } from "./plan-sync";
 import { ScheduleLegend } from "./SessionBits";
 import { useOpenSession, useSessionHref } from "./SessionModalHost";
 import {
@@ -49,7 +50,7 @@ function sessionDayKey(days: PublicDay[], slug: string | null) {
 export default function PublicSchedule({
   days,
   locations,
-  mine,
+  mine: initialMine,
   board,
   initialView,
 }: {
@@ -91,6 +92,29 @@ export default function PublicSchedule({
     return () => clearTimeout(t);
   }, [initialView]);
   const [onlyMine, setOnlyMine] = useState(false);
+
+  // The modal's RSVP and bookmark clicks land here rather than in a refresh
+  // of the whole page; a newer server read wins, as usual.
+  const [plans, setPlans] = useState({ ids: initialMine, from: initialMine });
+  if (plans.from !== initialMine) {
+    setPlans({ ids: initialMine, from: initialMine });
+  }
+  const mine = plans.ids;
+  const router = useRouter();
+  useEffect(() => {
+    let changed = false;
+    const stop = onPlanChange((change) => {
+      changed = true;
+      setPlans((p) =>
+        p.ids ? { ...p, ids: withPlanChange(p.ids, change) } : p,
+      );
+    });
+    return () => {
+      stop();
+      // Going back restores cached pages, which still have the old plans.
+      if (changed) router.refresh();
+    };
+  }, [router]);
 
   // Landing with ?session= open (coming back from sign-in) shows that day
   // too. Read off the location: useSearchParams would need a Suspense
