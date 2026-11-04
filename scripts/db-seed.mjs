@@ -43,6 +43,7 @@
 import { createHash, scryptSync } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { neon } from "@neondatabase/serverless";
+import { routeLocalDatabase } from "../src/db/local-endpoint.mjs";
 import { textDoc } from "../src/lib/notice-doc.ts";
 import { SPEAKER_ACCOUNTS } from "../src/v2/data/speaker-accounts.ts";
 
@@ -78,6 +79,7 @@ if (!process.argv.includes("--yes")) {
   process.exit(1);
 }
 
+routeLocalDatabase(url);
 const sql = neon(url);
 
 // Matches better-auth's scrypt settings (src/lib/auth.ts leaves the default

@@ -7,6 +7,7 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { migrate } from "drizzle-orm/neon-http/migrator";
+import { routeLocalDatabase } from "../src/db/local-endpoint.mjs";
 
 // `vercel pull` writes the environment's vars under .vercel/; locally they come
 // from .env.local. Vars already in the environment are never overridden.
@@ -28,5 +29,6 @@ if (!url) {
   process.exit(0);
 }
 
+routeLocalDatabase(url);
 await migrate(drizzle({ client: neon(url) }), { migrationsFolder: "drizzle" });
 console.log("[db:migrate] migrations applied");

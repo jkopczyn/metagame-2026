@@ -54,3 +54,6 @@ next-env.d.ts
 
 # scripts/preview-shot.mjs output
 /preview-shots
+
+# scripts/dev-local.mjs embedded database
+/.local-db

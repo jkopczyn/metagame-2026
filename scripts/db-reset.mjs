@@ -8,6 +8,7 @@
 // The "Reset dev DB" workflow runs exactly this against the shared dev branch.
 import { execFileSync } from "node:child_process";
 import { neon } from "@neondatabase/serverless";
+import { routeLocalDatabase } from "../src/db/local-endpoint.mjs";
 
 for (const file of [
   ".env.local",
@@ -42,6 +43,7 @@ if (!process.argv.includes("--yes")) {
   process.exit(1);
 }
 
+routeLocalDatabase(url);
 const sql = neon(url);
 await sql.query("drop schema if exists drizzle cascade");
 await sql.query("drop schema public cascade");
