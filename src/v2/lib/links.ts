@@ -16,10 +16,6 @@ export const JOIN_TEAM_FORM_URL = "/team/join";
 export const SPONSOR_FORM_URL = "/sponsor/interest";
 export const FINANCIAL_AID_FORM_URL = "/financial-aid";
 
-// What volunteering on each team involves (linked from the volunteer journey).
-export const VOLUNTEER_TEAMS_DOC_URL =
-  "https://docs.google.com/document/d/1AOKulmKhgzZ0ms2wFEzqga7SA76dKB3lsoj2u0bOxWs/edit?usp=sharing";
-
 // On-site housing at Lighthaven.
 export const HOUSING_URL =
   "https://www.havenbookings.space/events/metagame-2026";

@@ -16,8 +16,7 @@ import tommy from "../../../public/images/team/tommy.jpg";
 import yemima from "../../../public/images/team/yemima.jpg";
 
 // The people running the con (TEAM) and the advisors (ADVISORS), shown on
-// /team in display order. TeamCarousel also reads TEAM but isn't mounted
-// anywhere right now. To add someone: add an entry and import their photo from
+// /team in display order. To add someone: add an entry and import their photo from
 // public/images/team/ (800px JPEGs). Omit `photo` for an initials placeholder,
 // `contactKey` if they'd rather not be contacted directly.
 export type Person = {

@@ -102,18 +102,6 @@ async function call<T>(
 
 const encodeRange = (range: string) => encodeURIComponent(range);
 
-/** Raw (unformatted) cell values; dates come back as serial numbers. */
-export async function readRange(
-  spreadsheetId: string,
-  range: string,
-): Promise<CellValue[][]> {
-  const data = await call<{ values?: CellValue[][] }>(
-    spreadsheetId,
-    `/values/${encodeRange(range)}?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=SERIAL_NUMBER`,
-  );
-  return data.values ?? [];
-}
-
 export async function readRanges(
   spreadsheetId: string,
   ranges: string[],

@@ -1,5 +1,5 @@
 // Last year's (Metagame 2025) schedule, served from a committed static snapshot
-// (`src/data/last-year-schedule.json`, pulled once from the 2025 Supabase). The
+// (`src/v2/data/last-year-schedule.json`, pulled once from the 2025 Supabase). The
 // conference is over, so the data never changes — no live DB dependency.
 import rawData from "@/v2/data/last-year-schedule.json";
 

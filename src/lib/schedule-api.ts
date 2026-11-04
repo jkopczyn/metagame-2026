@@ -32,8 +32,6 @@ export function done() {
   revalidatePath("/backstage/schedule");
 }
 
-export type HostInput = { email: string; name?: string };
-
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { INTEREST_OPTIONS } from "@/v2/lib/interests";
+import { INTEREST_OPTIONS } from "@/lib/interests";
 import {
   airtableFields,
   allQuestions,

@@ -4,7 +4,6 @@ node_modules/
 pnpm-lock.yaml
 next-env.d.ts
 # kept rolls, written by /api/dev/keep-take — flat keyframe arrays, not for humans
-src/components/dice3d/takes/*.json
 src/v2/components/dice/dice3d/takes/*.json
 # hand-tuned email HTML: keep attribute quoting as written
 emails/

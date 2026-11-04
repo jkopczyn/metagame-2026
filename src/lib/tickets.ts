@@ -149,16 +149,6 @@ export const supporterTier: SupporterTier = {
   ],
 };
 
-/**
- * The supporter chip's Payment Link for the active Stripe mode, or null when it's
- * still an unfilled placeholder — so the UI can render without navigating nowhere.
- */
-export function supporterChipUrl(chip: SupporterChip): string | null {
-  const link = chip.links[stripeMode];
-  if (!link || link === "TODO_PAYMENT_LINK") return null;
-  return link;
-}
-
 // ── Day passes ──────────────────────────────────────────────────────────────
 // Single-day admission. USD via Stripe Checkout; BTC via the OpenNode modal at
 // a fixed price scaled off Standard's ₿/$ ratio (no discount codes on either rail).
@@ -226,11 +216,6 @@ export const dayPasses: DayPass[] = [
 /** Look up a day pass by id; undefined when none matches. */
 export function getDayPass(id: string): DayPass | undefined {
   return dayPasses.find((p) => p.id === id);
-}
-
-/** Checkout URL for a day pass in the active Stripe mode. */
-export function dayPassUrl(pass: DayPass): string | null {
-  return pass.links[stripeMode] || null;
 }
 
 /** The day pass a Stripe Payment Link URL (either mode) sells, if any. */
@@ -314,17 +299,4 @@ export function tierLabelForStripeCheckout({
     (productName && PRODUCT_TIER_LABELS[productName.trim().toLowerCase()]) ??
     productName
   );
-}
-
-/**
- * Checkout URL for the active Stripe mode, with the early-bird promo code
- * prefilled. Returns null when no link is configured for this mode yet, so the
- * UI can hide the CTA rather than link somewhere dead.
- */
-export function ticketUrl(tier: TicketTier): string | null {
-  const base = tier.links[stripeMode];
-  if (!base) return null;
-  return tier.promoCode
-    ? `${base}?prefilled_promo_code=${tier.promoCode}`
-    : base;
 }

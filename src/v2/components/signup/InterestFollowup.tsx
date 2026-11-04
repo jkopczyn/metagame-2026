@@ -6,7 +6,7 @@ import {
   EMAIL_LIST_VALUE,
   INTEREST_OPTIONS,
   type InterestValue,
-} from "@/v2/lib/interests";
+} from "@/lib/interests";
 import { RFP_FORM_URL } from "@/v2/lib/links";
 import { Button } from "@/v2/components/ui/button";
 import { Input } from "@/v2/components/ui/input";
