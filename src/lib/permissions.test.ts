@@ -172,3 +172,20 @@ describe("catalog order", () => {
     }
   });
 });
+
+describe("megagame", () => {
+  it("has manage imply verify, and not the other way round", () => {
+    expect(expand(["megagame.manage"]).has("megagame.verify")).toBe(true);
+    expect(expand(["megagame.verify"]).has("megagame.manage")).toBe(false);
+  });
+
+  it("opens backstage for a volunteer holding only verify", () => {
+    expect(hasTeamPermission(expand(["megagame.verify"]))).toBe(true);
+  });
+
+  it("is one group with the two keys in order", () => {
+    expect(
+      permissionGroups().find((g) => g.group === "Megagame")?.keys,
+    ).toEqual(["megagame.verify", "megagame.manage"]);
+  });
+});
