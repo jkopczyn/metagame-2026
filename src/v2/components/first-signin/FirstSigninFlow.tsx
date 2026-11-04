@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useActionState, useEffect, useState, useTransition } from "react";
+import {
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { ExternalLink } from "lucide-react";
 import { SOCIAL_LINKS } from "@/v2/lib/urls";
 import { claim, claimMine, type ClaimState } from "@/app/(v2)/account/actions";
@@ -27,6 +33,10 @@ import {
 import { Input } from "@/v2/components/ui/input";
 import { CHILD_REGISTRATION_FORM_URL } from "@/v2/lib/links";
 import { cn } from "@/v2/lib/utils";
+import {
+  notifyAccountChanged,
+  useAccountStatus,
+} from "../nav/useAccountStatus";
 import { HEADING, NEWSLETTER_LINK } from "../styles";
 import { saveFirstSignin, type FirstSigninState } from "./actions";
 
@@ -40,9 +50,16 @@ const RECRUITERS_INFO =
 
 type Open = Extract<FirstSigninStatus, { needed: true }>;
 
-// Asked from the client so the layout stays static. Re-asked on every
-// navigation: signing up or in happens client-side and the layout never remounts.
+// Keyed by account: signing up or in happens client-side and the layout never
+// remounts, so the next account starts over and a signed-out visitor never asks.
 export default function FirstSigninFlow() {
+  const userId = useAccountStatus()?.userId;
+  return userId ? <SignedInFlow key={userId} /> : null;
+}
+
+// Asked from the client so the layout stays static, and once per account. A
+// failed ask is retried on the next navigation.
+function SignedInFlow() {
   const pathname = usePathname();
   const hidden = firstSigninHidden(pathname);
   const [status, setStatus] = useState<Open | null>(null);
@@ -50,6 +67,7 @@ export default function FirstSigninFlow() {
   // Shown once after saving with children: a link, not a redirect, so the
   // user keeps their place if they'd rather register later.
   const [childrenNudge, setChildrenNudge] = useState(false);
+  const answered = useRef(false);
   const [state, action, pending] = useActionState<FirstSigninState, FormData>(
     async (prev, formData) => {
       const result = await saveFirstSignin(prev, formData).catch(() => ({
@@ -58,6 +76,7 @@ export default function FirstSigninFlow() {
       if ("saved" in result && result.saved) {
         setChildrenNudge(formData.get("bringingChildren") === "yes");
         setDone(true);
+        notifyAccountChanged();
       }
       return result;
     },
@@ -65,18 +84,23 @@ export default function FirstSigninFlow() {
   );
 
   useEffect(() => {
-    if (hidden || status || done) return;
+    if (hidden || answered.current) return;
     let live = true;
     fetch("/api/first-signin")
-      .then((res) => (res.ok ? res.json() : { needed: false }))
+      .then((res) => {
+        if (!res.ok) throw new Error(`first-signin: ${res.status}`);
+        return res.json();
+      })
       .then((body: FirstSigninStatus) => {
-        if (live && body.needed) setStatus(body);
+        if (!live) return;
+        answered.current = true;
+        if (body.needed) setStatus(body);
       })
       .catch(() => {});
     return () => {
       live = false;
     };
-  }, [pathname, hidden, status, done]);
+  }, [pathname, hidden]);
 
   if (!status || hidden) return null;
   if (done) {

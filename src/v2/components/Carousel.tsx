@@ -26,7 +26,6 @@ export default function Carousel({
               hats={hats}
               className="aspect-[4/3] w-full"
               sizes="(min-width: 960px) 896px, 100vw"
-              priority={i === 0}
             />
           ) : (
             <div key={i} className="relative aspect-[4/3] w-full">
@@ -36,7 +35,6 @@ export default function Carousel({
                 fill
                 sizes="(min-width: 960px) 896px, 100vw"
                 className="object-cover"
-                priority={i === 0}
               />
             </div>
           ),

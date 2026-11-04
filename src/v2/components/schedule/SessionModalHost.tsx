@@ -77,6 +77,8 @@ export function SessionLink({
     <Link
       {...rest}
       href={href}
+      // Opening in place never uses a prefetch, and a grid holds dozens of these.
+      prefetch={false}
       scroll={false}
       onClick={(e) => {
         onClick?.(e);

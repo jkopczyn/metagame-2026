@@ -12,13 +12,18 @@ import { emailKey, ticketLabel, ticketsForUser } from "@/lib/ticket-store";
 
 export const dynamic = "force-dynamic";
 
+const NO_STORE = { "Cache-Control": "no-store" };
+
 /** Whether the signed-in account still owes the first sign-in questions; lets the static site open the modal. */
 export async function GET() {
   const status = await firstSigninStatus().catch((e) => {
     console.error("[first-signin] status read failed", e);
-    return { needed: false } as const;
+    return null;
   });
-  return Response.json(status, { headers: { "Cache-Control": "no-store" } });
+  // Not {needed:false}: the client keeps that answer for the account, so a blip
+  // would skip the required questions until a reload.
+  if (!status) return new Response(null, { status: 503, headers: NO_STORE });
+  return Response.json(status, { headers: NO_STORE });
 }
 
 async function firstSigninStatus(): Promise<FirstSigninStatus> {
