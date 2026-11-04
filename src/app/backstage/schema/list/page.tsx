@@ -62,7 +62,7 @@ export default async function AdminSchemaListPage() {
 
       {groups.map((g) => (
         <Section key={g.name} title={g.name} count={g.tables.length}>
-          <div className="grid items-start gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-2">
             {g.tables.map((t) => (
               <TableCard key={t.name} table={t} />
             ))}
@@ -72,13 +72,13 @@ export default async function AdminSchemaListPage() {
 
       <Section title="Enums" count={enums.length}>
         {enums.map((e) => (
-          <p key={e.name} className="font-mono text-sm">
+          <p key={e.name} className="flex flex-wrap gap-1.5 font-mono text-sm">
             <span className="text-ink">{e.name}</span>
-            <span className="text-ink/50"> = </span>
+            <span className="text-ink/50">=</span>
             {e.values.map((v) => (
               <span
                 key={v}
-                className="mr-1.5 rounded bg-white px-1.5 py-0.5 text-navy ring-1 ring-line"
+                className="rounded bg-white px-1.5 py-0.5 text-navy ring-1 ring-line"
               >
                 {v}
               </span>
@@ -180,7 +180,7 @@ function TableCard({ table }: { table: TableInfo }) {
         </table>
       </div>
       {(table.indexes.length > 0 || table.referencedBy.length > 0) && (
-        <div className="space-y-1 border-t border-line px-4 py-3 font-mono text-xs text-ink/70">
+        <div className="space-y-1 border-t border-line px-4 py-3 font-mono text-xs wrap-anywhere text-ink/70">
           {table.indexes.map((i) => (
             <p key={i.name}>
               {i.unique ? "unique index" : "index"} {i.name} on (

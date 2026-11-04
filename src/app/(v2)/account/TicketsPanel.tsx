@@ -239,7 +239,11 @@ export default function TicketsPanel({ tickets }: { tickets: TicketView[] }) {
             Have a ticket code? Claim it here.
           </label>
           <div className="flex flex-wrap items-center gap-3">
-            <div role="group" aria-labelledby="code-label">
+            <div
+              role="group"
+              aria-labelledby="code-label"
+              className="w-full sm:w-auto"
+            >
               <PinInput
                 name="code"
                 id="code"

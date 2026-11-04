@@ -44,12 +44,12 @@ export default function SiteFooter() {
           </div>
           <div
             aria-label="Event details"
-            className="flex items-center gap-3 font-space-mono text-xs tracking-[0.08em] text-ink/60 uppercase"
+            className="flex items-center gap-x-3 gap-y-1 font-space-mono text-xs tracking-[0.08em] whitespace-nowrap text-ink/60 uppercase max-[420px]:flex-col max-[420px]:items-start"
           >
             <span>November 6&ndash;8, 2026</span>
             <span
               aria-hidden="true"
-              className="h-1 w-1 rounded-full bg-brand-blue"
+              className="h-1 w-1 rounded-full bg-brand-blue max-[420px]:hidden"
             />
             <span>Berkeley, California</span>
           </div>

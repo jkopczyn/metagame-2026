@@ -584,7 +584,7 @@ export default function ScheduleGrid({
         <div
           role="tablist"
           aria-label="Conference day"
-          className="inline-flex overflow-hidden rounded-lg border border-line bg-white"
+          className="inline-flex max-w-full overflow-x-auto rounded-lg border border-line bg-white"
         >
           {days.map((d, i) => {
             const active = d.key === day.key;
@@ -595,7 +595,7 @@ export default function ScheduleGrid({
                 role="tab"
                 aria-selected={active}
                 onClick={() => setDayKey(d.key)}
-                className={`px-3 py-2 text-sm font-semibold transition-colors sm:px-4 ${
+                className={`shrink-0 px-3 py-2 text-sm font-semibold whitespace-nowrap transition-colors sm:px-4 ${
                   active ? "bg-navy text-white" : "text-ink/70 hover:bg-ink/5"
                 } ${i > 0 ? "border-l border-line" : ""}`}
               >

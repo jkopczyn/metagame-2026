@@ -18,6 +18,7 @@ import {
   smallButtonClass,
 } from "../ui";
 import { downscaleImage } from "@/lib/downscale-image";
+import { cn } from "@/v2/lib/utils";
 import { UnsavedChangesDialog, useUnsavedChanges } from "./UnsavedChanges";
 import {
   LOCATION_VISIBILITIES,
@@ -193,7 +194,7 @@ export default function LocationForm({
     <Dialog open onOpenChange={(open) => !open && requestClose()}>
       <DialogContent
         showCloseButton={false}
-        className="max-w-[480px] border-line bg-white px-6 py-6 text-ink sm:px-8"
+        className="max-h-[92vh] max-w-[480px] overflow-y-auto border-line bg-white px-6 py-6 text-ink sm:px-8"
       >
         <button
           type="button"
@@ -393,7 +394,7 @@ export default function LocationForm({
               <button
                 type="submit"
                 disabled={pending}
-                className={`${buttonClass} w-auto`}
+                className={cn(buttonClass, "w-auto")}
               >
                 {pending ? "Saving…" : location ? "Save" : "Create"}
               </button>

@@ -52,7 +52,7 @@ export default function PinInput({
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex w-full items-center gap-1.5 sm:gap-2">
       {cells.map((cell, i) => (
         <Fragment key={i}>
           <input
@@ -101,14 +101,14 @@ export default function PinInput({
             }}
             onFocus={(e) => e.target.select()}
             className={cn(
-              "size-12 rounded-lg border-[1.5px] border-navy/20 bg-white text-center font-space-mono text-2xl text-ink uppercase transition-colors outline-none focus:border-meeple disabled:opacity-60 sm:size-14",
+              "aspect-square max-w-12 min-w-0 flex-1 rounded-lg border-[1.5px] border-navy/20 bg-white text-center font-space-mono text-2xl text-ink uppercase transition-colors outline-none focus:border-meeple disabled:opacity-60 sm:max-w-14 sm:min-w-14",
             )}
           />
           {dashAfter === i + 1 && (
             // A drawn bar, not a glyph: the font's dash sits below centre.
             <span
               aria-hidden
-              className="h-0.5 w-3 rounded-full bg-current opacity-40"
+              className="h-0.5 w-2 shrink-0 rounded-full bg-current opacity-40 sm:w-3"
             />
           )}
         </Fragment>

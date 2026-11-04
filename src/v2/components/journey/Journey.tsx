@@ -614,7 +614,7 @@ function Footer({
       ) : (
         <span />
       )}
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-4">
         {hint && (
           <p role="alert" className="text-sm font-semibold text-meeple">
             {hint}

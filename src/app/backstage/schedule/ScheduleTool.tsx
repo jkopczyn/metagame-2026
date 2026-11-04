@@ -15,6 +15,7 @@ import ScheduleGrid, { GrabHandle, type DropFn } from "./ScheduleGrid";
 import SessionForm, { type SessionDefaults } from "./SessionForm";
 import ConfirmDialog from "./ConfirmDialog";
 import ScheduleSearch from "@/v2/components/schedule/ScheduleSearch";
+import { cn } from "@/v2/lib/utils";
 import { buttonClass, smallButtonClass } from "../ui";
 import {
   buildDays,
@@ -306,7 +307,7 @@ export default function ScheduleTool({
           <button
             type="button"
             onClick={() => openSession(null)}
-            className={`${buttonClass} w-auto py-1.5 text-sm`}
+            className={cn(buttonClass, "w-auto py-1.5 text-sm")}
           >
             New session
           </button>

@@ -19,7 +19,7 @@ export default function ScheduleSearch<S extends SearchableSession>({
   sessions,
   onPick,
   roomName,
-  placeholder = "Search sessions or hosts…",
+  placeholder = "Search…",
   className = "",
 }: {
   sessions: readonly S[];
@@ -80,7 +80,7 @@ export default function ScheduleSearch<S extends SearchableSession>({
         ref={inputRef}
         type="search"
         role="combobox"
-        aria-label="Search the schedule"
+        aria-label="Search sessions or hosts"
         aria-expanded={showing}
         aria-controls={listId}
         aria-activedescendant={

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { createOwnKey, revokeOwnKey } from "./own-actions";
 import { buttonClass, fieldClass, smallButtonClass } from "../ui";
 import { MintedKeyDialog } from "@/components/MintedKeyDialog";
+import { cn } from "@/v2/lib/utils";
 
 export type OwnKeyRow = {
   id: string;
@@ -18,7 +19,9 @@ export type OwnKeyRow = {
 export default function OwnKeysPanel({ rows }: { rows: OwnKeyRow[] }) {
   const [error, setError] = useState<string | null>(null);
   const [minted, setMinted] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [creating, startCreate] = useTransition();
+  const [revoking, startRevoke] = useTransition();
+  const pending = creating || revoking;
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
   return (
@@ -34,7 +37,7 @@ export default function OwnKeysPanel({ rows }: { rows: OwnKeyRow[] }) {
           e.preventDefault();
           const form = e.currentTarget;
           const label = String(new FormData(form).get("label") ?? "");
-          startTransition(async () => {
+          startCreate(async () => {
             const result = await createOwnKey(label);
             setError(result.error ?? null);
             if (result.key) {
@@ -50,14 +53,14 @@ export default function OwnKeysPanel({ rows }: { rows: OwnKeyRow[] }) {
           required
           maxLength={80}
           placeholder="metagame-claude-code"
-          className={fieldClass}
+          className={cn(fieldClass, "min-w-0 flex-1")}
         />
         <button
           type="submit"
           disabled={pending}
-          className={`${buttonClass} w-auto whitespace-nowrap`}
+          className={cn(buttonClass, "w-auto whitespace-nowrap")}
         >
-          {pending && !revokingId ? "Creating…" : "Create"}
+          {creating ? "Creating…" : "Create"}
         </button>
       </form>
       {error && (
@@ -86,13 +89,12 @@ export default function OwnKeysPanel({ rows }: { rows: OwnKeyRow[] }) {
                 className={`${smallButtonClass} hover:border-meeple hover:text-meeple`}
                 onClick={() => {
                   setRevokingId(k.id);
-                  startTransition(async () => {
+                  startRevoke(async () => {
                     setError((await revokeOwnKey(k.id)).error ?? null);
-                    setRevokingId(null);
                   });
                 }}
               >
-                {revokingId === k.id ? "Revoking…" : "Revoke"}
+                {revoking && revokingId === k.id ? "Revoking…" : "Revoke"}
               </button>
             </li>
           ))}

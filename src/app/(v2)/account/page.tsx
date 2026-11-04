@@ -16,6 +16,7 @@ import { accountSessions } from "@/lib/account-sessions";
 import { can, teamAccess } from "@/lib/access";
 import { currentSession, hasPassword } from "@/lib/auth";
 import { prefillDiscord } from "@/lib/discord-handle";
+import { firstSigninNeeded } from "@/lib/first-signin";
 import { loadMegagameLevels } from "@/lib/megagame-store";
 import {
   loadRsvpCounts,
@@ -96,7 +97,6 @@ export default async function AccountPage({
     // Same measure and top clearance as ContentPage, without its title block.
     <div className="mx-auto max-w-[1180px] px-8 pt-28 pb-20">
       <AccountTabs
-        initial={initialTab}
         trailing={
           backstage && (
             <Button
@@ -122,6 +122,9 @@ export default async function AccountPage({
               />
               <div className="grid gap-12 md:grid-cols-2">
                 <ProfileForm
+                  // Its fields are uncontrolled, so a first-sign-in save over this
+                  // page has to remount them to show what was just written.
+                  key={firstSigninNeeded(profile) ? "pending" : "done"}
                   email={user.email}
                   profileHref={`/u/${encodeURIComponent(user.id)}`}
                   initialValues={{
