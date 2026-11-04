@@ -199,10 +199,9 @@ export async function saveLocation(
   if (!parsed.ok) return { field: parsed.field, error: parsed.error };
 
   const id = str(formData, "id") || undefined;
-  // Order comes from dragging the rooms list; a new room joins at the end.
-  const displayOrder = id
-    ? parsed.value.displayOrder
-    : await nextDisplayOrder();
+  // Order comes from dragging the rooms list (schedule.rooms); this form only
+  // places a new room, at the end.
+  const displayOrder = id ? undefined : await nextDisplayOrder();
   const previous: RoomImages = (id && (await locationImages(id))) || {
     thumbnailUrl: null,
     imageUrl: null,

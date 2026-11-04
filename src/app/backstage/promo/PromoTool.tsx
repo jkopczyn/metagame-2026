@@ -215,7 +215,7 @@ export default function PromoTool({
 
             <Field
               label="Custom code"
-              hint="Leave blank for a deterministic COMP-XXXXX code."
+              hint="Leave blank to generate a COMP- code. The same person always gets the same one."
               error={err("customCode")}
             >
               <input

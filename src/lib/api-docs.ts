@@ -126,7 +126,11 @@ const LOCATION_FIELDS: Field[] = [
   { name: "capacity", type: "integer | null" },
   { name: "campusLocation", type: "string | null" },
   { name: "description", type: "string | null" },
-  { name: "displayOrder", type: "integer", note: "Default 100." },
+  {
+    name: "displayOrder",
+    type: "integer",
+    note: "Default 100. Needs schedule.rooms; without it the value is ignored and a new room goes last.",
+  },
   {
     name: "visibility",
     type: oneOf(LOCATION_VISIBILITIES),

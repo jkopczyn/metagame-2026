@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { cn } from "@/v2/lib/utils";
 import { fillCells, typedChars } from "./pin-cells";
 
@@ -46,7 +47,8 @@ export default function PinInput({
     const incoming = normalize(text);
     if (!incoming) return;
     const { cells: next, focus: last } = fillCells(cells, from, incoming);
-    setCells(next);
+    // Committed now: onComplete submits the form, which reads the hidden input.
+    flushSync(() => setCells(next));
     focus(last);
     if (next.every(Boolean)) onComplete?.();
   };

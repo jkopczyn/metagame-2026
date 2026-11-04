@@ -12,12 +12,28 @@ describe("safeNextPath", () => {
     expect(safeNextPath("//evil.example")).toBe("/account");
     expect(safeNextPath("/\\evil.example")).toBe("/account");
     expect(safeNextPath("/a\r\nLocation: x")).toBe("/account");
+    for (const value of [
+      "/\t/evil.example",
+      "/\n/evil.example",
+      "/\r/evil.example",
+      "/\t\\evil.example",
+      "\\\\evil.example",
+      "/\\/evil.example",
+      "/\u0000/evil.example",
+      "/\u007f/evil.example",
+      "/.//evil.example",
+      "/.\\/evil.example",
+      "/a/..//evil.example",
+    ]) {
+      expect(safeNextPath(value)).toBe("/account");
+    }
   });
 
   it("falls back for missing values and login loops", () => {
     expect(safeNextPath(undefined)).toBe("/account");
     expect(safeNextPath(["/a"])).toBe("/account");
     expect(safeNextPath("/login?next=/account")).toBe("/account");
+    expect(safeNextPath("/a/../login")).toBe("/account");
     expect(safeNextPath("", "/")).toBe("/");
   });
 });

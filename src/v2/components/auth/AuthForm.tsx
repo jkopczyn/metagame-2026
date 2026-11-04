@@ -64,6 +64,10 @@ export default function AuthForm({ next }: { next: string }) {
   const state: AuthState =
     backedOut === result ? { step: "email", email: result.email } : result;
   const verifyButton = useRef<HTMLButtonElement>(null);
+  // Every result empties the code boxes: left full, each correction would
+  // auto-submit and use up the code's attempts.
+  const [pin, setPin] = useState({ result, key: 0 });
+  if (pin.result !== result) setPin({ result, key: pin.key + 1 });
 
   const hidden = <input type="hidden" name="next" value={next} />;
   // Past the first step the address is settled; it rides along hidden, with
@@ -164,6 +168,7 @@ export default function AuthForm({ next }: { next: string }) {
           new one.
         </p>
         <PinInput
+          key={pin.key}
           name="code"
           disabled={pending}
           onComplete={() => verifyButton.current?.click()}

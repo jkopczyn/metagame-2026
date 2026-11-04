@@ -1,3 +1,4 @@
+import { can } from "@/lib/access";
 import {
   authorize,
   done,
@@ -7,7 +8,11 @@ import {
   readBody,
 } from "@/lib/schedule-api";
 import { parseLocationFields } from "@/lib/schedule-input";
-import { querySchedule, upsertLocation } from "@/lib/schedule-store";
+import {
+  nextDisplayOrder,
+  querySchedule,
+  upsertLocation,
+} from "@/lib/schedule-store";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +28,9 @@ export async function POST(request: Request) {
   try {
     id = await upsertLocation({
       ...parsed.value,
+      displayOrder: (await can("schedule.rooms"))
+        ? parsed.value.displayOrder
+        : await nextDisplayOrder(),
       thumbnailUrl: null,
       imageUrl: null,
     });

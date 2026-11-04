@@ -4,7 +4,7 @@ import { TICKET_CODE_LENGTH } from "@/lib/ticket-code-format";
 export { formatTicketCode } from "@/lib/ticket-code-format";
 
 // Crockford-style: no I/L/O/U, so codes survive being read aloud or retyped.
-const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+export const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 /**
  * Deterministic 6-char ticket code derived from the payment id (Stripe

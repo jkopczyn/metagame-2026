@@ -6,7 +6,13 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb, schema } from "@/db";
-import { currentSession, getAuth, hasPassword } from "@/lib/auth";
+import {
+  API_KEY_HEADER,
+  codeDelivered,
+  currentSession,
+  getAuth,
+  hasPassword,
+} from "@/lib/auth";
 import { deleteImage, uploadImage } from "@/lib/blob";
 import { isMegagameClass, starterLevels } from "@/lib/megagame-levels";
 import { loadMegagameLevels, setMegagameLevels } from "@/lib/megagame-store";
@@ -140,12 +146,21 @@ export async function savePassword(
 
   if (intent === "cancel") return { mode: "password" };
 
+  const requestHeaders = await headers();
+  if (requestHeaders.has(API_KEY_HEADER)) {
+    return { ...prev, error: "Sign in on the site to change your password." };
+  }
+
   if (intent === "send" || intent === "resend") {
+    const failed = { ...prev, error: "We couldn't send the email. Try again." };
     try {
-      await auth.api.requestPasswordResetEmailOTP({ body: { email } });
+      const delivered = await codeDelivered(() =>
+        auth.api.requestPasswordResetEmailOTP({ body: { email } }),
+      );
+      if (!delivered) return failed;
     } catch (e) {
       console.error("[account] sending reset code failed", e);
-      return { ...prev, error: "We couldn't send the email. Try again." };
+      return failed;
     }
     return {
       mode: "code",
@@ -159,7 +174,6 @@ export async function savePassword(
   if (newPassword !== String(formData.get("confirm") ?? "")) {
     return fail("The passwords don't match.");
   }
-  const requestHeaders = await headers();
 
   if (intent === "reset") {
     const otp = String(formData.get("code") ?? "").replace(/\D/g, "");
