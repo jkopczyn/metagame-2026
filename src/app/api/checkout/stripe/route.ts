@@ -3,6 +3,7 @@ import { reportError } from "@/lib/error-report";
 import type Stripe from "stripe";
 import { isEarlyBirdActive } from "@/lib/early-bird";
 import { sendAdminErrorEmail } from "@/lib/email";
+import { isDayPassOnSale } from "@/lib/event-clock";
 import { REFERRAL_PARAM } from "@/lib/referral";
 import {
   referralMetadata,
@@ -139,6 +140,13 @@ export async function GET(request: Request) {
   }
 
   const params = new URL(request.url).searchParams;
+  const dayPass =
+    params.get("tier") === DAY_PASS_TIER && getDayPass(params.get("day") ?? "");
+  if (dayPass && !isDayPassOnSale(dayPass)) {
+    return new NextResponse("That day's pass is no longer on sale.", {
+      status: 410,
+    });
+  }
   const purchase = resolvePurchase(params);
   if (!purchase) {
     return new NextResponse("Unknown ticket.", { status: 400 });

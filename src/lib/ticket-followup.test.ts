@@ -1,5 +1,26 @@
-import { describe, expect, it } from "vitest";
-import { renderOneWeekOutEmail } from "./ticket-followup";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { send, createContact, reportError } = vi.hoisted(() => ({
+  send: vi.fn(),
+  createContact: vi.fn(),
+  reportError: vi.fn(),
+}));
+vi.mock("@/lib/email", async (original) => ({
+  ...(await original<typeof import("@/lib/email")>()),
+  getResend: () => ({
+    emails: { send },
+    contacts: { create: createContact },
+  }),
+}));
+vi.mock("@/lib/error-report", () => ({ reportError }));
+vi.mock("@/lib/sent-emails", async (original) => ({
+  ...(await original<typeof import("@/lib/sent-emails")>()),
+  readEmail: async () => FIXTURE,
+}));
+import {
+  followUpTicketPurchase,
+  renderOneWeekOutEmail,
+} from "./ticket-followup";
 
 const OPENER =
   '<p style="margin:0 0 18px;font-size:17px;line-height:1.6;color:#1b1b1b;">We are less than a week out, and are super excited.</p>';
@@ -68,5 +89,51 @@ describe("renderOneWeekOutEmail", () => {
     expect(() =>
       renderOneWeekOutEmail(`${FIXTURE}<p>{{RewardsURL}}</p>`, "Ada"),
     ).toThrow(/RewardsURL/);
+  });
+});
+
+describe("followUpTicketPurchase", () => {
+  const ok = { data: { id: "x" }, error: null, headers: null };
+  const followUp = () =>
+    followUpTicketPurchase({
+      to: "ada@example.com",
+      name: "Ada Lovelace",
+      ticketType: "Standard",
+      paymentId: "pi_1",
+      test: false,
+      source: "Stripe webhook",
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    send.mockResolvedValue(ok);
+    createContact.mockResolvedValue(ok);
+  });
+  afterEach(() => void vi.useRealTimers());
+
+  it("adds the contact and sends the email once per payment", async () => {
+    await followUp();
+    expect(createContact).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][1]).toEqual({
+      idempotencyKey: "one-week-out/pi_1",
+    });
+  });
+
+  it("rides out a rate limit on both steps", async () => {
+    vi.useFakeTimers();
+    const limited = {
+      data: null,
+      error: { name: "rate_limit_exceeded", message: "Too many requests" },
+      headers: null,
+    };
+    createContact.mockResolvedValueOnce(limited);
+    send.mockResolvedValueOnce(limited);
+    const done = followUp();
+    await vi.runAllTimersAsync();
+    await done;
+    expect(createContact).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(reportError).not.toHaveBeenCalled();
   });
 });

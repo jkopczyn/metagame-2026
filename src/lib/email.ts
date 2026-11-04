@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { env } from "@/env";
+import { retryRateLimited } from "@/lib/resend-retry";
 import { SOCIAL_LINKS } from "@/lib/urls";
 import { formatTicketCode } from "@/lib/ticket-code";
 
@@ -222,6 +223,11 @@ This is not a puzzle.
   return { subject, html, text };
 }
 
+// Resend's answer to a replayed key whose body differs (the opt-out line, a
+// reissued code): the buyer already has it. A racing send isn't this: it may
+// still fail, so it throws and the webhook retries.
+const ALREADY_SENT = "invalid_idempotent_request";
+
 export async function sendTicketConfirmationEmail(
   data: TicketConfirmationEmail,
 ) {
@@ -234,20 +240,26 @@ export async function sendTicketConfirmationEmail(
   }
 
   const { subject, html, text } = renderTicketConfirmationEmail(data);
-  const { error } = await resend.emails.send(
-    {
-      from: FROM,
-      to: data.to,
-      bcc: [CORE],
-      replyTo: [TEAM],
-      subject,
-      html,
-      text,
-    },
-    data.idempotencyKey ? { idempotencyKey: data.idempotencyKey } : undefined,
+  const { error } = await retryRateLimited(() =>
+    resend.emails.send(
+      {
+        from: FROM,
+        to: data.to,
+        bcc: [CORE],
+        replyTo: [TEAM],
+        subject,
+        html,
+        text,
+      },
+      data.idempotencyKey ? { idempotencyKey: data.idempotencyKey } : undefined,
+    ),
   );
 
-  if (error) throw new Error(`Resend send failed: ${error.message}`);
+  if (error) {
+    if (error.name === ALREADY_SENT)
+      return { sent: false as const, reason: "already-sent" };
+    throw new Error(`Resend send failed: ${error.message}`);
+  }
   return { sent: true as const };
 }
 
@@ -398,12 +410,13 @@ export async function sendSignInCodeEmail({ to, code }: SignInCodeEmail) {
     );
     return;
   }
-  const { error } = await resend.emails.send({
-    from: FROM,
-    to,
-    replyTo: [TEAM],
-    subject: `${code} is your Metagame sign-in code`,
-    html: `
+  const { error } = await retryRateLimited(() =>
+    resend.emails.send({
+      from: FROM,
+      to,
+      replyTo: [TEAM],
+      subject: `${code} is your Metagame sign-in code`,
+      html: `
       <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
         <div style="text-align: center; margin: 24px 0;">
           <img src="${SITE}/images/dice_logo.png" alt="METAGAME" width="240" style="max-width: 100%; height: auto;" />
@@ -414,8 +427,9 @@ export async function sendSignInCodeEmail({ to, code }: SignInCodeEmail) {
         <p style="font-size: 12px; color: #888;">&copy; 2026 Arbor</p>
       </div>
     `,
-    text: `Your Metagame sign-in code is ${code}. It works for 10 minutes.\n\nIf you didn't ask for it, ignore this email — nobody can sign in without the code.`,
-  });
+      text: `Your Metagame sign-in code is ${code}. It works for 10 minutes.\n\nIf you didn't ask for it, ignore this email — nobody can sign in without the code.`,
+    }),
+  );
   if (error) throw new Error(`Resend send failed: ${error.message}`);
 }
 
