@@ -27,13 +27,7 @@ export type NewTrackingLink = Omit<
 
 export const GO_PREFIX = "/go/";
 
-// /go/<slug>?promo=CODE forwards the code to the destination, where the site
-// stores it and applies it at Standard checkout. Stripe decides if it's valid.
-export const PROMO_PARAM = "promo";
-export function promoCode(value: string | null | undefined): string {
-  const code = value?.trim() ?? "";
-  return /^[A-Za-z0-9_-]{1,100}$/.test(code) ? code : "";
-}
+export { PROMO_PARAM, promoCode } from "@/lib/promo-code";
 
 // The UTM fields mirror single-select columns in Airtable; their choice lists
 // are the source of truth. Open fields also take a typed value, which `typecast`
