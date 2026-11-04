@@ -4,9 +4,28 @@
 // reproduce races between concurrent transactions.
 import { createServer } from "node:http";
 import { PGlite } from "@electric-sql/pglite";
+import { lockDatabase, unlockDatabase } from "./lib/dev-local-state.mjs";
 
 const [dataDir, port] = process.argv.slice(2);
-const db = await PGlite.create(dataDir);
+// Two PGlites on one directory corrupt it.
+const lock = lockDatabase(dataDir);
+if (!lock.claimed) {
+  console.error(
+    lock.busy
+      ? `[local-db] another server is claiming ${dataDir}; if none is: rm ${lock.busy}`
+      : `[local-db] ${dataDir} is in use; stop it with: kill ${lock.previous}`,
+  );
+  process.exit(1);
+}
+let db;
+try {
+  db = await PGlite.create(dataDir);
+} catch (error) {
+  console.error(
+    `[local-db] couldn't open ${dataDir} (${error.message}); rm -rf it to rebuild`,
+  );
+  process.exit(1);
+}
 
 // Neon's client sends and receives text and does its own type conversion.
 const passthrough = (table) =>
@@ -56,7 +75,7 @@ async function execute(body, arrayMode) {
   return { results };
 }
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
   let text = "";
   for await (const chunk of req) text += chunk;
   res.setHeader("content-type", "application/json");
@@ -78,6 +97,20 @@ createServer(async (req, res) => {
       }),
     );
   }
-}).listen(Number(port), "127.0.0.1", () => {
+});
+server.once("error", (error) => {
+  console.error(`[local-db] couldn't listen on port ${port}: ${error.message}`);
+  process.exit(1);
+});
+server.listen(Number(port), "127.0.0.1", () => {
   console.log(`[local-db] listening on 127.0.0.1:${port}`);
 });
+
+const stop = async () => {
+  server.close();
+  await db.close();
+  unlockDatabase(dataDir);
+  process.exit(0);
+};
+process.once("SIGINT", stop);
+process.once("SIGTERM", stop);

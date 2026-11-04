@@ -11,7 +11,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Worktrees
 
 Always work in a worktree, never in this checkout directly, even for a one-line fix.
-Use Claude Code's built-in worktree flow.
+Use Claude Code's built-in worktree flow. `pnpm dev:local` runs the app there with
+its own seeded database on a printed port, no credentials needed; without Resend
+sign-in codes appear in its log.
 
 ## Code comments
 
@@ -30,6 +32,10 @@ site that `next build` generates from the migrations into `public/schema-erd`;
 objects. Airtable stays the ops view for
 purchases and RFPs; Postgres is the source of truth for accounts, ticket
 ownership, and the schedule.
+
+Drizzle silently skips a migration whose journal `when` is older than the newest
+applied one, so regenerate after rebasing rather than renumbering; `pnpm db:check`
+(also run by CI and `db:migrate`) fails on that.
 
 ### Tickets
 
@@ -70,7 +76,8 @@ rubric for one proposal, gated on `submissions.grade`.
 For any substantive UI change, run `node scripts/preview-shot.mjs <preview-url>
 /path [/path…]` against the PR's Vercel preview (URL in the bot comment) and
 inspect the screenshots to see that things appear correct on mobile and
-desktop. It needs `node_modules/playwright` plus a Chromium: the per-machine
+desktop (or against `pnpm dev:local`, as a fork PR gets no preview). It needs
+`node_modules/playwright` plus a Chromium: the per-machine
 one from `npx playwright install chromium-headless-shell`, or any Chromium on
 the box via `SHOT_BROWSER=<path>`. If either is missing, ask before installing
 and say it's for the screenshots. If anything is off,

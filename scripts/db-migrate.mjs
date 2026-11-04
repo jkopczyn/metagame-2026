@@ -8,20 +8,11 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { migrate } from "drizzle-orm/neon-http/migrator";
 import { routeLocalDatabase } from "../src/db/local-endpoint.mjs";
+import { loadDbEnv } from "./lib/db-env.mjs";
+import { assertValidJournal } from "./lib/migration-journal.mjs";
 
-// `vercel pull` writes the environment's vars under .vercel/; locally they come
-// from .env.local. Vars already in the environment are never overridden.
-for (const file of [
-  ".env.local",
-  ".vercel/.env.production.local",
-  ".vercel/.env.preview.local",
-]) {
-  try {
-    process.loadEnvFile(file);
-  } catch {
-    // file absent
-  }
-}
+assertValidJournal("db:migrate");
+loadDbEnv({ production: true });
 
 const url = process.env.DATABASE_URL;
 if (!url) {
