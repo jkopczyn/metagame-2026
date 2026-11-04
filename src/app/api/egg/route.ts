@@ -1,4 +1,5 @@
 import { recordEgg } from "@/lib/airtable";
+import { throttled } from "@/lib/throttle";
 import { SPELLS } from "@/v2/components/dividers/scrabble/effects";
 import {
   CLICK_EGGS,
@@ -52,6 +53,8 @@ export async function POST(request: Request) {
   const found = body && typeof body === "object" ? parse(body) : null;
   const visit = body?.visit;
   if (found && typeof visit === "string" && /^[a-z0-9]{1,12}$/.test(visit)) {
+    if (await throttled(request, "egg"))
+      return new Response(null, { status: 204 });
     try {
       await recordEgg(found, visit);
     } catch (err) {

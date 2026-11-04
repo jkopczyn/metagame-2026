@@ -12,6 +12,7 @@ import {
 } from "@/lib/auth";
 import { getDb, schema } from "@/db";
 import { safeNextPath } from "@/lib/next-path";
+import { overBudget } from "@/lib/throttle";
 
 // Email first, then whatever that address calls for:
 //   email ─lookup─┬─ has a password ──▶ password  (or ask for a code)
@@ -58,7 +59,13 @@ async function sendCode(email: string): Promise<string | undefined> {
 }
 
 async function toCodeStep(email: string, notice?: string): Promise<AuthState> {
-  const error = await sendCode(email);
+  // Per IP first, so one address's refused sends don't eat the shared ceiling.
+  const refused =
+    (await overBudget("signInCode", await headers())) ||
+    (await overBudget("signInCodeTotal"));
+  const error = refused
+    ? "Too many sign-in emails right now. Try again in a little while."
+    : await sendCode(email);
   if (error) return { step: "email", email, error };
   return { step: "code", email, notice };
 }

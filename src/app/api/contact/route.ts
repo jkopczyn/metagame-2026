@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sendContactEmail } from "@/lib/email";
 import { reportError } from "@/lib/error-report";
 import { resolveRecipient } from "@/lib/contact-recipients";
+import { throttled } from "@/lib/throttle";
 import { TEAM_EMAIL } from "@/v2/lib/links";
 
 const MAX = { name: 200, email: 254, subject: 200, message: 5000 };
@@ -46,6 +47,9 @@ export async function POST(request: Request) {
   if (!to) {
     return NextResponse.json({ error: "Invalid recipient" }, { status: 400 });
   }
+
+  const limited = await throttled(request, "contact");
+  if (limited) return limited;
 
   try {
     const sent = await sendContactEmail({ to, name, email, subject, message });

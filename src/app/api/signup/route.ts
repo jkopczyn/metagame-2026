@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { recordSignup } from "@/lib/airtable";
 import { reportError } from "@/lib/error-report";
 import { isInterestValue } from "@/lib/interests";
+import { throttled } from "@/lib/throttle";
 
 export async function POST(request: Request) {
   let body: {
@@ -29,6 +30,9 @@ export async function POST(request: Request) {
     ? interests.filter(isInterestValue)
     : [];
   const trimmedNotes = typeof notes === "string" ? notes.trim() : "";
+
+  const limited = await throttled(request, "signup");
+  if (limited) return limited;
 
   try {
     const result = await recordSignup(email.trim(), {

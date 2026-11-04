@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { attachFile, createFormRow } from "@/lib/airtable-forms";
 import { sendFormBackupEmail } from "@/lib/email";
 import { reportError } from "@/lib/error-report";
+import { throttled } from "@/lib/throttle";
 import { pickUtm } from "@/lib/utm";
 import { FORMS } from "@/v2/forms";
 import {
@@ -54,6 +55,9 @@ export async function POST(
       { status: 400 },
     );
   }
+
+  const limited = await throttled(request, "forms");
+  if (limited) return limited;
 
   const fields = airtableFields(def, answers);
   if (def.utmFields) {

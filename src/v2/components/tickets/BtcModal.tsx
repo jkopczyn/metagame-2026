@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { FaBitcoin } from "react-icons/fa";
 import { readUtm } from "@/lib/utm";
+import { readCodeCheck, type CodeCheck } from "@/v2/lib/btc-code-check";
 import type { TicketTier } from "@/v2/lib/tickets";
 import { Button } from "@/v2/components/ui/button";
 import { Input } from "@/v2/components/ui/input";
@@ -49,14 +50,9 @@ export default function BtcModal({
   const [discord, setDiscord] = useState("");
   // Validated live against the server.
   const [discountCode, setDiscountCode] = useState(initialCode);
-  const [codeState, setCodeState] = useState<{
-    validating: boolean;
-    valid: boolean;
-    test: boolean;
-    btcPrice: number | null;
-    label?: string;
-    exhausted?: boolean; // code is real but has hit its redemption cap
-  }>({ validating: true, valid: false, test: false, btcPrice: null });
+  const [codeState, setCodeState] = useState<
+    CodeCheck & { validating: boolean }
+  >({ validating: true, valid: false, test: false, btcPrice: null });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,17 +81,8 @@ export default function BtcModal({
         body: JSON.stringify({ ticketId: ticket.id, code }),
         signal: controller.signal,
       })
-        .then((r) => r.json())
-        .then((d) =>
-          setCodeState({
-            validating: false,
-            valid: Boolean(d.valid),
-            test: Boolean(d.test),
-            btcPrice: typeof d.btcPrice === "number" ? d.btcPrice : null,
-            label: d.label,
-            exhausted: Boolean(d.exhausted),
-          }),
-        )
+        .then(readCodeCheck)
+        .then((check) => setCodeState({ validating: false, ...check }))
         .catch((err) => {
           if (err?.name === "AbortError") return;
           setCodeState({
@@ -252,9 +239,11 @@ export default function BtcModal({
             )}
             {codeInvalid && (
               <p className="text-xs text-salmon">
-                {codeState.exhausted
-                  ? "This code has reached its redemption limit."
-                  : "Code not found"}
+                {codeState.rateLimited
+                  ? "Couldn\u2019t check this code right now. Please try again in a little while."
+                  : codeState.exhausted
+                    ? "This code has reached its redemption limit."
+                    : "Code not found"}
               </p>
             )}
             {isTestCode && (

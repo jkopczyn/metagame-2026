@@ -4,6 +4,7 @@ import { findTrackingLink, PROMO_PARAM, promoCode } from "@/lib/tracking-links";
 import { createPosterPdf, createPosterQrSvg } from "@/lib/poster-pdf";
 import { checkPosterPromo } from "@/lib/poster-promo";
 import { parsePosterQr } from "@/lib/qr-styles";
+import { throttled } from "@/lib/throttle";
 
 export const runtime = "nodejs";
 const REJECTED = "This code can’t be used on a poster.";
@@ -27,6 +28,8 @@ export async function GET(request: Request) {
         { error: "Invalid code." },
         { status: 400, headers },
       );
+    const limited = await throttled(request, "codeLookup");
+    if (limited) return limited;
     try {
       const result = await checkPosterPromo(promo);
       return Response.json(
@@ -52,6 +55,8 @@ export async function GET(request: Request) {
       { status: 400, headers },
     );
   }
+  const limited = await throttled(request, "poster");
+  if (limited) return limited;
   try {
     const choice = (await loadPosterCatalog()).find(
       (option) => option.value === area,
