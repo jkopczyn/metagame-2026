@@ -520,6 +520,7 @@ export type DiscountCodeRecord = {
   label?: string;
   purpose?: string; // comp category from the comp tool (Purpose single-select; typecast adds new options)
   notes?: string; // operator's free-text note from the comp tool (Comp Notes)
+  issuedBy?: string; // backstage admin who minted the code (Issued By)
 };
 
 /**
@@ -560,6 +561,7 @@ export async function recordDiscountCode(
   if (record.label) fields.Label = record.label;
   if (record.purpose) fields.Purpose = record.purpose;
   if (record.notes) fields["Comp Notes"] = record.notes;
+  if (record.issuedBy) fields["Issued By"] = record.issuedBy;
 
   const res = await fetch(
     `https://api.airtable.com/v0/${airtableConfig.baseId}/${encodeURIComponent(airtableConfig.discountCodesTableId)}`,

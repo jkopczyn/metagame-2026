@@ -102,6 +102,7 @@ export async function POST(request: Request) {
         label: name ? `Comp – ${name}` : (coupon?.name ?? undefined),
         purpose: promo.metadata?.purpose || undefined,
         notes: promo.metadata?.notes || undefined,
+        issuedBy: promo.metadata?.issued_by || undefined,
       });
     } catch (err) {
       // 500 → Stripe retries; recordDiscountCode upserts, so a retry can't duplicate.
