@@ -62,6 +62,13 @@ export default function PlayerRows({
               >
                 Remove
               </Link>
+              <Link
+                href={`${boardHref({ ...params, levelUp: player.id })}#level-up`}
+                replace
+                className={LINK}
+              >
+                Level up
+              </Link>
             </div>
           </div>
         </li>

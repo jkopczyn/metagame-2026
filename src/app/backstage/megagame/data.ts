@@ -1,4 +1,5 @@
 import "server-only";
+import { MEGAGAME_CLASSES, type MegagameClass } from "@/lib/megagame-levels";
 import {
   isCompleteMegagameCode,
   playerQuestStatus,
@@ -7,11 +8,18 @@ import {
 } from "@/lib/megagame-rules";
 import {
   completionsByIds,
+  completionsInClass,
   findQuestByCode,
   liveCompletions,
   playersByIds,
+  recentCompletions,
+  recentLevelUps,
+  recentVoids,
   type PlayerSummary,
   type Quest,
+  type RecentCompletion,
+  type RecentLevelUp,
+  type VoidRow,
 } from "@/lib/megagame-store";
 import { claimedCounts } from "@/lib/ticket-store";
 
@@ -63,6 +71,75 @@ export async function loadQuest(code: string): Promise<QuestLookup> {
 
 export type Viewer = { userId: string; manager: boolean };
 
+type Common = { key: string; at: Date; mayUndo: boolean };
+export type RecentAction =
+  | (Common & { kind: "completion"; item: RecentCompletion })
+  | (Common & { kind: "level"; item: RecentLevelUp })
+  | (Common & { kind: "void"; item: VoidRow });
+
+export type RecentSources = {
+  completions: readonly RecentCompletion[];
+  levelUps: readonly RecentLevelUp[];
+  voids: readonly VoidRow[];
+};
+
+export function mergeRecentActions(
+  { completions, levelUps, voids }: RecentSources,
+  viewer: Viewer,
+  limit: number,
+): RecentAction[] {
+  const mayUndo = (by: string | null, voidedAt: Date | null) =>
+    voidedAt === null && (viewer.manager || by === viewer.userId);
+  const all: RecentAction[] = [
+    ...completions.map((item) => ({
+      kind: "completion" as const,
+      key: `completion-${item.id}`,
+      at: item.completedAt,
+      mayUndo: mayUndo(item.confirmedBy, item.undoneAt),
+      item,
+    })),
+    ...levelUps.map((item) => ({
+      kind: "level" as const,
+      key: `level-${item.id}`,
+      at: item.awardedAt,
+      mayUndo: mayUndo(item.awardedBy, item.voidedAt),
+      item,
+    })),
+    ...voids.map((item) => ({
+      kind: "void" as const,
+      key: `void-${item.id}`,
+      at: item.voidedAt,
+      mayUndo: false,
+      item,
+    })),
+  ];
+  return all.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, limit);
+}
+
+/**
+ * Completions per player, level-ups and level-up undos by every volunteer,
+ * newest first. An undone completion stays in its place with its reason.
+ */
+export async function loadRecentActions(
+  limit: number,
+  viewer: Viewer,
+): Promise<{ actions: RecentAction[]; more: boolean }> {
+  const [completions, levelUps, voids] = await Promise.all([
+    recentCompletions(null, limit + 1),
+    recentLevelUps(limit + 1),
+    recentVoids(limit + 1),
+  ]);
+  const total = completions.length + levelUps.length + voids.length;
+  return {
+    actions: mergeRecentActions(
+      { completions, levelUps, voids },
+      viewer,
+      limit,
+    ),
+    more: total > limit,
+  };
+}
+
 export type CompletionResultView = {
   recorded: { id: string; name: string; undone: boolean }[];
   /** Names of listed players whose row for this quest was already completed. */
@@ -105,5 +182,32 @@ export async function loadCompletionResult(
     })),
     alreadyCompleted: others.filter((id) => completedEarlier.has(id)).map(name),
     undoIds: mayUndo ? live.map((r) => r.id) : [],
+  };
+}
+
+export async function loadListedPlayers(
+  ids: readonly string[],
+): Promise<PlayerSummary[]> {
+  return ids.length > 0 ? playersByIds(ids) : [];
+}
+
+export type LevelUpTarget = {
+  player: PlayerSummary;
+  completions: Record<MegagameClass, number>;
+};
+
+export async function loadLevelUpTarget(
+  userId: string,
+): Promise<LevelUpTarget | null> {
+  const [player] = await playersByIds([userId]);
+  if (!player) return null;
+  const counts = await Promise.all(
+    MEGAGAME_CLASSES.map(
+      async (c) => [c, await completionsInClass(player.id, c)] as const,
+    ),
+  );
+  return {
+    player,
+    completions: Object.fromEntries(counts) as Record<MegagameClass, number>,
   };
 }

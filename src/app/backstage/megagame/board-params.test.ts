@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { BOARD, boardHref, parseBoardParams } from "./board-params";
+import {
+  BOARD,
+  RECENT_MAX,
+  RECENT_STEP,
+  boardHref,
+  parseBoardParams,
+} from "./board-params";
 
 const C = "6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b";
 const D = "0b9c8d7e-6f5a-4b3c-9d2e-1f0a9b8c7d6e";
@@ -10,6 +16,8 @@ describe("parseBoardParams", () => {
       quest: null,
       players: [],
       done: null,
+      levelUp: null,
+      recent: RECENT_STEP,
     });
   });
 
@@ -40,6 +48,20 @@ describe("parseBoardParams", () => {
     expect(parseBoardParams({ done: "" }).done).toEqual([]);
     expect(parseBoardParams({}).done).toBeNull();
   });
+
+  it("keeps the level-up player id", () => {
+    expect(parseBoardParams({ levelup: " u9 " }).levelUp).toBe("u9");
+    expect(parseBoardParams({ levelup: "" }).levelUp).toBeNull();
+  });
+
+  it("reads the show-more count, clamped to steps between the default and the maximum", () => {
+    expect(parseBoardParams({ recent: "60" }).recent).toBe(60);
+    expect(parseBoardParams({ recent: "45" }).recent).toBe(60);
+    expect(parseBoardParams({ recent: "5" }).recent).toBe(RECENT_STEP);
+    expect(parseBoardParams({ recent: "-30" }).recent).toBe(RECENT_STEP);
+    expect(parseBoardParams({ recent: "lots" }).recent).toBe(RECENT_STEP);
+    expect(parseBoardParams({ recent: "100000" }).recent).toBe(RECENT_MAX);
+  });
 });
 
 describe("boardHref", () => {
@@ -53,12 +75,16 @@ describe("boardHref", () => {
         quest: "A2C4EF",
         players: ["u1", "u2"],
         done: [C, D],
+        levelUp: "u2",
+        recent: 60,
       }),
-    ).toBe(`${BOARD}?quest=A2C4EF&players=u1%2Cu2&done=${C}%2C${D}`);
+    ).toBe(
+      `${BOARD}?quest=A2C4EF&players=u1%2Cu2&done=${C}%2C${D}&levelup=u2&recent=60`,
+    );
     expect(boardHref({ quest: "A2C4EF", done: [] })).toBe(
       `${BOARD}?quest=A2C4EF&done=`,
     );
-    expect(boardHref({ players: [] })).toBe(BOARD);
+    expect(boardHref({ players: [], recent: RECENT_STEP })).toBe(BOARD);
   });
 
   it("round-trips through parseBoardParams", () => {
@@ -66,6 +92,7 @@ describe("boardHref", () => {
       quest: "A2C4EF",
       players: "u1",
       done: `${C},${D}`,
+      recent: "90",
     });
     const query = new URLSearchParams(boardHref(params).split("?")[1]);
     expect(parseBoardParams(Object.fromEntries(query))).toEqual(params);

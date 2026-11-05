@@ -6,6 +6,8 @@ import { normalizeMegagameCode } from "@/lib/megagame-rules";
 // reload, a tab switch or a camera detour keeps it.
 
 export const BOARD = "/backstage/megagame";
+export const RECENT_STEP = 30;
+export const RECENT_MAX = 300;
 
 export type BoardParams = {
   /** Normalized, possibly incomplete, so the page can say it was not found. */
@@ -16,6 +18,8 @@ export type BoardParams = {
    * Null when no result is showing; empty when it recorded nobody new.
    */
   done: string[] | null;
+  levelUp: string | null;
+  recent: number;
 };
 
 export type SearchParams = Record<string, string | string[] | undefined>;
@@ -23,12 +27,20 @@ export type SearchParams = Record<string, string | string[] | undefined>;
 const first = (v: string | string[] | undefined) =>
   ([v].flat()[0] ?? "").trim();
 
+function parseRecent(raw: string): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= RECENT_STEP) return RECENT_STEP;
+  return Math.min(RECENT_MAX, Math.ceil(n / RECENT_STEP) * RECENT_STEP);
+}
+
 export function parseBoardParams(sp: SearchParams): BoardParams {
   const quest = normalizeMegagameCode(first(sp.quest)).slice(0, 12);
   return {
     quest: quest || null,
     players: parsePlayerIds(sp.players),
     done: sp.done === undefined ? null : parsePlayerIds(sp.done).filter(isUuid),
+    levelUp: first(sp.levelup).slice(0, 100) || null,
+    recent: parseRecent(first(sp.recent)),
   };
 }
 
@@ -38,6 +50,9 @@ export function boardHref(p: Partial<BoardParams>): string {
   if (p.players && p.players.length > 0)
     params.set("players", p.players.join(","));
   if (p.done) params.set("done", p.done.join(","));
+  if (p.levelUp) params.set("levelup", p.levelUp);
+  if (p.recent && p.recent !== RECENT_STEP)
+    params.set("recent", String(p.recent));
   const query = params.toString();
   return query ? `${BOARD}?${query}` : BOARD;
 }
