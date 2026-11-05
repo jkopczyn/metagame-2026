@@ -58,11 +58,6 @@ export const MEGAGAME_INTEGRATION_LEVELS =
 export type MegagameIntegrationLevel =
   (typeof MEGAGAME_INTEGRATION_LEVELS)[number];
 
-export const isPhase = (v: string): v is Phase =>
-  (PHASES as readonly string[]).includes(v);
-export const isVerdict = (v: string): v is Verdict =>
-  (VERDICTS as readonly string[]).includes(v);
-
 export type Account = {
   userId: string;
   /** Preferred name, else account name, else email. */

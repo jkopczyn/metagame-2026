@@ -12,7 +12,7 @@ import {
 import { ChevronDown } from "lucide-react";
 import type { PosterOption, PosterTracking } from "@/lib/poster-options";
 import { posterQrQuery } from "@/lib/qr-styles";
-import { PROMO_PARAM, promoCode } from "@/lib/tracking-links";
+import { PROMO_PARAM, promoCode } from "@/lib/promo-code";
 import {
   QrStylePicker,
   useQrStyle,

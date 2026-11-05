@@ -112,11 +112,6 @@ export const dayPasses: DayPass[] = [
   },
 ];
 
-/** Look up a day pass by id; undefined when none matches. */
-export function getDayPass(id: string): DayPass | undefined {
-  return dayPasses.find((p) => p.id === id);
-}
-
 /** Our Stripe checkout route for a USD ticket; it redirects to Stripe. */
 export function stripeCheckoutHref(
   params:

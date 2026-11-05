@@ -20,7 +20,7 @@ import { setTableauPreview } from "./tableauPreview";
 // Dev-only curation panel (Dice.tsx mounts it only in development): throw fresh
 // live rolls, re-watch the one just thrown, keep the good ones, and replay or
 // delete any roll kept earlier. The dropdown lists the kept rolls in
-// src/components/dice3d/takes/ (served by /api/dev/keep-take), which IS the
+// src/v2/components/dice/dice3d/takes/ (served by /api/dev/keep-take), which IS the
 // shipped set — keeping a roll ships it, deleting one unships it.
 //
 // Playing an arbitrary take works through window.__replayTake: the panel queues

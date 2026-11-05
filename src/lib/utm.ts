@@ -4,7 +4,7 @@ import {
   REFERRAL_PARAM,
   referralCodeOf,
 } from "@/lib/referral";
-import { PROMO_PARAM, promoCode } from "@/lib/tracking-links";
+import { PROMO_PARAM, promoCode } from "@/lib/promo-code";
 
 // Last-touch attribution: the UTMs from the most recent tracking link a visitor
 // arrived through, when they first visited, and their PostHog ids (browser and

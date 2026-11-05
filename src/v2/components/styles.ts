@@ -1,6 +1,6 @@
 // Shared class strings for the mock design system (headings, eyebrows, fields).
-// Buttons now live in the shadcn <Button> (src/components/ui/button.tsx) and the
-// shared dark form field in the shadcn <Input> (src/components/ui/input.tsx).
+// Buttons now live in the shadcn <Button> (src/v2/components/ui/button.tsx) and the
+// shared dark form field in the shadcn <Input> (src/v2/components/ui/input.tsx).
 
 export const HEADING =
   "font-grotesk font-bold leading-[1.05] tracking-[-0.01em]";
