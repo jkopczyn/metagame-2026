@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { create, list, getStripe, sendAdminErrorEmail } = vi.hoisted(() => ({
   create: vi.fn(),
   list: vi.fn(),
@@ -53,5 +53,45 @@ describe("standard checkout with a linked promo code", () => {
     create.mockRejectedValue(new Error("Stripe down"));
     expect((await get("tier=standard")).status).toBe(502);
     expect(create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("day pass sales window", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getStripe.mockReturnValue({
+      checkout: { sessions: { create } },
+      promotionCodes: { list },
+    });
+    create.mockResolvedValue({
+      id: "cs_1",
+      url: "https://checkout.stripe.com/c/pay/test",
+    });
+    vi.useFakeTimers({ toFake: ["Date"] });
+  });
+  afterEach(() => void vi.useRealTimers());
+
+  it.each([
+    ["friday", "2026-11-07T07:59:59Z", "2026-11-07T08:00:00Z"],
+    ["saturday", "2026-11-08T07:59:59Z", "2026-11-08T08:00:00Z"],
+    ["sunday", "2026-11-09T07:59:59Z", "2026-11-09T08:00:00Z"],
+  ])("sells %s until Pacific midnight", async (day, before, after) => {
+    vi.setSystemTime(new Date(before));
+    expect((await get(`tier=day-pass&day=${day}`)).status).toBe(303);
+    expect(create).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(new Date(after));
+    expect((await get(`tier=day-pass&day=${day}`)).status).toBe(410);
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves general tickets on sale", async () => {
+    vi.setSystemTime(new Date("2026-11-10T20:00:00Z"));
+    expect((await get("tier=standard")).status).toBe(303);
+  });
+
+  it("still calls an unknown day unknown", async () => {
+    vi.setSystemTime(new Date("2026-11-10T20:00:00Z"));
+    expect((await get("tier=day-pass&day=monday")).status).toBe(400);
   });
 });

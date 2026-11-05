@@ -1,5 +1,6 @@
 import { CORE, FROM, escapeHtml, getResend } from "@/lib/email";
 import { reportError } from "@/lib/error-report";
+import { retryRateLimited } from "@/lib/resend-retry";
 import { emailSubject, readEmail } from "@/lib/sent-emails";
 
 const TICKET_HOLDERS_SEGMENT_ID = "352cb53c-55e4-48d4-8a11-fa32aaa73f1e";
@@ -80,13 +81,15 @@ export async function followUpTicketPurchase({
   const errors: string[] = [];
 
   try {
-    const { error } = await resend.contacts.create({
-      email: to,
-      firstName,
-      lastName,
-      properties: { ticket_type: ticketType ?? "" },
-      segments: [{ id: TICKET_HOLDERS_SEGMENT_ID }],
-    });
+    const { error } = await retryRateLimited(() =>
+      resend.contacts.create({
+        email: to,
+        firstName,
+        lastName,
+        properties: { ticket_type: ticketType ?? "" },
+        segments: [{ id: TICKET_HOLDERS_SEGMENT_ID }],
+      }),
+    );
     if (error) throw new Error(`Resend contact failed: ${error.message}`);
   } catch (err) {
     errors.push(err instanceof Error ? err.message : String(err));
@@ -96,9 +99,11 @@ export async function followUpTicketPurchase({
     const source = await readEmail("one-week-out");
     if (source == null) throw new Error("one-week-out email not found");
     const { subject, html } = renderOneWeekOutEmail(source, firstName);
-    const { error } = await resend.emails.send(
-      { from: FROM, to, replyTo: [CORE], subject, html },
-      { idempotencyKey: `one-week-out/${paymentId}` },
+    const { error } = await retryRateLimited(() =>
+      resend.emails.send(
+        { from: FROM, to, replyTo: [CORE], subject, html },
+        { idempotencyKey: `one-week-out/${paymentId}` },
+      ),
     );
     if (error) throw new Error(`Resend send failed: ${error.message}`);
   } catch (err) {

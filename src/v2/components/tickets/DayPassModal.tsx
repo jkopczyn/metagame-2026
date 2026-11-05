@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { FaBitcoin } from "react-icons/fa";
+import { isDayPassOnSale } from "@/lib/event-clock";
 import { readUtm, withCodes, withUtm } from "@/lib/utm";
 import { dayPasses, stripeCheckoutHref } from "@/v2/lib/tickets";
 import {
@@ -37,6 +38,7 @@ function isOpenNodeCheckoutUrl(url: string): boolean {
 // Mirrors the server cap so over-long input fails fast in the browser too.
 const MAX_FIELD_LEN = 200;
 
+const GRID_COLS = ["", "grid-cols-1", "grid-cols-2", "grid-cols-3"];
 const DAY_TILE = "h-auto flex-col gap-1 px-3 py-4";
 const DAY_LABEL =
   "font-space-mono text-[13px] tracking-[0.18em] text-cream/85 uppercase";
@@ -53,8 +55,11 @@ export default function DayPassModal({ onClose }: { onClose: () => void }) {
   );
   const isBtc = currency === "btc";
 
+  // Read once on open; the checkout routes refuse a day that ends meanwhile.
+  const [onSale] = useState(() => dayPasses.filter((p) => isDayPassOnSale(p)));
+  const grid = `grid ${GRID_COLS[onSale.length]} gap-3 max-[420px]:grid-cols-1`;
   const [selected, setSelected] = useState(0);
-  const pass = dayPasses[selected];
+  const pass = onSale[selected];
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [discord, setDiscord] = useState("");
@@ -130,10 +135,12 @@ export default function DayPassModal({ onClose }: { onClose: () => void }) {
           </DialogDescription>
         </div>
 
-        {isBtc ? (
+        {!pass ? (
+          <p className="text-cream/80">Day passes are no longer on sale.</p>
+        ) : isBtc ? (
           <form onSubmit={payWithBtc} className="flex flex-col gap-3">
-            <div className="grid grid-cols-3 gap-3 max-[420px]:grid-cols-1">
-              {dayPasses.map((p, i) => (
+            <div className={grid}>
+              {onSale.map((p, i) => (
                 <Button
                   key={p.id}
                   type="button"
@@ -191,8 +198,8 @@ export default function DayPassModal({ onClose }: { onClose: () => void }) {
           </form>
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-3 max-[420px]:grid-cols-1">
-              {dayPasses.map((p) => {
+            <div className={grid}>
+              {onSale.map((p) => {
                 const href = stripeCheckoutHref({
                   tier: "day-pass",
                   day: p.id,

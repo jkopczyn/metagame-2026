@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Options } from "qr-code-styling";
+import type { Options, TypeNumber } from "qr-code-styling";
 import { cn } from "@/lib/utils";
+import { qrQuietZone } from "@/lib/qr-quiet-zone";
 import { LINK_QR_STYLES } from "@/lib/qr-styles";
 import { selectClass, selectStyle } from "../ui";
 
@@ -20,20 +21,26 @@ const NAVY = "#173059";
 const qrOptions = (url: string, style: Style, size: number): Options => {
   const s = STYLES[style];
   const image = "image" in s ? s.image : undefined;
+  const errorCorrectionLevel = image ? "H" : "M";
+  const { version, margin } = qrQuietZone(url, errorCorrectionLevel, size);
   return {
     width: size,
     height: size,
     type: "canvas",
     data: url,
-    // Quiet zone and logo padding scale with the export size.
-    margin: Math.round(size / 40),
+    margin,
     image,
     imageOptions: {
+      // Logo padding scales with the export size.
       margin: Math.round(size / 64),
       imageSize: 0.35,
       crossOrigin: "anonymous",
     },
-    qrOptions: { errorCorrectionLevel: image ? "H" : "M" },
+    qrOptions: {
+      errorCorrectionLevel,
+      mode: "Byte",
+      typeNumber: version as TypeNumber,
+    },
     dotsOptions: { type: s.dots, color: NAVY },
     cornersSquareOptions: { type: s.eye, color: NAVY },
     cornersDotOptions: { type: s.eyeDot, color: NAVY },

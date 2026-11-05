@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getDayPass, getTicket, supporterTier } from "@/lib/tickets";
 import { countCodeRedemptions, lookupDiscountCode } from "@/lib/discount-codes";
 import { isEarlyBirdActive } from "@/lib/early-bird";
+import { isDayPassOnSale } from "@/lib/event-clock";
 import { createCharge, getHostedCheckoutUrl } from "@/lib/opennode";
 import { throttled } from "@/lib/throttle";
 import { pickUtm, type Utm } from "@/lib/utm";
@@ -85,6 +86,12 @@ export async function POST(request: Request) {
   } else if (getDayPass(ticketId)) {
     // Day pass: fixed BTC price, no discount codes on this rail either.
     const pass = getDayPass(ticketId)!;
+    if (!isDayPassOnSale(pass)) {
+      return NextResponse.json(
+        { error: "That day's pass is no longer on sale." },
+        { status: 410 },
+      );
+    }
     ticketIdOut = pass.id;
     ticketLabel = pass.label;
     usd = pass.usd;
