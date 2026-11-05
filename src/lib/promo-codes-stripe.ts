@@ -1,7 +1,9 @@
+import { createHmac } from "node:crypto";
 import type Stripe from "stripe";
 import { env } from "@/env";
 import {
   identityOf,
+  legacySlugCode,
   MAX_SLUG_ATTEMPTS,
   normalizeCustomCode,
   normalizeName,
@@ -10,13 +12,13 @@ import {
   PROMO_SOURCE,
   PromoError,
   seedOf,
-  slugCode,
   type MintInput,
   type MintResult,
   type Prior,
 } from "@/lib/promo-codes";
 import { getPromoStripe, promoMode } from "@/lib/stripe-promo";
 import { getStripe } from "@/lib/stripe";
+import { ALPHABET } from "@/lib/ticket-code";
 import { getTicket, stripeMode } from "@/lib/tickets";
 
 // Each code is a Stripe promotion code pointing at a
@@ -226,6 +228,25 @@ type Probe =
   | { status: "reused"; promo: Stripe.PromotionCode; prior: Prior }
   | { status: "taken"; promo: Stripe.PromotionCode };
 
+const SLUG_LEN = 10; // chars after "COMP-"
+
+/**
+ * Human-typable code from a seed (email, else name), keyed so that knowing
+ * who a code is for doesn't reveal it. Stable per (seed, attempt), so a re-run
+ * reproduces the same walk: 0 is the primary code, 1… the fallbacks when the
+ * primary is already taken by a different identity.
+ */
+export function slugCode(secret: string, seed: string, attempt = 0): string {
+  const digest = createHmac("sha256", secret)
+    .update(`comp-code:${seed.trim().toLowerCase()}#${attempt}`)
+    .digest();
+  let slug = "";
+  for (let i = 0; i < SLUG_LEN; i++) {
+    slug += ALPHABET[digest[i] % ALPHABET.length];
+  }
+  return `COMP-${slug}`;
+}
+
 type Resolved = {
   email: string;
   name: string;
@@ -265,32 +286,58 @@ async function createOrReuse(
     if (!dup) throw err;
     const p = (await stripe.promotionCodes.list({ code, limit: 1 })).data[0];
     if (!p) throw err;
-    const want = identityOf({ email, name });
-    const owner = identityOf({
-      email: meta(p).email,
-      name: meta(p).name,
-    });
-    // Same guest → reuse. No identity on either side (an anonymous custom code)
-    // → reuse only if it's one of ours; never claim a stranger's code.
-    const mine = want ? owner === want : meta(p).source === PROMO_SOURCE;
-    if (!mine) return { status: "taken", promo: p };
-    const prior: Prior = {
-      name: meta(p).name ?? "",
-      email: meta(p).email ?? "",
-      purpose: meta(p).purpose ?? "",
-      created: p.created,
-      redeemed: p.times_redeemed ?? 0,
-    };
-    // A re-run is how a mis-filed code gets fixed: carry the new purpose/notes
-    // onto it (the stripe-webhook re-mirrors on promotion_code.updated).
-    const patch: Record<string, string> = {};
-    if (purpose !== (meta(p).purpose ?? "")) patch.purpose = purpose;
-    if (notes && notes !== (meta(p).notes ?? "")) patch.notes = notes;
-    const promo = Object.keys(patch).length
-      ? await stripe.promotionCodes.update(p.id, { metadata: patch })
-      : p;
-    return { status: "reused", promo, prior };
+    if (!isIssuedTo(p, { email, name })) return { status: "taken", promo: p };
+    return reuse(stripe, p, { purpose, notes });
   }
+}
+
+function isIssuedTo(
+  p: Stripe.PromotionCode,
+  who: { email: string; name: string },
+): boolean {
+  const want = identityOf(who);
+  const owner = identityOf({ email: meta(p).email, name: meta(p).name });
+  // Same guest → reuse. No identity on either side (an anonymous custom code)
+  // → reuse only if it's one of ours; never claim a stranger's code.
+  return want ? owner === want : meta(p).source === PROMO_SOURCE;
+}
+
+async function reuse(
+  stripe: Stripe,
+  p: Stripe.PromotionCode,
+  { purpose, notes }: Pick<Resolved, "purpose" | "notes">,
+): Promise<Probe> {
+  const prior: Prior = {
+    name: meta(p).name ?? "",
+    email: meta(p).email ?? "",
+    purpose: meta(p).purpose ?? "",
+    created: p.created,
+    redeemed: p.times_redeemed ?? 0,
+  };
+  // A re-run is how a mis-filed code gets fixed: carry the new purpose/notes
+  // onto it (the stripe-webhook re-mirrors on promotion_code.updated).
+  const patch: Record<string, string> = {};
+  if (purpose !== (meta(p).purpose ?? "")) patch.purpose = purpose;
+  if (notes && notes !== (meta(p).notes ?? "")) patch.notes = notes;
+  const promo = Object.keys(patch).length
+    ? await stripe.promotionCodes.update(p.id, { metadata: patch })
+    : p;
+  return { status: "reused", promo, prior };
+}
+
+/** A code this person already holds under the old scheme, walked the way it was minted. */
+async function legacyCodeFor(
+  stripe: Stripe,
+  seed: string,
+  resolved: Resolved,
+): Promise<Probe | null> {
+  for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
+    const code = legacySlugCode(seed, attempt);
+    const p = (await stripe.promotionCodes.list({ code, limit: 1 })).data[0];
+    if (!p) return null;
+    if (isIssuedTo(p, resolved)) return reuse(stripe, p, resolved);
+  }
+  return null;
 }
 
 export async function mintStripeCode(
@@ -341,9 +388,22 @@ export async function mintStripeCode(
     return result(r);
   }
 
+  // Always set wherever this is reachable: the callers gate on an account.
+  const secret = env.BETTER_AUTH_SECRET;
+  if (!secret)
+    throw new PromoError(
+      "BETTER_AUTH_SECRET isn't set, so no code can be generated — use a custom code.",
+      "config",
+    );
   const seed = seedOf({ email, name });
+  const issued = await legacyCodeFor(stripe, seed, resolved);
+  if (issued) return result(issued);
   for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
-    const r = await createOrReuse(stripe, slugCode(seed, attempt), resolved);
+    const r = await createOrReuse(
+      stripe,
+      slugCode(secret, seed, attempt),
+      resolved,
+    );
     if (r.status !== "taken") return result(r);
   }
   throw new PromoError(

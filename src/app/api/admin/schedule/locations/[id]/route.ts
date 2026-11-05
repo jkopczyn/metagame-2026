@@ -1,3 +1,4 @@
+import { can } from "@/lib/access";
 import {
   authorize,
   done,
@@ -28,6 +29,9 @@ export async function PATCH(request: Request, ctx: Ctx) {
     await upsertLocation({
       id,
       ...parsed.value,
+      displayOrder: (await can("schedule.rooms"))
+        ? parsed.value.displayOrder
+        : undefined,
       thumbnailUrl: current.thumbnailUrl,
       imageUrl: current.imageUrl,
     });

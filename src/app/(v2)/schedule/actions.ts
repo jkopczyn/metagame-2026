@@ -11,6 +11,7 @@ import {
 } from "@/lib/schedule";
 import {
   cancelRsvp,
+  constraintMessage,
   loadSessionRsvps,
   rsvp,
   setBookmark,
@@ -28,6 +29,10 @@ export type PlanResult = {
   needsTicket?: RsvpTicket["claimable"];
 };
 
+const FAILED = "That didn't save. Try again.";
+const NO_SUCH_SESSION = "No such session.";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** The signed-in user, if they may act on this session. */
 async function attendee(sessionId: string): Promise<string | PlanResult> {
   const session = await currentSession();
@@ -41,7 +46,7 @@ async function attendee(sessionId: string): Promise<string | PlanResult> {
       .from(schema.sessions)
       .where(eq(schema.sessions.id, sessionId))
       .limit(1);
-    if (row?.status !== "published") return { error: "No such session." };
+    if (row?.status !== "published") return { error: NO_SUCH_SESSION };
   }
   return u.id;
 }
@@ -50,12 +55,15 @@ async function act(
   sessionId: string,
   run: (userId: string) => Promise<PlanResult>,
 ): Promise<PlanResult> {
-  const who = await attendee(sessionId);
-  if (typeof who !== "string") return who;
+  if (!UUID.test(sessionId)) return { error: NO_SUCH_SESSION };
   try {
+    const who = await attendee(sessionId);
+    if (typeof who !== "string") return who;
     return await run(who);
   } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) };
+    // A driver message can carry SQL, so it's logged and never relayed.
+    console.error("[schedule] RSVP or bookmark failed:", err);
+    return { error: constraintMessage(err)?.error ?? FAILED };
   }
 }
 

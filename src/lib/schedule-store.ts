@@ -753,9 +753,11 @@ export async function removeSession(id: string): Promise<void> {
 
 export type LocationInput = Omit<
   ScheduleLocation,
-  "id" | "boardStartsAt" | "boardEndsAt"
+  "id" | "boardStartsAt" | "boardEndsAt" | "displayOrder"
 > & {
   id?: string;
+  /** Left out: an update keeps the room's place, an insert takes the default. */
+  displayOrder?: number;
   boardStartsAt: Date | null;
   boardEndsAt: Date | null;
 };

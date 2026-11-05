@@ -1,5 +1,5 @@
-// Shared half of the promo-code tool (/backstage/promo): the deterministic code
-// generator and the mint contract used by promo-codes-stripe.ts.
+// Shared half of the promo-code tool (/backstage/promo): the mint contract used
+// by promo-codes-stripe.ts.
 
 export const PURPOSES = [
   "Speaker",
@@ -84,26 +84,27 @@ export function normalizeUses(
   return Math.max(1, Math.floor(Number(maxUses) || 1));
 }
 
-export const SLUG_LEN = 5; // chars after "COMP-"
+const LEGACY_SLUG_LEN = 5; // chars after "COMP-"
 export const MAX_SLUG_ATTEMPTS = 10;
 
 /**
- * Deterministic, human-typable code from a seed (email, else name). Stable per
- * (seed, attempt) so a re-run reproduces the same walk → idempotent. `attempt`
- * salts the hash: 0 is the primary code, 1… the fallbacks when the primary is
- * already taken by a different identity.
+ * The unkeyed scheme codes were once minted with. Only kept to find a code
+ * already issued to someone, so a re-run returns it rather than a second one.
  */
-export function slugCode(seed: string, attempt = 0): string {
+export function legacySlugCode(seed: string, attempt = 0): string {
   const base = seed.trim().toLowerCase() + (attempt ? `#${attempt}` : "");
   let h = 0;
   for (let i = 0; i < base.length; i++) h = (h * 31 + base.charCodeAt(i)) >>> 0;
   return (
     "COMP-" +
-    (h % 36 ** SLUG_LEN).toString(36).toUpperCase().padStart(SLUG_LEN, "0")
+    (h % 36 ** LEGACY_SLUG_LEN)
+      .toString(36)
+      .toUpperCase()
+      .padStart(LEGACY_SLUG_LEN, "0")
   );
 }
 
-/** The identity a code was issued to — the same string slugCode() hashes. */
+/** The identity a code was issued to. */
 export const identityOf = ({
   email,
   name,

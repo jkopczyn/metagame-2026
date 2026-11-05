@@ -5,12 +5,19 @@ import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
+  API_KEY_HEADER,
+  codeDelivered,
   currentSession,
   getAuth,
   hasPassword,
   replacePassword,
 } from "@/lib/auth";
 import { getDb, schema } from "@/db";
+import {
+  beginLoginAttempt,
+  clientIp,
+  MAX_EMAIL_LENGTH,
+} from "@/lib/login-throttle";
 import { safeNextPath } from "@/lib/next-path";
 
 // Email first, then whatever that address calls for:
@@ -29,6 +36,7 @@ export type AuthState = {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FRESH_SESSION_MS = 10 * 60 * 1000;
+const SERVER_ERROR = "Something went wrong on our side. Try again in a minute.";
 
 const apiCode = (e: unknown) =>
   e instanceof APIError ? e.body?.code : undefined;
@@ -47,13 +55,17 @@ async function lookup(
 }
 
 async function sendCode(email: string): Promise<string | undefined> {
+  const failed = "We couldn't send the email. Try again in a minute.";
   try {
-    await getAuth().api.sendVerificationOTP({
-      body: { email, type: "sign-in" },
-    });
+    const delivered = await codeDelivered(() =>
+      getAuth().api.sendVerificationOTP({
+        body: { email, type: "sign-in" },
+      }),
+    );
+    if (!delivered) return failed;
   } catch (e) {
     console.error("[auth] sending code failed", e);
-    return "We couldn't send the email. Try again in a minute.";
+    return failed;
   }
 }
 
@@ -78,10 +90,13 @@ export async function authenticate(
 
   if (intent === "set-password") {
     const session = await currentSession();
+    const requestHeaders = await headers();
     // Only a session minted just now (by the code above, or a password) may
     // replace a password without the old one; a stolen older session can't.
+    // An API key's stand-in session always reads as new, so it never counts.
     const fresh =
       session &&
+      !requestHeaders.has(API_KEY_HEADER) &&
       Date.now() - new Date(session.session.createdAt).getTime() <
         FRESH_SESSION_MS;
     if (!session || !fresh) {
@@ -103,7 +118,6 @@ export async function authenticate(
     if (newPassword !== String(formData.get("confirm") ?? "")) {
       return fail("The passwords don't match.");
     }
-    const requestHeaders = await headers();
     if (replacing) {
       await replacePassword(session.user.id, newPassword);
       await getAuth().api.revokeOtherSessions({ headers: requestHeaders });
@@ -116,7 +130,7 @@ export async function authenticate(
     redirect(next);
   }
 
-  if (!EMAIL_RE.test(email)) {
+  if (email.length > MAX_EMAIL_LENGTH || !EMAIL_RE.test(email)) {
     return { step: "email", email, error: "Enter a valid email address." };
   }
 
@@ -137,13 +151,28 @@ export async function authenticate(
     const password = String(formData.get("password") ?? "");
     if (!password)
       return { step: "password", email, error: "Enter your password." };
+    const requestHeaders = await headers();
+    const attempt = await beginLoginAttempt(
+      "password",
+      email,
+      clientIp(requestHeaders),
+    );
+    if (!attempt) {
+      return {
+        step: "password",
+        email,
+        error:
+          "Too many tries. Email yourself a code instead, or try again in a few minutes.",
+      };
+    }
     try {
       await getAuth().api.signInEmail({
         body: { email, password },
-        headers: await headers(),
+        headers: requestHeaders,
       });
     } catch (e) {
       if (apiCode(e) === "EMAIL_NOT_VERIFIED") {
+        await attempt.release();
         // Nobody has proved they own this address yet, so its password can't
         // be trusted. Signing in by code also clears that password.
         return toCodeStep(
@@ -151,12 +180,18 @@ export async function authenticate(
           "This address hasn't been verified yet, so we emailed you a code instead.",
         );
       }
+      if (apiCode(e) !== "INVALID_EMAIL_OR_PASSWORD") {
+        console.error("[auth] password sign-in failed", e);
+        await attempt.release();
+        return { step: "password", email, error: SERVER_ERROR };
+      }
       return {
         step: "password",
         email,
         error: "That password didn't match. Forgot it? Email yourself a code.",
       };
     }
+    await attempt.succeeded();
     redirect(next);
   }
 
@@ -165,24 +200,51 @@ export async function authenticate(
     if (otp.length !== 6) {
       return { step: "code", email, error: "Enter the 6-digit code." };
     }
+    const requestHeaders = await headers();
+    const attempt = await beginLoginAttempt(
+      "code",
+      email,
+      clientIp(requestHeaders),
+    );
+    if (!attempt) {
+      return {
+        step: "code",
+        email,
+        error: "Too many tries. Wait a few minutes, then try again.",
+      };
+    }
     let userId: string;
     try {
       // Creates the account when the address is new.
       const result = await getAuth().api.signInEmailOTP({
         body: { email, otp },
-        headers: await headers(),
+        headers: requestHeaders,
       });
       userId = result.user.id;
     } catch (e) {
       const code = apiCode(e);
-      const error =
-        code === "OTP_EXPIRED"
-          ? "That code expired. Send a new one."
-          : code === "TOO_MANY_ATTEMPTS"
-            ? "Too many tries. Send a new code."
-            : "That code didn't match.";
-      return { step: "code", email, error };
+      if (code === "OTP_EXPIRED") {
+        return {
+          step: "code",
+          email,
+          error: "That code expired. Send a new one.",
+        };
+      }
+      if (code === "TOO_MANY_ATTEMPTS") {
+        return {
+          step: "code",
+          email,
+          error: "Too many tries. Send a new code.",
+        };
+      }
+      if (code === "INVALID_OTP") {
+        return { step: "code", email, error: "That code didn't match." };
+      }
+      console.error("[auth] code sign-in failed", e);
+      await attempt.release();
+      return { step: "code", email, error: SERVER_ERROR };
     }
+    await attempt.succeeded();
     // Signed in. Offer a password: a first one for new and password-less
     // accounts, a replacement where a code was the way past a forgotten one.
     return {

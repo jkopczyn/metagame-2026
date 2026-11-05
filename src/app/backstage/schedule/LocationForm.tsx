@@ -224,16 +224,7 @@ export default function LocationForm({
           }}
           className="grid gap-4"
         >
-          {location && (
-            <>
-              <input type="hidden" name="id" value={location.id} />
-              <input
-                type="hidden"
-                name="displayOrder"
-                value={location.displayOrder}
-              />
-            </>
-          )}
+          {location && <input type="hidden" name="id" value={location.id} />}
 
           <Field label="Name" name="name" state={state}>
             <input

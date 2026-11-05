@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { apiKey } from "@better-auth/api-key";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -8,7 +9,8 @@ import { headers } from "next/headers";
 import { cache } from "react";
 import { getDb, schema, type Db } from "@/db";
 import { env } from "@/env";
-import { sendSignInCodeEmail } from "@/lib/email";
+import { sendSignInCodeEmail, type SignInCodeEmail } from "@/lib/email";
+import { reportError } from "@/lib/error-report";
 
 export const API_KEY_HEADER = "x-api-key";
 
@@ -50,10 +52,8 @@ function createAuth() {
     },
     plugins: [
       emailOTP({
-        sendVerificationOTP: async ({ email, otp, type }) => {
-          if (await sentRecently(db, email, otp)) return;
-          await sendSignInCodeEmail({ to: email, code: otp, type });
-        },
+        sendVerificationOTP: ({ email, otp, type }) =>
+          deliverCode(db, { to: email, code: otp, type }),
         // Resends extend the same code rather than minting a new one, so a
         // send skipped by the cooldown leaves the person with a working code.
         resendStrategy: "reuse",
@@ -73,6 +73,66 @@ function createAuth() {
       nextCookies(),
     ],
   });
+}
+
+// Better Auth catches and logs whatever sendVerificationOTP throws and answers
+// success, so a failure reaches the caller this way instead.
+const codeSend = new AsyncLocalStorage<{ failed: boolean }>();
+
+/** Runs an auth.api call that emails a code. False when the email didn't go out. */
+export async function codeDelivered(
+  request: () => Promise<unknown>,
+): Promise<boolean> {
+  const outcome = { failed: false };
+  await codeSend.run(outcome, request);
+  return !outcome.failed;
+}
+
+export async function deliverCode(db: Db, message: SignInCodeEmail) {
+  try {
+    if (await sentRecently(db, message.to, message.code)) return;
+    await sendSignInCodeEmail(message);
+  } catch (thrown) {
+    const error = withoutCode(thrown, message.code);
+    const outcome = codeSend.getStore();
+    if (outcome) outcome.failed = true;
+    console.error("[auth] sending code failed", error);
+    await clearSendCooldown(db, message.to).catch((e) =>
+      console.error("[auth] clearing the send cooldown failed", e),
+    );
+    await reportError({
+      source: "Sign-in email",
+      summary: "A sign-in code couldn't be emailed; they were asked to retry.",
+      details: { Email: message.to },
+      error,
+    });
+  }
+}
+
+/**
+ * A copy of a failure that's safe to log and alert on. The code is still valid
+ * at this point, and Drizzle puts a failed query's parameters in the message.
+ */
+function withoutCode(thrown: unknown, code: string): Error {
+  const scrub = (text: string) =>
+    text.replace(/\nparams: [\s\S]*/, "").replaceAll(code, "[code]");
+  const messages: string[] = [];
+  for (
+    let e = thrown;
+    e != null;
+    e = e instanceof Error ? e.cause : undefined
+  ) {
+    messages.push(scrub(e instanceof Error ? e.message : String(e)));
+  }
+  const safe = new Error(messages.join("\nCaused by: "));
+  if (thrown instanceof Error) {
+    safe.name = thrown.name;
+    const frames = (thrown.stack ?? "")
+      .split("\n")
+      .filter((line) => line.trim().startsWith("at "));
+    safe.stack = scrub([`${safe.name}: ${safe.message}`, ...frames].join("\n"));
+  }
+  return safe;
 }
 
 const SEND_COOLDOWN_MS = 30 * 1000;
@@ -101,6 +161,14 @@ async function sentRecently(db: Db, email: string, otp: string) {
     expiresAt: new Date(now.getTime() + SEND_COOLDOWN_MS),
   });
   return false;
+}
+
+/** Lets a retry send at once when the send this cooldown was written for failed. */
+async function clearSendCooldown(db: Db, email: string) {
+  const { verification } = schema;
+  await db
+    .delete(verification)
+    .where(eq(verification.identifier, `code-sent:${email}`));
 }
 
 export type Auth = ReturnType<typeof createAuth>;

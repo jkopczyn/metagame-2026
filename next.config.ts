@@ -44,6 +44,13 @@ const nextConfig: NextConfig = {
   // images change.
   headers: async () => [
     {
+      source: "/:path*",
+      headers: [
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      ],
+    },
+    {
       source: "/images/puzzle/:path*",
       headers: [
         { key: "Cache-Control", value: "public, max-age=31536000, immutable" },

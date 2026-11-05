@@ -17,6 +17,14 @@ export function getResend(): Resend | null {
   return cached;
 }
 
+export const escapeHtml = (s: string) =>
+  s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 export const FROM = "Metagame 2026 <tickets@metagame.games>";
 const NO_REPLY = "Metagame 2026 <no-reply@metagame.games>";
 const TEAM = "team@metagame.games";
@@ -103,20 +111,8 @@ export function renderTicketConfirmationEmail(
   }`;
 
   const subject = `${test ? "TEST: " : ""}Metagame 2026 ${groupTickets ? "Family & Friends Pack" : "Ticket"}`;
-  const escape = (value: string) =>
-    value.replace(
-      /[&<>"']/g,
-      (c) =>
-        ({
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-          "'": "&#39;",
-        })[c]!,
-    );
   const groupHtml = groupTickets
-    ? `<p>Your pack includes ${groupTickets.length} separate weekend admissions. We've also emailed each attendee their own code. For attendee changes or refund requests, reply to this email.</p><ul>${groupTickets.map((t) => `<li>${escape(t.name)} (${escape(t.email)}): <strong>${formatTicketCode(t.code)}</strong></li>`).join("")}</ul>`
+    ? `<p>Your pack includes ${groupTickets.length} separate weekend admissions. We've also emailed each attendee their own code. For attendee changes or refund requests, reply to this email.</p><ul>${groupTickets.map((t) => `<li>${escapeHtml(t.name)} (${escapeHtml(t.email)}): <strong>${formatTicketCode(t.code)}</strong></li>`).join("")}</ul>`
     : "";
   const groupText = groupTickets
     ? `Your pack includes ${groupTickets.length} separate weekend admissions. We've also emailed each attendee their own code. For attendee changes or refund requests, reply to this email.\n${groupTickets.map((t) => `${t.name} (${t.email}): ${formatTicketCode(t.code)}`).join("\n")}`
@@ -147,7 +143,7 @@ export function renderTicketConfirmationEmail(
 
         <h1 style="color: #333; text-align: center;">Ready to play.</h1>
 
-        <p>Hi ${purchaserName || "there"},</p>
+        <p>Hi ${purchaserName ? escapeHtml(purchaserName) : "there"},</p>
 
         <p>Your Metagame 2026 ticket is confirmed. We're excited to see you there!</p>
 
@@ -155,19 +151,19 @@ export function renderTicketConfirmationEmail(
 
         <p>Have questions? Check out our <a href="${SITE}/#faq">FAQ</a>. More questions? Reply to this email.</p>
 
-        ${mailingListOptOutUrl ? `<p>We've also added you to the Metagame mailing list for news about this and future events &mdash; <a href="${mailingListOptOutUrl}">opt out here</a> if you'd rather not get those.</p>` : ""}
+        ${mailingListOptOutUrl ? `<p>We've also added you to the Metagame mailing list for news about this and future events &mdash; <a href="${escapeHtml(mailingListOptOutUrl)}">opt out here</a> if you'd rather not get those.</p>` : ""}
 
         <p>See you at Metagame 2026!</p>
 
         <div style="background-color: #f5f5f5; border: 1px solid #ddd; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h2 style="margin-top: 0;">Ticket Details</h2>
-          <p><strong>Name:</strong> ${purchaserName || "—"}</p>
-          <p><strong>Email:</strong> ${to}</p>
-          <p><strong>Type:</strong> ${tierLabel}</p>
+          <p><strong>Name:</strong> ${purchaserName ? escapeHtml(purchaserName) : "—"}</p>
+          <p><strong>Email:</strong> ${escapeHtml(to)}</p>
+          <p><strong>Type:</strong> ${escapeHtml(tierLabel)}</p>
           ${groupHtml}
           ${ticketCode ? `<p><strong>Ticket code:</strong> <span style="font-family: monospace; font-size: 15px;">${formatTicketCode(ticketCode)}</span></p>` : ""}
-          <p><strong>Amount Paid:</strong> ${discounted ? `<span style="text-decoration: line-through; color: #999;">${full}</span> ` : ""}${paid}${discountCode && discounted ? ` (<strong>${discountCode}</strong>)` : ""}</p>
-          ${receiptUrl ? `<p><a href="${receiptUrl}">View your receipt</a></p>` : ""}
+          <p><strong>Amount Paid:</strong> ${discounted ? `<span style="text-decoration: line-through; color: #999;">${full}</span> ` : ""}${paid}${discountCode && discounted ? ` (<strong>${escapeHtml(discountCode)}</strong>)` : ""}</p>
+          ${receiptUrl ? `<p><a href="${escapeHtml(receiptUrl)}">View your receipt</a></p>` : ""}
         </div>
 
         <div style="background-color: #f9fafb; border: 1px solid #ddd; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -268,16 +264,9 @@ export async function sendAdminErrorEmail(errorMessage: string) {
     from: FROM,
     to: [TEAM],
     subject: "**URGENT** METAGAME Admin Error",
-    html: `<p>An error occurred: ${errorMessage}</p>`,
+    html: `<p style="white-space: pre-wrap;">An error occurred: ${escapeHtml(errorMessage)}</p>`,
   });
 }
-
-export const escapeHtml = (s: string) =>
-  s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 
 export type ContactMessage = {
   /** Recipient — the caller has already checked it against the allowed set. */
@@ -456,7 +445,7 @@ export async function sendAccountInviteEmail({
         <div style="text-align: center; margin: 24px 0;">
           <img src="${SITE}/images/dice_logo.png" alt="METAGAME" width="240" style="max-width: 100%; height: auto;" />
         </div>
-        <p>Hi ${name},</p>
+        <p>Hi ${escapeHtml(name)},</p>
         <p>An account has been set up for you on metagame.games under this email address.</p>
         <p>To use it, <a href="${login}">sign in here</a>: you'll get a code by email, and can set up a password after.</p>
         <p style="font-size: 12px; color: #aaa; font-style: italic;">This is not a puzzle.</p>
