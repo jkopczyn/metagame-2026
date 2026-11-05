@@ -18,6 +18,8 @@ describe("parseBoardParams", () => {
       done: null,
       levelUp: null,
       recent: RECENT_STEP,
+      range: null,
+      bucket: null,
     });
   });
 
@@ -62,6 +64,13 @@ describe("parseBoardParams", () => {
     expect(parseBoardParams({ recent: "lots" }).recent).toBe(RECENT_STEP);
     expect(parseBoardParams({ recent: "100000" }).recent).toBe(RECENT_MAX);
   });
+
+  it("passes the chart's range and bucket through as given", () => {
+    expect(parseBoardParams({ range: "con", bucket: "1h" })).toMatchObject({
+      range: "con",
+      bucket: "1h",
+    });
+  });
 });
 
 describe("boardHref", () => {
@@ -77,9 +86,11 @@ describe("boardHref", () => {
         done: [C, D],
         levelUp: "u2",
         recent: 60,
+        range: "con",
+        bucket: "1h",
       }),
     ).toBe(
-      `${BOARD}?quest=A2C4EF&players=u1%2Cu2&done=${C}%2C${D}&levelup=u2&recent=60`,
+      `${BOARD}?quest=A2C4EF&players=u1%2Cu2&done=${C}%2C${D}&levelup=u2&recent=60&range=con&bucket=1h`,
     );
     expect(boardHref({ quest: "A2C4EF", done: [] })).toBe(
       `${BOARD}?quest=A2C4EF&done=`,

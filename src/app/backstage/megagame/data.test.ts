@@ -9,6 +9,8 @@ const { store, tickets } = vi.hoisted(() => ({
     recentCompletions: vi.fn(),
     recentLevelUps: vi.fn(),
     recentVoids: vi.fn(),
+    completionSeries: vi.fn(),
+    levelEventSeries: vi.fn(),
     completionsInClass: vi.fn(),
   },
   tickets: { claimedCounts: vi.fn() },
@@ -16,9 +18,12 @@ const { store, tickets } = vi.hoisted(() => ({
 vi.mock("@/lib/megagame-store", () => store);
 vi.mock("@/lib/ticket-store", () => tickets);
 
+import { parseBoardParams } from "./board-params";
+import { overTimeView } from "./over-time/view";
 import {
   loadCompletionResult,
   loadLevelUpTarget,
+  loadOverTime,
   loadPlayerRows,
   loadQuest,
   loadRecentActions,
@@ -216,6 +221,32 @@ describe("loadRecentActions", () => {
     const exact = await loadRecentActions(2, { userId: "v1", manager: false });
     expect(exact.actions).toHaveLength(2);
     expect(exact.more).toBe(false);
+  });
+});
+
+describe("loadOverTime", () => {
+  it("queries the series over the chosen range, with day buckets from Pacific midnight", async () => {
+    store.completionSeries.mockResolvedValue([]);
+    store.levelEventSeries.mockResolvedValue([]);
+    const view = overTimeView(
+      parseBoardParams({ range: "con", bucket: "1d" }),
+      new Date("2026-11-01T18:00:00.000Z"),
+    );
+    const rows = await loadOverTime(view);
+    const from = new Date("2026-11-06T08:00:00.000Z");
+    const to = new Date("2026-11-09T08:00:00.000Z");
+    expect(store.completionSeries).toHaveBeenCalledWith("1d", from, to);
+    expect(store.levelEventSeries).toHaveBeenCalledWith("1d", from, to);
+    expect(rows).toHaveLength(3);
+  });
+
+  it("skips the queries when the range has too many buckets", async () => {
+    const view = overTimeView(
+      parseBoardParams({ range: "con", bucket: "5m" }),
+      new Date("2026-11-07T18:00:00.000Z"),
+    );
+    expect(await loadOverTime(view)).toEqual([]);
+    expect(store.completionSeries).not.toHaveBeenCalled();
   });
 });
 
