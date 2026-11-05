@@ -97,13 +97,19 @@ describe("parseSchedule", () => {
     );
   });
 
-  it("rejects overlapping and out-of-order shifts", () => {
+  it("rejects overlapping, gapped and out-of-order shifts", () => {
     expect(() =>
       parsed(
         shift("10:00", "11:00", ["wizard"]),
         shift("10:30", "12:00", ["crown"]),
       ),
     ).toThrow(ScheduleParseError);
+    expect(() =>
+      parsed(
+        shift("10:00", "11:00", ["wizard"]),
+        shift("11:30", "12:00", ["crown"]),
+      ),
+    ).toThrow(/contiguous/);
     expect(() =>
       parsed(
         shift("12:00", "13:00", ["wizard"]),
@@ -158,17 +164,16 @@ describe("currentShift and nextShift", () => {
   const schedule = parsed(
     shift("10:00", "11:00", ["wizard"]),
     shift("11:00", "12:00", ["crown"]),
-    shift("13:00", "14:00", ["fuzzy"]),
+    shift("12:00", "13:00", ["fuzzy"]),
   );
 
   it("finds the shift containing now", () => {
     expect(currentShift(schedule, at("10:30"))?.hats).toEqual(["wizard"]);
   });
 
-  it("returns null in a gap, before the first shift, and after the last", () => {
-    expect(currentShift(schedule, at("12:30"))).toBeNull();
+  it("returns null before the first shift and after the last", () => {
     expect(currentShift(schedule, at("09:00"))).toBeNull();
-    expect(currentShift(schedule, at("14:30"))).toBeNull();
+    expect(currentShift(schedule, at("13:30"))).toBeNull();
   });
 
   it("counts a shift's exact start as current", () => {
@@ -179,15 +184,15 @@ describe("currentShift and nextShift", () => {
     expect(currentShift(schedule, at("11:00"))?.hats).toEqual(["crown"]);
   });
 
-  it("returns null at an exact end followed by a gap", () => {
-    expect(currentShift(schedule, at("12:00"))).toBeNull();
+  it("returns null at the last end", () => {
+    expect(currentShift(schedule, at("13:00"))).toBeNull();
   });
 
   it("finds the first shift starting at or after now", () => {
     expect(nextShift(schedule, at("09:00"))?.hats).toEqual(["wizard"]);
-    expect(nextShift(schedule, at("12:30"))?.hats).toEqual(["fuzzy"]);
-    expect(nextShift(schedule, at("13:00"))?.hats).toEqual(["fuzzy"]);
-    expect(nextShift(schedule, at("14:00"))).toBeNull();
+    expect(nextShift(schedule, at("11:30"))?.hats).toEqual(["fuzzy"]);
+    expect(nextShift(schedule, at("12:00"))?.hats).toEqual(["fuzzy"]);
+    expect(nextShift(schedule, at("12:30"))).toBeNull();
   });
 });
 
@@ -196,30 +201,17 @@ describe("shiftState", () => {
     shift("10:00", "11:00", ["wizard"]),
     shift("11:00", "12:00", ["crown"]),
   );
-  const withGap = parsed(
-    shift("10:00", "11:00", ["wizard"]),
-    shift("13:00", "14:00", ["crown"]),
-  );
-
   it("is unposted for an empty schedule", () => {
     expect(shiftState([], at("10:30"))).toEqual({ kind: "unposted" });
   });
 
-  it("is on with the next shift back to back", () => {
+  it("is on with the next shift's end", () => {
     expect(shiftState(backToBack, at("10:30"))).toEqual({
       kind: "on",
       hats: ["wizard"],
       endsAt: at("11:00"),
-      next: { startsAt: at("11:00"), endsAt: at("12:00") },
+      nextEndsAt: at("12:00"),
     });
-  });
-
-  it("is on with the next shift after a gap", () => {
-    const state = shiftState(withGap, at("10:30"));
-    expect(state.kind).toBe("on");
-    if (state.kind !== "on") return;
-    expect(state.next).toEqual({ startsAt: at("13:00"), endsAt: at("14:00") });
-    expect(state.next?.startsAt.getTime()).not.toBe(state.endsAt.getTime());
   });
 
   it("is on with no next shift in the last shift", () => {
@@ -228,24 +220,20 @@ describe("shiftState", () => {
       kind: "on",
       hats: ["crown"],
       endsAt: at("12:00"),
-      next: null,
+      nextEndsAt: null,
     });
   });
 
-  it("is off before the first shift and in a gap", () => {
-    expect(shiftState(withGap, at("09:00"))).toEqual({
+  it("is off before the first shift", () => {
+    expect(shiftState(backToBack, at("09:00"))).toEqual({
       kind: "off",
       nextStartsAt: at("10:00"),
-    });
-    expect(shiftState(withGap, at("12:00"))).toEqual({
-      kind: "off",
-      nextStartsAt: at("13:00"),
     });
   });
 
   it("is done at and after the last end", () => {
-    expect(shiftState(withGap, at("14:00"))).toEqual({ kind: "done" });
-    expect(shiftState(withGap, at("20:00"))).toEqual({ kind: "done" });
+    expect(shiftState(backToBack, at("12:00"))).toEqual({ kind: "done" });
+    expect(shiftState(backToBack, at("20:00"))).toEqual({ kind: "done" });
   });
 });
 
@@ -253,20 +241,13 @@ describe("shiftChangesBetween", () => {
   const schedule = parsed(
     shift("10:00", "11:00", ["wizard"]),
     shift("11:00", "12:00", ["crown"]),
-    shift("13:00", "14:00", ["fuzzy"]),
+    shift("12:00", "13:00", ["fuzzy"]),
   );
 
   it("counts a shared instant between back-to-back shifts once", () => {
     expect(
       shiftChangesBetween(schedule, at("10:30"), at("11:30")),
     ).toHaveLength(1);
-  });
-
-  it("reports both the end and the next start around a gap", () => {
-    expect(shiftChangesBetween(schedule, at("11:30"), at("13:30"))).toEqual([
-      at("12:00"),
-      at("13:00"),
-    ]);
   });
 
   it("excludes from and includes to by default", () => {
@@ -307,28 +288,28 @@ describe("the decoy weekend", () => {
     expect(schedule).toHaveLength(23);
   });
 
-  it("has 26 shift changes across the weekend", () => {
+  it("has 24 shift changes across the weekend", () => {
     expect(
       shiftChangesBetween(
         schedule,
         pacific("2020-01-03T13:00:00"),
         pacific("2020-01-05T13:00:00"),
       ),
-    ).toHaveLength(26);
+    ).toHaveLength(24);
   });
 
-  it("is on the overnight shift at Sat 03:00, with a gap before the next", () => {
+  it("is on the overnight shift at Sat 03:00", () => {
     const state = shiftState(schedule, pacific("2020-01-04T03:00:00"));
     expect(state.kind).toBe("on");
     if (state.kind !== "on") return;
-    expect(state.endsAt).toEqual(pacific("2020-01-04T04:00:00"));
-    expect(state.next?.startsAt).toEqual(pacific("2020-01-04T08:00:00"));
+    expect(state.endsAt).toEqual(pacific("2020-01-04T08:00:00"));
+    expect(state.nextEndsAt).toEqual(pacific("2020-01-04T10:00:00"));
   });
 
-  it("is off in the Saturday morning gap", () => {
-    expect(shiftState(schedule, pacific("2020-01-04T05:00:00"))).toEqual({
+  it("is off before the first shift on Friday", () => {
+    expect(shiftState(schedule, pacific("2020-01-03T13:00:00"))).toEqual({
       kind: "off",
-      nextStartsAt: pacific("2020-01-04T08:00:00"),
+      nextStartsAt: pacific("2020-01-03T14:00:00"),
     });
   });
 
@@ -336,7 +317,7 @@ describe("the decoy weekend", () => {
     const state = shiftState(schedule, pacific("2020-01-05T12:50:00"));
     expect(state.kind).toBe("on");
     if (state.kind !== "on") return;
-    expect(state.next).toBeNull();
+    expect(state.nextEndsAt).toBeNull();
     expect(shiftState(schedule, pacific("2020-01-05T13:00:00"))).toEqual({
       kind: "done",
     });
