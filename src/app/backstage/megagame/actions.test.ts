@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { auth, store, nav } = vi.hoisted(() => ({
+const { auth, store, blob, nav } = vi.hoisted(() => ({
   auth: {
     EXPIRED: "Your session expired. Reload.",
     requireAccess: vi.fn(),
@@ -12,6 +12,15 @@ const { auth, store, nav } = vi.hoisted(() => ({
     confirmCompletions: vi.fn(),
     completionsByIds: vi.fn(),
     undoCompletions: vi.fn(),
+    playersByIds: vi.fn(),
+    completionsInClass: vi.fn(),
+    findLevelEvent: vi.fn(),
+    recordLevelUp: vi.fn(),
+    voidLevelEvent: vi.fn(),
+  },
+  blob: {
+    LARGE_IMAGE_MAX_BYTES: 900 * 1024,
+    uploadImage: vi.fn(),
   },
   nav: {
     redirect: vi.fn((to: string) => {
@@ -21,14 +30,17 @@ const { auth, store, nav } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/admin-auth", () => auth);
 vi.mock("@/lib/megagame-store", () => store);
+vi.mock("@/lib/blob", () => blob);
 vi.mock("next/navigation", () => nav);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import {
   confirmCompletions,
   findPlayers,
+  levelUp,
   lookupPlayer,
   undoCompletions,
+  undoLevelUp,
 } from "./actions";
 
 const ME = { name: "Vol", userId: "v1" };
@@ -77,6 +89,15 @@ describe("gating", () => {
       ),
     ).toEqual({ error: auth.EXPIRED });
     expect(await undoCompletions({}, form({ id: ID }))).toEqual({
+      error: auth.EXPIRED,
+    });
+    expect(
+      await levelUp(
+        {},
+        form({ id: ID, userId: "u1", class: "wizard", level: "2" }),
+      ),
+    ).toEqual({ error: auth.EXPIRED });
+    expect(await undoLevelUp({}, form({ id: ID }))).toEqual({
       error: auth.EXPIRED,
     });
     for (const fn of Object.values(store)) expect(fn).not.toHaveBeenCalled();
@@ -174,6 +195,19 @@ describe("confirmCompletions", () => {
     );
   });
 
+  it("keeps the level-up and recent choices on the board", async () => {
+    store.confirmCompletions.mockResolvedValue(ok([ID]));
+    await expect(
+      submit(
+        ["u1"],
+        "u1",
+        "quest=ZZZZZZ&players=u9&done=old&levelup=u2&recent=60",
+      ),
+    ).rejects.toThrow(
+      `REDIRECT /backstage/megagame?quest=A2C4EF&players=u1&done=${ID}&levelup=u2&recent=60`,
+    );
+  });
+
   it("records as the signed-in volunteer and puts the recorded row ids in the URL", async () => {
     store.confirmCompletions.mockResolvedValue(ok([ID, ID2]));
     await expect(submit(["u1", "u2"])).rejects.toThrow(
@@ -257,5 +291,153 @@ describe("undoCompletions", () => {
     );
     expect(store.completionsByIds).toHaveBeenCalledTimes(1);
     expect(store.undoCompletions).not.toHaveBeenCalled();
+  });
+});
+
+describe("levelUp", () => {
+  const submit = (extra: Record<string, string | File> = {}) =>
+    levelUp(
+      {},
+      form({ id: ID, userId: "u1", class: "wizard", level: "2", ...extra }),
+    );
+
+  beforeEach(() => {
+    store.findLevelEvent.mockResolvedValue(null);
+    store.playersByIds.mockResolvedValue([ada]);
+    store.completionsInClass.mockResolvedValue(0);
+    store.recordLevelUp.mockResolvedValue({ status: "awarded" });
+  });
+
+  it("records a level that passes every check", async () => {
+    expect(await submit()).toEqual({
+      awarded: { eventId: ID, class: "wizard", level: 2 },
+    });
+    expect(store.recordLevelUp).toHaveBeenCalledWith({
+      id: ID,
+      userId: "u1",
+      class: "wizard",
+      level: 2,
+      awardedBy: "v1",
+      checksPassed: true,
+      overrideReason: null,
+      cardPhotoUrl: null,
+      note: null,
+    });
+  });
+
+  it("refuses a level that is not above the current one, even when sure", async () => {
+    expect(await submit({ level: "1", sure: "on" })).toEqual({
+      error: "Already a level 1 wizard; a new level must be higher.",
+    });
+    expect(store.recordLevelUp).not.toHaveBeenCalled();
+  });
+
+  it("refuses a level above the maximum", async () => {
+    expect((await submit({ level: "6", sure: "on" })).error).toBe(
+      "Level 6 is above the maximum of 5.",
+    );
+  });
+
+  it("asks for Yes, I'm sure when a check fails, and writes nothing", async () => {
+    expect(await submit({ level: "3" })).toEqual({
+      warnings: ["Skips level 2."],
+    });
+    expect(store.recordLevelUp).not.toHaveBeenCalled();
+  });
+
+  it("records anyway when sure, with the override reason", async () => {
+    await submit({ level: "3", sure: "on", reason: "Card game win" });
+    expect(store.recordLevelUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 3,
+        checksPassed: false,
+        overrideReason: "Card game win",
+      }),
+    );
+  });
+
+  it("uploads an optional record-card photo", async () => {
+    blob.uploadImage.mockResolvedValue("https://b.test/card.webp");
+    const photo = new File(["x"], "card.webp", { type: "image/webp" });
+    await submit({ photo });
+    expect(blob.uploadImage).toHaveBeenCalledWith(
+      "megagame-cards",
+      photo,
+      blob.LARGE_IMAGE_MAX_BYTES,
+    );
+    expect(store.recordLevelUp).toHaveBeenCalledWith(
+      expect.objectContaining({ cardPhotoUrl: "https://b.test/card.webp" }),
+    );
+  });
+
+  it("ignores an empty file input", async () => {
+    await submit({
+      photo: new File([], "", { type: "application/octet-stream" }),
+    });
+    expect(blob.uploadImage).not.toHaveBeenCalled();
+  });
+
+  it("passes a retry of a recorded event straight to the store, skipping the checks", async () => {
+    store.findLevelEvent.mockResolvedValue({ id: ID });
+    store.playersByIds.mockResolvedValue([
+      { ...ada, levels: { wizard: 2, pirate: 0, alien: 0 } },
+    ]);
+    store.recordLevelUp.mockResolvedValue({ status: "retry" });
+    expect(await submit()).toEqual({
+      awarded: { eventId: ID, class: "wizard", level: 2 },
+    });
+  });
+
+  it("does not upload the photo again on a retry", async () => {
+    store.findLevelEvent.mockResolvedValue({ id: ID });
+    store.recordLevelUp.mockResolvedValue({ status: "retry" });
+    await submit({
+      photo: new File(["x"], "card.webp", { type: "image/webp" }),
+    });
+    expect(blob.uploadImage).not.toHaveBeenCalled();
+    expect(store.recordLevelUp).toHaveBeenCalledWith(
+      expect.objectContaining({ cardPhotoUrl: null }),
+    );
+  });
+
+  it("refuses an unknown player", async () => {
+    store.playersByIds.mockResolvedValue([]);
+    expect((await submit()).error).toMatch(/no such player/i);
+    expect(store.recordLevelUp).not.toHaveBeenCalled();
+  });
+
+  it("explains a level another volunteer already recorded", async () => {
+    store.recordLevelUp.mockResolvedValue({ status: "already-awarded" });
+    expect((await submit()).error).toMatch(/already recorded/);
+  });
+});
+
+describe("undoLevelUp", () => {
+  it("lets the awarding volunteer undo their level-up", async () => {
+    store.findLevelEvent.mockResolvedValue({ id: ID, awardedBy: "v1" });
+    store.voidLevelEvent.mockResolvedValue({ status: "voided", level: 1 });
+    expect(await undoLevelUp({}, form({ id: ID }))).toEqual({ done: true });
+    expect(store.voidLevelEvent).toHaveBeenCalledWith({
+      id: ID,
+      voidedBy: "v1",
+      reason: null,
+    });
+  });
+
+  it("refuses another volunteer's level-up without megagame.manage", async () => {
+    store.findLevelEvent.mockResolvedValue({ id: ID, awardedBy: "v2" });
+    expect((await undoLevelUp({}, form({ id: ID }))).error).toMatch(
+      /only the volunteer who recorded it/i,
+    );
+    expect(store.voidLevelEvent).not.toHaveBeenCalled();
+  });
+
+  it("refuses a picker join", async () => {
+    holds("megagame.verify", "megagame.manage");
+    store.findLevelEvent.mockResolvedValue({ id: ID, awardedBy: "u1" });
+    store.voidLevelEvent.mockResolvedValue({ status: "not-volunteer" });
+    expect((await undoLevelUp({}, form({ id: ID }))).error).toMatch(
+      /faction picker/,
+    );
   });
 });

@@ -1,17 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { auth, data } = vi.hoisted(() => ({
+const { auth, data, nav } = vi.hoisted(() => ({
   auth: { toolAccess: vi.fn(), requireAccess: vi.fn(), EXPIRED: "expired" },
   data: {
     loadPlayerRows: vi.fn(),
     loadQuest: vi.fn(),
     loadCompletionResult: vi.fn(),
+    loadLevelUpTarget: vi.fn(),
+    loadListedPlayers: vi.fn(),
+    loadRecentActions: vi.fn(),
+  },
+  nav: {
+    redirect: vi.fn((to: string) => {
+      throw new Error(`REDIRECT ${to}`);
+    }),
   },
 }));
 vi.mock("@/lib/admin-auth", () => auth);
 vi.mock("./data", () => data);
 vi.mock("./actions", () => ({}));
 vi.mock("next/server", () => ({ connection: vi.fn() }));
+vi.mock("next/navigation", () => nav);
 
 import SignIn from "../SignIn";
 import QuestBoard from "./page";
@@ -59,13 +68,23 @@ describe("Quest Board for a volunteer", () => {
     );
   });
 
-  it("renders the quest section with the viewer's undo rights", async () => {
+  it("renders the three sections in order with the viewer's undo rights", async () => {
+    type Node = { type: unknown; props: Record<string, unknown> };
     const el = (await QuestBoard(props({ quest: "A2C4EF" }))) as {
-      type: unknown;
-      props: Record<string, unknown>;
+      props: { children: Node[] };
     };
-    expect(el.type).toBe(QuestSection);
-    expect(el.props.viewer).toEqual({ userId: "v1", manager: false });
+    // The first two sections sit in a grid of wrapper divs on wide screens.
+    const unwrap = (n: Node): Node[] =>
+      typeof n.type === "string"
+        ? ([n.props.children] as (Node | Node[])[]).flat().flatMap(unwrap)
+        : [n];
+    const sections = el.props.children.flatMap(unwrap);
+    expect(sections.map((s) => (s.type as { name: string }).name)).toEqual([
+      "QuestSection",
+      "LevelUpSection",
+      "RecentActions",
+    ]);
+    expect(sections[0].props.viewer).toEqual({ userId: "v1", manager: false });
     expect(auth.toolAccess).toHaveBeenCalledWith("megagame.manage");
   });
 });
@@ -100,6 +119,8 @@ describe("QuestSection", () => {
     quest,
     players: [],
     done,
+    levelUp: null,
+    recent: 30,
   });
 
   it("loads no quest without a code", async () => {

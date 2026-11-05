@@ -6,13 +6,24 @@ const { store, tickets } = vi.hoisted(() => ({
     liveCompletions: vi.fn(),
     findQuestByCode: vi.fn(),
     completionsByIds: vi.fn(),
+    recentCompletions: vi.fn(),
+    recentLevelUps: vi.fn(),
+    recentVoids: vi.fn(),
+    completionsInClass: vi.fn(),
   },
   tickets: { claimedCounts: vi.fn() },
 }));
 vi.mock("@/lib/megagame-store", () => store);
 vi.mock("@/lib/ticket-store", () => tickets);
 
-import { loadCompletionResult, loadPlayerRows, loadQuest } from "./data";
+import {
+  loadCompletionResult,
+  loadLevelUpTarget,
+  loadPlayerRows,
+  loadQuest,
+  loadRecentActions,
+  mergeRecentActions,
+} from "./data";
 
 const player = (id: string, wizard = 1) => ({
   id,
@@ -81,6 +92,131 @@ describe("loadQuest", () => {
     expect(await loadQuest("A2C4EF")).toEqual({ status: "inactive", quest });
     store.findQuestByCode.mockResolvedValue({ ...quest, active: true });
     expect((await loadQuest("A2C4EF")).status).toBe("open");
+  });
+});
+
+const t = (m: number) => new Date(Date.UTC(2026, 10, 7, 18, m));
+const completion = (id: string, m: number, by: string, undone = false) => ({
+  id,
+  questId: "q1",
+  questTitle: "Riddle",
+  questCode: "A2C4EF",
+  userId: "u1",
+  playerName: "Ada",
+  confirmedBy: by,
+  confirmedByName: by.toUpperCase(),
+  completedAt: t(m),
+  undoneAt: undone ? t(m + 1) : null,
+  undoneByName: undone ? "Boss" : null,
+  undoReason: undone ? "typo" : null,
+});
+const levelUp = (id: string, m: number, by: string, voided = false) => ({
+  id,
+  playerName: "Ada",
+  class: "wizard",
+  level: 2,
+  awardedBy: by,
+  awardedByName: by.toUpperCase(),
+  awardedAt: t(m),
+  checksPassed: true,
+  overrideReason: null,
+  cardPhotoUrl: null,
+  note: null,
+  voidedAt: voided ? t(m + 1) : null,
+});
+const voidRow = (id: string, m: number) => ({
+  id,
+  voidedAt: t(m),
+  voidedByName: "Boss",
+  reason: "typo",
+  playerName: "Ada",
+  class: "wizard",
+  level: 2,
+});
+
+describe("mergeRecentActions", () => {
+  const sources = {
+    completions: [
+      completion("p1", 5, "v1"),
+      completion("p2", 1, "v2"),
+      completion("p3", 0, "v1", true),
+    ],
+    levelUps: [levelUp("l1", 4, "v2"), levelUp("l2", 2, "v1", true)],
+    voids: [voidRow("l0", 3)],
+  };
+
+  it("puts every kind in one list, newest first, cut to the limit", () => {
+    const rows = mergeRecentActions(
+      sources,
+      { userId: "v1", manager: false },
+      4,
+    );
+    expect(rows.map((r) => [r.kind, r.at.getUTCMinutes()])).toEqual([
+      ["completion", 5],
+      ["level", 4],
+      ["void", 3],
+      ["level", 2],
+    ]);
+  });
+
+  it("offers undo on the viewer's own live items only, never on an undone row", () => {
+    const rows = mergeRecentActions(
+      sources,
+      { userId: "v1", manager: false },
+      10,
+    );
+    expect(rows.map((r) => [r.key, r.mayUndo])).toEqual([
+      ["completion-p1", true],
+      ["level-l1", false],
+      ["void-l0", false],
+      ["level-l2", false],
+      ["completion-p2", false],
+      ["completion-p3", false],
+    ]);
+  });
+
+  it("offers undo on anyone's live items to a manager", () => {
+    const rows = mergeRecentActions(
+      sources,
+      { userId: "m1", manager: true },
+      10,
+    );
+    expect(rows.filter((r) => r.mayUndo).map((r) => r.key)).toEqual([
+      "completion-p1",
+      "level-l1",
+      "completion-p2",
+    ]);
+  });
+});
+
+describe("loadRecentActions", () => {
+  it("asks each source for one past the limit and reports when there is more", async () => {
+    store.recentCompletions.mockResolvedValue([completion("p1", 5, "v1")]);
+    store.recentLevelUps.mockResolvedValue([levelUp("l1", 4, "v1")]);
+    store.recentVoids.mockResolvedValue([]);
+    const viewer = { userId: "v1", manager: false };
+    const few = await loadRecentActions(30, viewer);
+    expect(store.recentCompletions).toHaveBeenCalledWith(null, 31);
+    expect(store.recentLevelUps).toHaveBeenCalledWith(31);
+    expect(store.recentVoids).toHaveBeenCalledWith(31);
+    expect(few.actions).toHaveLength(2);
+    expect(few.more).toBe(false);
+
+    const many = await loadRecentActions(1, viewer);
+    expect(many.actions.map((a) => a.key)).toEqual(["completion-p1"]);
+    expect(many.more).toBe(true);
+  });
+
+  it("does not offer more when the actions fill the limit exactly", async () => {
+    store.recentCompletions.mockResolvedValue([
+      completion("p1", 5, "v1"),
+      completion("p2", 4, "v1"),
+    ]);
+    store.recentLevelUps.mockResolvedValue([]);
+    store.recentVoids.mockResolvedValue([]);
+    const exact = await loadRecentActions(2, { userId: "v1", manager: false });
+    expect(exact.actions).toHaveLength(2);
+    expect(exact.more).toBe(false);
   });
 });
 
@@ -154,5 +290,17 @@ describe("loadCompletionResult", () => {
     const view = await loadCompletionResult([], quest, [], me);
     expect(view).toEqual({ recorded: [], alreadyCompleted: [], undoIds: [] });
     expect(store.completionsByIds).not.toHaveBeenCalled();
+  });
+});
+
+describe("loadLevelUpTarget", () => {
+  it("is null for an unknown player and counts completions per class otherwise", async () => {
+    store.playersByIds.mockResolvedValueOnce([]);
+    expect(await loadLevelUpTarget("nope")).toBeNull();
+    store.completionsInClass.mockImplementation(async (_u, c: string) =>
+      c === "wizard" ? 3 : 0,
+    );
+    const target = await loadLevelUpTarget("u1");
+    expect(target?.completions).toEqual({ wizard: 3, pirate: 0, alien: 0 });
   });
 });

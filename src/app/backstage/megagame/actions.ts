@@ -3,14 +3,25 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { EXPIRED, requireAccess, type Access } from "@/lib/admin-auth";
-import { formatBadgeNumber, normalizeBadgeNumber } from "@/lib/megagame-rules";
+import { LARGE_IMAGE_MAX_BYTES, uploadImage } from "@/lib/blob";
+import { isMegagameClass } from "@/lib/megagame-levels";
+import {
+  checkLevelUp,
+  formatBadgeNumber,
+  normalizeBadgeNumber,
+} from "@/lib/megagame-rules";
 import {
   completionsByIds,
+  completionsInClass,
   confirmCompletions as recordCompletions,
+  findLevelEvent,
   findPlayerByBadgeNumber,
   findQuestByCode,
+  playersByIds,
+  recordLevelUp,
   searchPlayers,
   undoCompletions as undoCompletionRows,
+  voidLevelEvent,
   type PlayerSummary,
 } from "@/lib/megagame-store";
 import { boardHref, parseBoardParams } from "./board-params";
@@ -139,6 +150,116 @@ export async function undoCompletions(
     by: access.userId,
     reason: optional(formData, "reason"),
   });
+  revalidatePath(TOOL, "layout");
+  return { done: true };
+}
+
+// ---- Level-ups ----
+
+export type LevelUpState = {
+  error?: string;
+  /** Failing soft checks: shown with "Yes, I'm sure" before anything is written. */
+  warnings?: string[];
+  awarded?: { eventId: string; class: string; level: number };
+};
+
+export async function levelUp(
+  _prev: LevelUpState,
+  formData: FormData,
+): Promise<LevelUpState> {
+  const access = await verify();
+  if (!access) return { error: EXPIRED };
+  const id = str(formData, "id");
+  const userId = str(formData, "userId");
+  const cls = str(formData, "class");
+  const level = Number(str(formData, "level"));
+  if (!isUuid(id) || !userId) return { error: STALE };
+  if (!isMegagameClass(cls)) return { error: "Pick a class." };
+
+  const [player] = await playersByIds([userId]);
+  if (!player)
+    return { error: "No such player. Reload and look them up again." };
+
+  let warnings: string[] = [];
+  // A retry of a recorded event would fail the checks against the level it
+  // already set, so it goes straight to the store, which tells retries apart.
+  const retry = (await findLevelEvent(id)) !== null;
+  if (!retry) {
+    const check = checkLevelUp({
+      class: cls,
+      level,
+      levels: player.levels,
+      completionsInClass: await completionsInClass(userId, cls),
+    });
+    if (!check.ok) return { error: check.errors[0] };
+    warnings = check.warnings;
+    if (warnings.length > 0 && formData.get("sure") !== "on") {
+      return { warnings };
+    }
+  }
+
+  let cardPhotoUrl: string | null = null;
+  const photo = formData.get("photo");
+  if (!retry && photo instanceof File && photo.size > 0) {
+    try {
+      cardPhotoUrl = await uploadImage(
+        "megagame-cards",
+        photo,
+        LARGE_IMAGE_MAX_BYTES,
+      );
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Upload failed." };
+    }
+  }
+
+  const result = await recordLevelUp({
+    id,
+    userId,
+    class: cls,
+    level,
+    awardedBy: access.userId,
+    checksPassed: warnings.length === 0,
+    overrideReason: warnings.length > 0 ? optional(formData, "reason") : null,
+    cardPhotoUrl,
+    note: optional(formData, "note"),
+  });
+  switch (result.status) {
+    case "awarded":
+    case "retry":
+      revalidatePath(TOOL, "layout");
+      return { awarded: { eventId: id, class: cls, level } };
+    case "already-awarded":
+      return { error: "That level was already recorded for this player." };
+    case "voided":
+      return { error: "That level-up was undone. Reload to record it again." };
+    case "id-reused":
+      return { error: STALE };
+    case "invalid":
+      return { error: "That level can't be recorded." };
+  }
+}
+
+export async function undoLevelUp(
+  _prev: UndoState,
+  formData: FormData,
+): Promise<UndoState> {
+  const access = await verify();
+  if (!access) return { error: EXPIRED };
+  const id = str(formData, "id");
+  const event = isUuid(id) ? await findLevelEvent(id) : null;
+  if (!event) return { error: "That level-up was not found." };
+  if (!(await mayUndo(access, event.awardedBy))) return { error: NOT_YOURS };
+  const result = await voidLevelEvent({
+    id,
+    voidedBy: access.userId,
+    reason: optional(formData, "reason"),
+  });
+  if (result.status === "not-volunteer") {
+    return { error: "A faction picker join can't be undone here." };
+  }
+  if (result.status === "not-found") {
+    return { error: "That level-up was not found." };
+  }
   revalidatePath(TOOL, "layout");
   return { done: true };
 }
