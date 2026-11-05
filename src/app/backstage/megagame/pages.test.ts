@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { auth, data, nav } = vi.hoisted(() => ({
+const { auth, store, data, nav } = vi.hoisted(() => ({
   auth: { toolAccess: vi.fn(), requireAccess: vi.fn(), EXPIRED: "expired" },
+  store: { findPlayerByBadgeNumber: vi.fn() },
   data: {
     loadPlayerRows: vi.fn(),
     loadQuest: vi.fn(),
@@ -18,6 +19,7 @@ const { auth, data, nav } = vi.hoisted(() => ({
   },
 }));
 vi.mock("@/lib/admin-auth", () => auth);
+vi.mock("@/lib/megagame-store", () => store);
 vi.mock("./data", () => data);
 vi.mock("./actions", () => ({}));
 vi.mock("next/server", () => ({ connection: vi.fn() }));
@@ -41,7 +43,8 @@ beforeEach(() => {
 
 const expectSignInOnly = (el: unknown, next: string) => {
   expect(el).toMatchObject({ type: SignIn, props: { next } });
-  for (const fn of Object.values(data)) expect(fn).not.toHaveBeenCalled();
+  for (const fn of [...Object.values(store), ...Object.values(data)])
+    expect(fn).not.toHaveBeenCalled();
 };
 
 describe("Quest Board without megagame.verify", () => {
@@ -56,9 +59,9 @@ describe("Quest Board without megagame.verify", () => {
     );
   });
 
-  it("drops a malformed recorded row id", async () => {
-    const el = await QuestBoard(props({ done: "nope" }));
-    expectSignInOnly(el, "/backstage/megagame?done=");
+  it("drops a malformed recorded row id and keeps a badge number", async () => {
+    const el = await QuestBoard(props({ done: "nope", player: "0042" }));
+    expectSignInOnly(el, "/backstage/megagame?done=&player=0042");
   });
 });
 
@@ -67,6 +70,43 @@ describe("Quest Board for a volunteer", () => {
     auth.toolAccess.mockImplementation(async (p: string) =>
       p === "megagame.verify" ? { name: "Vol", userId: "v1" } : null,
     );
+  });
+
+  it("adds a badge's player to the list and keeps the quest", async () => {
+    store.findPlayerByBadgeNumber.mockResolvedValue({ id: "u3" });
+    await expect(
+      QuestBoard(props({ quest: "A2C4EF", players: "u1", player: "0042" })),
+    ).rejects.toThrow(
+      "REDIRECT /backstage/megagame?quest=A2C4EF&players=u1%2Cu3",
+    );
+    expect(store.findPlayerByBadgeNumber).toHaveBeenCalledWith(42);
+  });
+
+  const noticeFor = async (player: string) => {
+    type Node = { type: unknown; props: Record<string, unknown> };
+    const el = (await QuestBoard(props({ player }))) as unknown;
+    const found: Node[] = [];
+    const visit = (n: unknown) => {
+      if (Array.isArray(n)) n.forEach(visit);
+      else if (n && typeof n === "object" && "props" in n) {
+        const node = n as Node;
+        if ((node.type as { name?: string }).name === "QuestSection")
+          found.push(node);
+        else visit(node.props.children);
+      }
+    };
+    visit(el);
+    return found[0]?.props.notice;
+  };
+
+  it("says when no player has the badge number", async () => {
+    store.findPlayerByBadgeNumber.mockResolvedValue(null);
+    expect(await noticeFor("42")).toBe("No player has badge number 0042.");
+  });
+
+  it("says when the player parameter is not a badge number", async () => {
+    expect(await noticeFor("b3d5f7")).toBe("b3d5f7 is not a badge number.");
+    expect(store.findPlayerByBadgeNumber).not.toHaveBeenCalled();
   });
 
   it("renders the four sections in order with the viewer's undo rights", async () => {
@@ -129,7 +169,7 @@ describe("QuestSection", () => {
 
   it("loads no quest without a code", async () => {
     data.loadPlayerRows.mockResolvedValue([]);
-    await QuestSection({ params: params(null), viewer });
+    await QuestSection({ params: params(null), viewer, notice: null });
     expect(data.loadQuest).not.toHaveBeenCalled();
   });
 
@@ -141,6 +181,7 @@ describe("QuestSection", () => {
     const el = await QuestSection({
       params: params("A2C4EF"),
       viewer,
+      notice: null,
     });
     const found = walk(el);
     expect(found.text).toContain(" is not active, so it can");
@@ -156,7 +197,11 @@ describe("QuestSection", () => {
       status: "inactive",
       quest: { id: "q1", code: "A2C4EF", title: "Riddle", active: false },
     });
-    const el = await QuestSection({ params: params("A2C4EF", [C]), viewer });
+    const el = await QuestSection({
+      params: params("A2C4EF", [C]),
+      viewer,
+      notice: null,
+    });
     const found = walk(el);
     expect(found.types).toContain("CompletionResult");
     expect(found.types).not.toContain("CheckAndConfirm");
