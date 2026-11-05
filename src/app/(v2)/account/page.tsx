@@ -17,7 +17,10 @@ import { can, teamAccess } from "@/lib/access";
 import { currentSession, hasPassword } from "@/lib/auth";
 import { prefillDiscord } from "@/lib/discord-handle";
 import { firstSigninNeeded } from "@/lib/first-signin";
-import { loadMegagameLevels } from "@/lib/megagame-store";
+import {
+  hasVolunteerLevelEvent,
+  loadMegagameLevels,
+} from "@/lib/megagame-store";
 import {
   loadRsvpCounts,
   loadSchedule,
@@ -58,6 +61,7 @@ export default async function AccountPage({
     admin,
     backstage,
     levels,
+    megagameLocked,
   ] = await Promise.all([
     getDb()
       .select()
@@ -72,6 +76,7 @@ export default async function AccountPage({
     can("schedule.manage"),
     teamAccess().then((a) => a?.team ?? false),
     loadMegagameLevels(user.id),
+    hasVolunteerLevelEvent(user.id),
   ]);
   // Referral codes are minted the first time their holder looks.
   const [, referrers] = await Promise.all([
@@ -165,7 +170,13 @@ export default async function AccountPage({
               )}
             />
           ),
-          megagame: <MegagamePanel levels={levels} />,
+          megagame: (
+            <MegagamePanel
+              levels={levels}
+              badgeCode={tickets.find((t) => t.badgeCode)?.badgeCode ?? null}
+              locked={megagameLocked}
+            />
+          ),
         }}
       />
     </div>
