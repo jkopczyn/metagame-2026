@@ -1,0 +1,446 @@
+<!--
+The Terminal
+Cryptography
+I7KI
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>[Chain Mail] Terminal</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #0a0d0a; color: #33ff66;
+    font-family: ui-monospace, 'Cascadia Code', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 15px;
+    font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0;
+  }
+  input, textarea { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+  #terminal {
+    height: 100vh; display: flex; flex-direction: column;
+    padding: 16px; overflow: hidden;
+  }
+  #output {
+    flex: 1 1 auto; overflow-y: auto; white-space: pre-wrap; word-break: break-word;
+    line-height: 1.4;
+  }
+  #output .line { min-height: 1.4em; }
+  #output .unlock { color: #baffca; font-weight: bold; }
+  #output .err { color: #ff6b6b; }
+  #output .dim { color: #1f8a3d; }
+  #inputLine { display: flex; align-items: center; padding-top: 6px; flex: 0 0 auto; }
+  #prompt { white-space: pre; color: #33ff66; }
+  #cmdInput {
+    flex: 1 1 auto; background: transparent; border: none; outline: none;
+    color: #33ff66; font: inherit; caret-color: #33ff66; margin-left: 4px;
+  }
+
+  #editorOverlay {
+    position: fixed; inset: 0; background: #05070550;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #editorOverlay.hidden { display: none; }
+  #editorBox {
+    width: min(720px, 92vw); height: min(420px, 70vh);
+    background: #0a0d0a; border: 1px solid #33ff66; box-shadow: 0 0 24px #33ff6640;
+    display: flex; flex-direction: column;
+  }
+  #editorArea {
+    flex: 1 1 auto; background: #05070a; color: #33ff66; border: none; outline: none;
+    font: inherit; padding: 12px; resize: none; caret-color: #33ff66;
+  }
+  #editorStatus {
+    flex: 0 0 auto; background: #123a1f; color: #baffca; padding: 4px 12px; font-size: 13px;
+  }
+  ::selection { background: #33ff6650; }
+</style>
+</head>
+<body>
+  <div id="terminal">
+    <div id="output"></div>
+    <div id="inputLine">
+      <span id="prompt">chainmail&gt;</span>
+      <input id="cmdInput" autocomplete="off" autocapitalize="off" spellcheck="false" />
+    </div>
+  </div>
+
+  <div id="editorOverlay" class="hidden">
+    <div id="editorBox">
+      <textarea id="editorArea" spellcheck="false"></textarea>
+      <div id="editorStatus">-- INSERT --&nbsp;&nbsp;&nbsp;Ctrl+Enter: confirm&nbsp;&nbsp;&nbsp;Esc: cancel</div>
+    </div>
+  </div>
+
+<script>
+'use strict';
+
+// ---------------------------------------------------------------------------
+// How the Chain works. Nothing in this file is secret.
+//
+// The Chain Message was compressed and locked with AES-GCM under a random
+// 128-bit key. LOCKED below is that locked message: without the key it is noise.
+// The key itself is not in this file. It was split with Shamir's Secret Sharing
+// into one share per Chain Card, and any set of shares below the threshold
+// reveals nothing at all about the key -- not "hard to crack", nothing.
+//
+// A Chain Card key is 30 characters of Crockford base32 (no I, L, O or U;
+// case, spaces and dashes don't matter). It packs 17 bytes -- the share's
+// x-coordinate and its 16 key bytes -- plus 10 check bits taken from SHA-256,
+// which catch typos before they're used.
+// ---------------------------------------------------------------------------
+const LOCKED = 'DnerVvecn6zzd3h41F+/9LfH4lbB/mJHa1MqweqxXxTa3dUBIgSgz/GicfkM0zhEPG+TEet0oy+g++FGMvZ26+kaQq1xlOhar/af0jS8nWvTVlOyjMibbQkq32u0VNNEbxzMSgAiQt5YoYiFXfbIhHwfCLbXjt4rPk5RVjIZY9MipV6wBZCJ2FUMZmYP5k0ZG6IfUXBupcD6TCT/R0+seu93aNCgSQd9qR95n+LIhMYYtNqjk67IvVnfDCicVAiDvRIsMrcVpdf/E+TfU3WPwZk8Fjwu3gQABC8ArQh4v+iAE0akKDVke8tHXBb3KzlmWV/Ajl97MJDtDxt+bunee2xyNMYDRKuNq1n/x3VCrL8L+O9BEh+1yN2IhIWxJLhoN43Z2wkUVHGByN96l3omN4L8msP3c1oUxelZEqKSH/K7S5Nixd6yqv5j04NMMl3+jknonk6xUunrPWgbdAryhpKcNC4ALQpqgcHQ7tzPuLEuYtKHYy93uYQuYPhcTatIKkR5XzLKxRFE3ZvGhLvSpnZuhjgpG4W4monzKRPITF5ByPTOLHgja91ZZKPWTAUg1xVsVOFIcJOyM99YMaOaZYWt41OIx98ytgPQTYqlvDawmpsu9DqciwMy+SB5+vBs8i6oKtCt612gJYvMa3vn';
+
+// ---------------------------------------------------------------------------
+// GF(256) arithmetic for Shamir's Secret Sharing.
+// Reduction poly 0x11b (AES field). Generator is 3, not 2 -- 2 only has
+// order 51 in this field, so doubling alone won't hit all 255 elements.
+// ---------------------------------------------------------------------------
+const EXP = new Uint8Array(510);
+const LOG = new Uint8Array(256);
+(function initTables() {
+  function xtime(a) { const r = a << 1; return (a & 0x80) ? (r ^ 0x11b) & 0xff : r & 0xff; }
+  let x = 1;
+  for (let i = 0; i < 255; i++) {
+    EXP[i] = x;
+    LOG[x] = i;
+    x = xtime(x) ^ x;
+  }
+  for (let i = 255; i < 510; i++) EXP[i] = EXP[i - 255];
+})();
+function gmul(a, b) { return (a === 0 || b === 0) ? 0 : EXP[LOG[a] + LOG[b]]; }
+function gdiv(a, b) { if (b === 0) throw new Error('div by zero'); return a === 0 ? 0 : EXP[(LOG[a] - LOG[b] + 255) % 255]; }
+
+function sssReconstruct(shares) {
+  const len = shares[0].bytes.length;
+  const out = new Uint8Array(len);
+  for (let byteIdx = 0; byteIdx < len; byteIdx++) {
+    let acc = 0;
+    for (let i = 0; i < shares.length; i++) {
+      const xi = shares[i].x, yi = shares[i].bytes[byteIdx];
+      let num = 1, den = 1;
+      for (let j = 0; j < shares.length; j++) {
+        if (j === i) continue;
+        const xj = shares[j].x;
+        num = gmul(num, xj);
+        den = gmul(den, xi ^ xj);
+      }
+      acc ^= gmul(yi, gdiv(num, den));
+    }
+    out[byteIdx] = acc;
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Keys: Crockford base32 with a 10-bit SHA-256 check.
+// ---------------------------------------------------------------------------
+const B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+const SHARE_BYTES = 17, CHECK_BITS = 10, KEY_CHARS = 30;
+
+function normaliseKey(s) {
+  return s.toUpperCase().replace(/[^0-9A-Z]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
+}
+async function checkBits(bytes) {
+  const d = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+  return (d[0] << 2) | (d[1] >> 6);
+}
+// Returns { x, bytes } for a well-formed key, or null if it has a typo.
+async function decodeKey(str) {
+  const s = normaliseKey(str);
+  if (s.length !== KEY_CHARS) return null;
+  const bits = [];
+  for (const ch of s) {
+    const v = B32.indexOf(ch);
+    if (v < 0) return null;
+    for (let b = 4; b >= 0; b--) bits.push((v >> b) & 1);
+  }
+  const bytes = new Uint8Array(SHARE_BYTES);
+  for (let i = 0; i < SHARE_BYTES * 8; i++) bytes[i >> 3] |= bits[i] << (7 - (i & 7));
+  let check = 0;
+  for (let i = 0; i < CHECK_BITS; i++) check = (check << 1) | bits[SHARE_BYTES * 8 + i];
+  if (bits.slice(SHARE_BYTES * 8 + CHECK_BITS).some(b => b)) return null;
+  if (check !== await checkBits(bytes)) return null;
+  if (bytes[0] === 0) return null;
+  return { x: bytes[0], bytes: bytes.slice(1) };
+}
+
+function base64ToBytes(b64) {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+function bufToBase64(buf) {
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+// AES-GCM refuses a wrong key outright, so a wrong combination of shares
+// can never show a player garbage -- it simply doesn't open.
+async function unlock(keyBytes) {
+  const blob = base64ToBytes(LOCKED);
+  const iv = blob.slice(0, 12), sealed = blob.slice(12);
+  try {
+    const key = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['decrypt']);
+    const packed = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, sealed);
+    const stream = new Blob([packed]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return await new Response(stream).text();
+  } catch (e) {
+    return null;
+  }
+}
+
+function* combinations(arr, k) {
+  const n = arr.length;
+  if (k > n || k <= 0) return;
+  const idx = Array.from({ length: k }, (_, i) => i);
+  while (true) {
+    yield idx.map(i => arr[i]);
+    let i = k - 1;
+    while (i >= 0 && idx[i] === i + n - k) i--;
+    if (i < 0) return;
+    idx[i]++;
+    for (let j = i + 1; j < k; j++) idx[j] = idx[j - 1] + 1;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Game state
+// ---------------------------------------------------------------------------
+const LS_KEY = 'chainmail_keys_v2';
+let keys = [];
+let currentSecret = '';
+
+function loadKeys() {
+  try { keys = JSON.parse(localStorage.getItem(LS_KEY)) || []; }
+  catch (e) { keys = []; }
+}
+function saveKeys() { try { localStorage.setItem(LS_KEY, JSON.stringify(keys)); } catch (e) { /* storage unavailable */ } }
+
+const EASTER_EGGS = { '0006': 'Vivi', 'kn': 'Fay' };
+
+// Tries every entered key together first; if a stray key spoils that, tries
+// smaller groups. Returns the Chain Message, or '' if it stays locked.
+async function checkForSecret() {
+  const shares = [];
+  for (const k of keys) {
+    const sh = await decodeKey(k);
+    if (sh && !shares.some(s => s.x === sh.x)) shares.push(sh);
+  }
+  for (let size = shares.length; size >= 1; size--) {
+    for (const combo of combinations(shares, size)) {
+      const secret = await unlock(sssReconstruct(combo));
+      if (secret !== null) return secret;
+    }
+  }
+  return '';
+}
+
+function easterEgg() {
+  for (const k of keys) if (Object.prototype.hasOwnProperty.call(EASTER_EGGS, k)) return EASTER_EGGS[k];
+  return '';
+}
+
+async function addKeyCmd(keyStr) {
+  keyStr = keyStr.trim();
+  if (!keyStr) { print('usage: add <key>'); return; }
+  const egg = Object.prototype.hasOwnProperty.call(EASTER_EGGS, keyStr);
+  const stored = egg ? keyStr : normaliseKey(keyStr);
+  if (keys.includes(stored)) { print('you already have that key.'); return; }
+  if (!egg && !(await decodeKey(stored))) {
+    print('that key looks mistyped -- check every character and try again.', 'err');
+    return;
+  }
+
+  keys.push(stored);
+  saveKeys();
+  print(`key added (#${keys.length - 1}).`);
+
+  if (egg) {
+    currentSecret = EASTER_EGGS[keyStr];
+    print('a strange key... something shifts.', 'dim');
+    print('>>> secret unlocked <<<', 'unlock');
+    print(currentSecret, 'unlock');
+    return;
+  }
+  const secret = await checkForSecret();
+  if (secret && secret !== currentSecret) {
+    currentSecret = secret;
+    print('');
+    print('>>> secret unlocked <<<', 'unlock');
+    print(secret, 'unlock');
+  }
+}
+
+async function removeKeyCmd(arg) {
+  const n = Number(arg.trim());
+  if (!Number.isInteger(n) || n < 0 || n >= keys.length) {
+    print(`usage: rm <index>  (0-${Math.max(keys.length - 1, 0)})`, 'err');
+    return;
+  }
+  keys.splice(n, 1);
+  saveKeys();
+  currentSecret = (await checkForSecret()) || easterEgg();
+  print(`key #${n} removed.`);
+  if (currentSecret) print('a secret is still unlocked -- type "secret" to view it.');
+  else print('no secret currently unlocked.');
+}
+
+function listKeysCmd() {
+  if (keys.length === 0) { print('no keys yet. use "add <key>" to add one.'); return; }
+  keys.forEach((k, i) => print(`  [${i}] ${k.length === KEY_CHARS ? k.match(/.{1,5}/g).join('-') : k}`));
+  print(`${keys.length} key(s) total.`);
+}
+
+function showSecretCmd() {
+  print(currentSecret ? currentSecret : 'no secret unlocked yet -- find more keys.');
+}
+
+async function startVerifyWizard() {
+  print('opening editor -- type the text you want to verify.');
+  print('press Ctrl+Enter to confirm, Esc to cancel.', 'dim');
+  const text = await openEditor();
+  if (text === null) { print('verify cancelled.'); return; }
+  const cleaned = Array.from(text).filter(ch => /[a-zA-Z0-9𓋼𓆏]/u.test(ch)).join('');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(cleaned));
+  print(bufToBase64(digest));
+}
+
+function openEditor() {
+  return new Promise(resolve => {
+    editorOverlay.classList.remove('hidden');
+    editorArea.value = '';
+    editorArea.focus();
+    function onKeydown(e) {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        cleanup();
+        resolve(editorArea.value);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cleanup();
+        resolve(null);
+      }
+    }
+    function cleanup() {
+      editorArea.removeEventListener('keydown', onKeydown);
+      editorOverlay.classList.add('hidden');
+      inputEl.focus();
+    }
+    editorArea.addEventListener('keydown', onKeydown);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Terminal plumbing
+// ---------------------------------------------------------------------------
+const outputEl = document.getElementById('output');
+const inputEl = document.getElementById('cmdInput');
+const editorOverlay = document.getElementById('editorOverlay');
+const editorArea = document.getElementById('editorArea');
+const terminalEl = document.getElementById('terminal');
+
+let history = [];
+let historyIdx = -1;
+let busy = false;
+
+function print(text, cls) {
+  const div = document.createElement('div');
+  div.className = 'line' + (cls ? ' ' + cls : '');
+  div.textContent = text;
+  outputEl.appendChild(div);
+  outputEl.scrollTop = outputEl.scrollHeight;
+}
+
+function printHelp() {
+  print('commands:');
+  print('  help                 show this list');
+  print('  add <key>            add a key you found');
+  print('  keys                 list your keys');
+  print('  rm <index>           remove a key by its number');
+  print('  secret               show the currently unlocked secret');
+  print('  verify               hash text in the editor to check it against the Hash List');
+  print('  clear                clear the screen');
+}
+
+async function runCommand(line) {
+  const trimmed = line.trim();
+  if (!trimmed) return;
+  const sp = trimmed.indexOf(' ');
+  const cmd = (sp === -1 ? trimmed : trimmed.slice(0, sp)).toLowerCase();
+  const arg = sp === -1 ? '' : trimmed.slice(sp + 1);
+
+  switch (cmd) {
+    case 'help': printHelp(); break;
+    case 'add': case 'key': await addKeyCmd(arg); break;
+    case 'keys': case 'list': listKeysCmd(); break;
+    case 'rm': case 'remove': await removeKeyCmd(arg); break;
+    case 'secret': showSecretCmd(); break;
+    case 'verify': await startVerifyWizard(); break;
+    case 'clear': outputEl.innerHTML = ''; break;
+    default: print(`unknown command: "${cmd}" (try "help")`, 'err');
+  }
+}
+
+inputEl.addEventListener('keydown', async (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (busy) return;
+    const val = inputEl.value;
+    inputEl.value = '';
+    print('chainmail> ' + val);
+    if (val.trim()) history.push(val);
+    historyIdx = history.length;
+    busy = true;
+    try { await runCommand(val); } finally { busy = false; }
+  } else if (e.key === 'ArrowUp') {
+    if (history.length === 0) return;
+    e.preventDefault();
+    historyIdx = Math.max(0, historyIdx - 1);
+    inputEl.value = history[historyIdx] || '';
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    historyIdx = Math.min(history.length, historyIdx + 1);
+    inputEl.value = history[historyIdx] || '';
+  }
+});
+
+terminalEl.addEventListener('click', () => inputEl.focus());
+
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+async function init() {
+  print('========================================');
+  print('  [ C H A I N   M A I L ]  terminal');
+  print('========================================');
+  print('type "help" to see available commands.');
+  print('');
+  inputEl.focus();
+
+  if (!(window.crypto && window.crypto.subtle && window.DecompressionStream)) {
+    print('error: this browser is missing the cryptography this terminal needs -- try an up-to-date Chrome, Edge, Firefox or Safari.', 'err');
+    return;
+  }
+  if (LOCKED.startsWith('{{')) print('warning: this terminal has not been sealed with a Chain Message yet.', 'err');
+
+  loadKeys();
+  if (keys.length > 0) {
+    print(`loaded ${keys.length} saved key(s) from this browser.`);
+    currentSecret = (await checkForSecret()) || easterEgg();
+    if (currentSecret) print('a secret is already unlocked -- type "secret" to view it.');
+  } else {
+    print('no keys found yet.');
+  }
+}
+init();
+</script>
+</body>
+</html>
+<!--
+5oohOhf/3iQnRi563E8Wom5NN2lIzOoXykagnc6L7AI=
+-->

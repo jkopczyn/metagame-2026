@@ -57,6 +57,10 @@ const nextConfig: NextConfig = {
       ],
     },
   ],
+  rewrites: async () => [
+    // The Chain Mail puzzle terminal is a standalone page in public/.
+    { source: "/chainmail", destination: "/chainmail.html" },
+  ],
   redirects: async () => [
     // The team tools were /admin until the permission system made them
     // everyone's; bookmarks and old links keep working.
