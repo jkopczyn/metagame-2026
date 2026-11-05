@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { reportError } from "@/lib/error-report";
 import { addCrypticClueContact, recordCrypticClue } from "@/lib/airtable";
+import { throttled } from "@/lib/throttle";
 
 // Two steps: POST the clue (returns the new record id), then an optional PATCH
 // to put a name/email on that record. Same "503 when unconfigured in prod"
@@ -38,6 +39,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid clue" }, { status: 400 });
   }
 
+  const limited = await throttled(request, "clue");
+  if (limited) return limited;
+
   try {
     const result = await recordCrypticClue(trimmed);
     return (
@@ -73,6 +77,9 @@ export async function PATCH(request: Request) {
   if (!trimmedName && !trimmedEmail) {
     return NextResponse.json({ error: "Nothing to add" }, { status: 400 });
   }
+
+  const limited = await throttled(request, "clue");
+  if (limited) return limited;
 
   try {
     const result = await addCrypticClueContact(id, {

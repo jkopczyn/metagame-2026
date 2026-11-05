@@ -5,6 +5,7 @@ import { getDayPass, getTicket, supporterTier } from "@/lib/tickets";
 import { countCodeRedemptions, lookupDiscountCode } from "@/lib/discount-codes";
 import { isEarlyBirdActive } from "@/lib/early-bird";
 import { createCharge, getHostedCheckoutUrl } from "@/lib/opennode";
+import { throttled } from "@/lib/throttle";
 import { pickUtm, type Utm } from "@/lib/utm";
 
 export const runtime = "nodejs";
@@ -51,6 +52,9 @@ export async function POST(request: Request) {
   if (!EMAIL_RE.test(email)) {
     return NextResponse.json({ error: "Invalid email" }, { status: 400 });
   }
+
+  const limited = await throttled(request, "bitcoinCharge");
+  if (limited) return limited;
 
   // Shared shape both paths fill in, then feed into the charge + metadata below.
   let ticketIdOut: string;

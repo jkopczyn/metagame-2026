@@ -38,7 +38,10 @@ export default function DiscountModal({ onClose }: { onClose: () => void }) {
         `/api/checkout/stripe/discount?${new URLSearchParams({ code: typed })}`,
         { signal: controller.signal },
       )
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) throw new Error(`Lookup answered ${res.status}`);
+          return res.json();
+        })
         .then(setSaving)
         .catch((err) => {
           if (err?.name !== "AbortError") setSaving("unknown");

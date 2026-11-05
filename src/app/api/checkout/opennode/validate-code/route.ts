@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getTicket } from "@/lib/tickets";
 import { countCodeRedemptions, lookupDiscountCode } from "@/lib/discount-codes";
+import { throttled } from "@/lib/throttle";
 
 export const runtime = "nodejs";
 
@@ -20,6 +21,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unknown ticket" }, { status: 400 });
   }
   const fullBtc = ticket.prices.full.btc;
+
+  const limited = await throttled(request, "codeLookup");
+  if (limited) return limited;
 
   const code = (body.code ?? "").trim();
   const applied = code

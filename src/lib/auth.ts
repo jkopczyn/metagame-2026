@@ -29,6 +29,13 @@ function createAuth() {
     // whatever host they're served from.
     advanced: { useSecureCookies: process.env.NODE_ENV === "production" },
     telemetry: { enabled: false },
+    // Public routes that email a code would skip /login's budgets. The app calls
+    // these server-side, which disabledPaths doesn't affect.
+    disabledPaths: [
+      "/email-otp/send-verification-otp",
+      "/email-otp/request-password-reset",
+      "/forget-password/email-otp",
+    ],
     emailAndPassword: {
       enabled: true,
       // Accounts only come from proving the email with a code; a password is
