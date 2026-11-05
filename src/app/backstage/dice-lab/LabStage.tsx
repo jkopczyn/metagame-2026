@@ -21,7 +21,7 @@ import {
 } from "@react-three/drei";
 import * as THREE from "three";
 import { DieBody } from "@/v2/components/dice/dice3d/Die";
-import { faceTexture, type DieSpec } from "./labDice";
+import { bodyColor, faceTexture, type DieSpec } from "./labDice";
 import type { DropShadow, Layout, Show } from "./labLayout";
 import { diceSvg, type SvgOpts } from "./labSvg";
 import { DIE_HALF, type ThrowParams } from "./labPhysics";
@@ -66,6 +66,8 @@ type Props = {
   fov: number;
   shadows: boolean;
   shadow: DropShadow;
+  // flat-wordmark mode: letter tiles only, no cube or pip faces
+  lettersOnly: boolean;
   grid: boolean;
   settle: SettleMode;
   keepOrder: boolean;
@@ -216,6 +218,7 @@ function Scene({
   fov,
   shadows,
   shadow,
+  lettersOnly,
   grid,
   arena,
   selected,
@@ -339,6 +342,7 @@ function Scene({
           rig={rig}
           selected={selected === i}
           shadow={shadow}
+          lettersOnly={lettersOnly}
           onPointerDown={beginDrag(i)}
         />
       ))}
@@ -354,7 +358,12 @@ function Scene({
         </group>
       )}
 
-      <Exporter rig={rig} dice={dice} shadow={shadow} />
+      <Exporter
+        rig={rig}
+        dice={dice}
+        shadow={shadow}
+        lettersOnly={lettersOnly}
+      />
     </>
   );
 }
@@ -365,6 +374,7 @@ function LabDie({
   rig,
   selected,
   shadow,
+  lettersOnly,
   onPointerDown,
 }: {
   spec: DieSpec;
@@ -372,11 +382,15 @@ function LabDie({
   rig: LabRig;
   selected: boolean;
   shadow: DropShadow;
+  lettersOnly: boolean;
   onPointerDown: (e: ThreeEvent<PointerEvent>) => void;
 }) {
   const group = useRef<THREE.Group>(null);
   const shadowMesh = useRef<THREE.Mesh>(null);
-  const textures = useMemo(() => spec.faces.map(faceTexture), [spec]);
+  const textures = useMemo(
+    () => spec.faces.map((f) => faceTexture(f, spec)),
+    [spec],
+  );
   useEffect(() => () => textures.forEach((t) => t.dispose()), [textures]);
   const shadowTex = useMemo(() => shadowTexture(shadow.blur), [shadow.blur]);
   useEffect(() => () => shadowTex.dispose(), [shadowTex]);
@@ -404,7 +418,11 @@ function LabDie({
   return (
     <>
       <group ref={group} onPointerDown={onPointerDown}>
-        <DieBody textures={textures} />
+        <DieBody
+          textures={textures}
+          body={bodyColor(spec)}
+          lettersOnly={lettersOnly}
+        />
         {selected && (
           <mesh name="ui">
             <boxGeometry args={[1.14, 1.14, 1.14]} />
@@ -454,18 +472,23 @@ function Exporter({
   rig,
   dice,
   shadow,
+  lettersOnly,
 }: {
   rig: LabRig;
   dice: DieSpec[];
   shadow: DropShadow;
+  lettersOnly: boolean;
 }) {
   const get = useThree((s) => s.get);
   useEffect(() => {
     rig.setSvgFn((opts) =>
-      diceSvg(dice, rig.poses, get().camera.quaternion, shadow, opts),
+      diceSvg(dice, rig.poses, get().camera.quaternion, shadow, {
+        ...opts,
+        lettersOnly,
+      }),
     );
     return () => rig.setSvgFn(null);
-  }, [get, rig, dice, shadow]);
+  }, [get, rig, dice, shadow, lettersOnly]);
   useEffect(() => {
     rig.setExportFn(async ({ width, crop, pad }) => {
       const { gl, scene, camera, size } = get();

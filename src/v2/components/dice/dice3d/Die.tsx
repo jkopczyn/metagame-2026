@@ -275,7 +275,17 @@ export default function Die({
 // The die itself — ink body plus the six printed panels — with no pose or
 // animation of its own, so other scenes (the dice lab) render the exact hero
 // die from any texture set. `textures` follow FACES order.
-export function DieBody({ textures }: { textures: THREE.Texture[] }) {
+// `lettersOnly` drops the body and pip faces, leaving the letter tiles floating
+// (dice-lab's flat-wordmark mode).
+export function DieBody({
+  textures,
+  body = COLORS.ink,
+  lettersOnly = false,
+}: {
+  textures: THREE.Texture[];
+  body?: string;
+  lettersOnly?: boolean;
+}) {
   // One rounded-panel geometry shared by all six faces.
   const panelGeo = useMemo(() => roundedPanelGeometry(PANEL, PANEL_R), []);
   useEffect(() => () => panelGeo.dispose(), [panelGeo]);
@@ -291,18 +301,21 @@ export function DieBody({ textures }: { textures: THREE.Texture[] }) {
         creaseAngle={0.6}
         castShadow
         receiveShadow
+        visible={!lettersOnly}
       >
-        <meshStandardMaterial
-          color={COLORS.ink}
-          roughness={0.9}
-          metalness={0}
-        />
+        <meshStandardMaterial color={body} roughness={0.9} metalness={0} />
       </RoundedBox>
 
       {/* printed faces: rounded panels filling each flat face, lit like the body
           so they read as painted-on rather than stuck-on stickers. */}
       {FACES.map((f, i) => (
-        <mesh key={i} geometry={panelGeo} position={f.pos} rotation={f.rot}>
+        <mesh
+          key={i}
+          geometry={panelGeo}
+          position={f.pos}
+          rotation={f.rot}
+          visible={!lettersOnly || i < 4}
+        >
           <meshStandardMaterial
             map={textures[i]}
             // pip faces (top/bottom) get a glossier finish so the white pips catch

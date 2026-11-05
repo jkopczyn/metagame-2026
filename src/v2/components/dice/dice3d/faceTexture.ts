@@ -91,9 +91,12 @@ export function letterTexture(
 
 // A pip face for the given die value. Flat ink fill (no baked gradient, body color)
 // so the panel reads as the same material as the cube — only the white pips stand out.
-export function pipTexture(value: number): THREE.CanvasTexture {
+export function pipTexture(
+  value: number,
+  fill: string = COLORS.ink,
+): THREE.CanvasTexture {
   const [canvas, ctx] = makeCanvas();
-  ctx.fillStyle = COLORS.ink;
+  ctx.fillStyle = fill;
   ctx.fillRect(0, 0, TEX, TEX);
 
   const on = PIP_MAP[value] ?? [];

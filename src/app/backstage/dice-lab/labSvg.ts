@@ -6,7 +6,7 @@ import {
   PIP_MAP,
 } from "@/v2/components/dice/dice3d/faceTexture";
 import { letterPaths } from "@/v2/lib/dice-letter-paths";
-import type { DieSpec, Face } from "./labDice";
+import { bodyColor, type DieSpec, type Face } from "./labDice";
 import type { DropShadow } from "./labLayout";
 import type { Pose } from "./labPhysics";
 
@@ -54,7 +54,7 @@ const FACES: { pos: THREE.Vector3; rot: THREE.Euler }[] = [
   },
 ];
 
-export type SvgOpts = { width: number; pad: number };
+export type SvgOpts = { width: number; pad: number; lettersOnly?: boolean };
 
 type Pt = { x: number; y: number };
 
@@ -155,9 +155,12 @@ export function diceSvg(
         f,
       );
 
+      if (opts.lettersOnly && spec.faces[k].kind !== "letter") return;
       const poly = corners.map((c) => `${f(c.x)},${f(c.y)}`).join(" ");
-      const ink = shade(COLORS.ink, light);
-      let svg = `<polygon points="${poly}" fill="${ink}" stroke="${ink}" stroke-width="${f(2 * R)}" stroke-linejoin="round"/>`;
+      const ink = shade(bodyColor(spec), light);
+      let svg = opts.lettersOnly
+        ? ""
+        : `<polygon points="${poly}" fill="${ink}" stroke="${ink}" stroke-width="${f(2 * R)}" stroke-linejoin="round"/>`;
       svg += `<g transform="matrix(${m.join(" ")})">${faceArt(spec.faces[k], paths, light)}</g>`;
       items.push({ depth, svg });
     });

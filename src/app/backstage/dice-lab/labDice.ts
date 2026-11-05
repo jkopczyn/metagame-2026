@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { DICE } from "@/v2/components/dice/dice3d/Die";
 import {
+  COLORS,
   letterTexture,
   pipTexture,
 } from "@/v2/components/dice/dice3d/faceTexture";
@@ -21,8 +22,16 @@ export const FACE_NAMES = [
   "top",
   "bottom",
 ] as const;
-// `show` is the letter face the Arrange layout points at the camera.
-export type DieSpec = { faces: Face[]; show: Show };
+// `show` is the face the Arrange layout points at the camera; `body` is the
+// cube's color (brand key or CSS color), ink when absent.
+export type DieSpec = { faces: Face[]; show: Show; body?: string };
+
+export function resolveColor(color: string): string {
+  return color in COLORS ? COLORS[color as keyof typeof COLORS] : color;
+}
+export function bodyColor(spec: DieSpec): string {
+  return resolveColor(spec.body ?? "ink");
+}
 
 export const LETTERS = ["M", "E", "T", "A", "G"];
 export const PIP_VALUES = [0, 1, 2, 5, 6, 7];
@@ -146,12 +155,20 @@ export const PRESETS: { name: string; dice: DieSpec[] }[] = [
   },
 ];
 
-export function faceTexture(face: Face): THREE.Texture {
+export function faceTexture(face: Face, spec: DieSpec): THREE.Texture {
   return face.kind === "letter"
     ? letterTexture(face.letter, face.color)
-    : pipTexture(face.value);
+    : pipTexture(face.value, bodyColor(spec));
 }
 
 export function cloneSpec(spec: DieSpec): DieSpec {
-  return { show: spec.show, faces: spec.faces.map((f) => ({ ...f })) };
+  return { ...spec, faces: spec.faces.map((f) => ({ ...f })) };
+}
+
+export function recolorBodies(
+  dice: DieSpec[],
+  color: string,
+  pick: (i: number) => boolean,
+): DieSpec[] {
+  return dice.map((d, i) => (pick(i) ? { ...cloneSpec(d), body: color } : d));
 }

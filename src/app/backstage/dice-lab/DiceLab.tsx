@@ -17,6 +17,7 @@ import {
   PRESETS,
   cloneSpec,
   heroDie,
+  recolorBodies,
   recolorLetters,
   spellDice,
   type DieSpec,
@@ -51,6 +52,7 @@ type Saved = {
   fov: number;
   shadows: boolean;
   shadow: DropShadow;
+  lettersOnly: boolean;
   grid: boolean;
   settle: SettleMode;
   keepOrder: boolean;
@@ -67,6 +69,7 @@ const DEFAULTS: Saved = {
   fov: 7,
   shadows: true,
   shadow: DEFAULT_SHADOW,
+  lettersOnly: false,
   grid: true,
   settle: "upright-blue",
   keepOrder: true,
@@ -153,6 +156,7 @@ export default function DiceLab() {
   const [rotStep, setRotStep] = useState(15);
   const [spell, setSpell] = useState("");
   const [tint, setTint] = useState("blue");
+  const [bodyTint, setBodyTint] = useState("ink");
   // the crop outline shows only while the padding slider is in use
   const [padActive, setPadActive] = useState(false);
 
@@ -309,8 +313,6 @@ export default function DiceLab() {
   };
   const rowOf = (i: number) =>
     lay.perRow > 0 ? Math.floor(i / lay.perRow) : 0;
-  const applyTint = (pick: (i: number) => boolean) =>
-    set("dice", recolorLetters(s.dice, tint, pick));
 
   const tp = s.throwParams;
   const setTp = <K extends keyof ThrowParams>(k: K, v: ThrowParams[K]) =>
@@ -390,43 +392,29 @@ export default function DiceLab() {
               +
             </button>
           </div>
-          <div
-            className="flex items-center gap-1"
+          <TintRow
+            label="Letters"
             title="Repaint every letter face on the chosen dice"
-          >
-            <span className="w-12 shrink-0 text-xs text-neutral-500">
-              Letters
-            </span>
-            <ColorPick color={tint} onChange={setTint} />
-            <button
-              type="button"
-              className={BTN}
-              disabled={selected === null}
-              onClick={() => applyTint((i) => i === selected)}
-              title="Selected die"
-            >
-              die
-            </button>
-            <button
-              type="button"
-              className={BTN}
-              disabled={selected === null}
-              onClick={() =>
-                selected !== null &&
-                applyTint((i) => rowOf(i) === rowOf(selected))
-              }
-              title="The selected die's row"
-            >
-              row
-            </button>
-            <button
-              type="button"
-              className={BTN}
-              onClick={() => applyTint(() => true)}
-            >
-              all
-            </button>
-          </div>
+            color={tint}
+            onColor={setTint}
+            selected={selected}
+            rowOf={rowOf}
+            apply={(pick) => set("dice", recolorLetters(s.dice, tint, pick))}
+          />
+          <TintRow
+            label="Body"
+            title="Recolor the cube itself on the chosen dice"
+            color={bodyTint}
+            onColor={setBodyTint}
+            selected={selected}
+            rowOf={rowOf}
+            apply={(pick) => set("dice", recolorBodies(s.dice, bodyTint, pick))}
+          />
+          <Check
+            label="Letters only (no cubes or pips)"
+            v={s.lettersOnly}
+            onChange={(v) => set("lettersOnly", v)}
+          />
           {sel && selected !== null ? (
             <div className="flex flex-col gap-2 rounded border border-neutral-800 p-2">
               <div className="flex items-center justify-between">
@@ -969,6 +957,7 @@ export default function DiceLab() {
             fov={s.fov}
             shadows={s.shadows}
             shadow={sh}
+            lettersOnly={s.lettersOnly}
             grid={s.grid}
             settle={s.settle}
             keepOrder={s.keepOrder}
@@ -1147,8 +1136,57 @@ function useSwatches() {
   );
 }
 
-// Brand key (blue / orange), a saved swatch, or a custom color editable as a
-// swatch or hex; custom colors can be saved into the dropdown.
+// A color plus "apply to the selected die / its row / every die" buttons.
+function TintRow({
+  label,
+  title,
+  color,
+  onColor,
+  selected,
+  rowOf,
+  apply,
+}: {
+  label: string;
+  title: string;
+  color: string;
+  onColor: (c: string) => void;
+  selected: number | null;
+  rowOf: (i: number) => number;
+  apply: (pick: (i: number) => boolean) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1" title={title}>
+      <span className="w-12 shrink-0 text-xs text-neutral-500">{label}</span>
+      <ColorPick color={color} onChange={onColor} />
+      <button
+        type="button"
+        className={BTN}
+        disabled={selected === null}
+        onClick={() => apply((i) => i === selected)}
+        title="Selected die"
+      >
+        die
+      </button>
+      <button
+        type="button"
+        className={BTN}
+        disabled={selected === null}
+        onClick={() =>
+          selected !== null && apply((i) => rowOf(i) === rowOf(selected))
+        }
+        title="The selected die's row"
+      >
+        row
+      </button>
+      <button type="button" className={BTN} onClick={() => apply(() => true)}>
+        all
+      </button>
+    </div>
+  );
+}
+
+// Brand key (blue / orange / ink), a saved swatch, or a custom color editable
+// as a swatch or hex; custom colors can be saved into the dropdown.
 function ColorPick({
   color,
   onChange,
@@ -1157,7 +1195,7 @@ function ColorPick({
   onChange: (c: string) => void;
 }) {
   const swatches = useSwatches();
-  const brand = color === "blue" || color === "orange";
+  const brand = color === "blue" || color === "orange" || color === "ink";
   const saved = swatches.includes(color);
   // the hex field holds partial input until it's a full #rrggbb
   const [hex, setHex] = useState(color);
@@ -1177,6 +1215,7 @@ function ColorPick({
       >
         <option value="blue">blue</option>
         <option value="orange">orange</option>
+        <option value="ink">ink</option>
         {swatches.map((c) => (
           <option key={c} value={c}>
             {c}
