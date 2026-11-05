@@ -20,19 +20,22 @@ import { alias } from "drizzle-orm/pg-core";
 import { getDb, schema } from "@/db";
 import {
   MAX_LEVEL,
-  MEGAGAME_CLASSES,
   NO_LEVELS,
   isMegagameClass,
   type MegagameClass,
   type MegagameLevels,
 } from "./megagame-levels";
+import type {
+  ProgressCompletion,
+  ProgressLevelEvent,
+  ProgressPlayer,
+} from "./megagame-progress";
 import type { QuestImportRow } from "./megagame-quest-csv";
 import {
   BUCKET_ORIGIN,
   bucketIntervalSql,
   isCompleteMegagameCode,
   normalizeMegagameCode,
-  type DatedLevelEvent,
   type EventTable,
 } from "./megagame-rules";
 import { visibleTickets } from "./ticket-store";
@@ -925,15 +928,48 @@ export async function levelEventsFor(userId: string): Promise<LevelEvent[]> {
 
 // ---- Dashboard ----
 
-/** Players per current level in each class, from the user columns; index = level. */
-export async function levelGrid(): Promise<Record<MegagameClass, number[]>> {
+/** Every live completion with its quest's class, for the progress page. */
+export async function liveCompletionLog(): Promise<ProgressCompletion[]> {
+  const { questCompletions, quests } = schema;
+  return getDb()
+    .select({
+      userId: questCompletions.userId,
+      class: quests.class,
+      confirmedAt: questCompletions.confirmedAt,
+    })
+    .from(questCompletions)
+    .innerJoin(quests, eq(quests.id, questCompletions.questId))
+    .where(isNull(questCompletions.voidedAt));
+}
+
+/** Every live level event, deleted accounts included, for the progress page. */
+export async function liveLevelEventLog(): Promise<ProgressLevelEvent[]> {
+  const { levelEvents } = schema;
+  return getDb()
+    .select({
+      userId: levelEvents.userId,
+      class: levelEvents.class,
+      level: levelEvents.level,
+      source: levelEvents.source,
+      awardedAt: levelEvents.awardedAt,
+    })
+    .from(levelEvents)
+    .where(isNull(levelEvents.voidedAt));
+}
+
+/** Names and level columns of everyone in a class plus these ids. */
+export async function progressPlayers(
+  ids: readonly string[],
+): Promise<ProgressPlayer[]> {
   const { user } = schema;
+  const unique = [...new Set(ids)];
   const rows = await getDb()
     .select({
+      id: user.id,
+      name: user.name,
       wizard: user.wizardLevel,
       pirate: user.pirateLevel,
       alien: user.alienLevel,
-      n: sql<number>`count(*)::int`,
     })
     .from(user)
     .where(
@@ -941,26 +977,20 @@ export async function levelGrid(): Promise<Record<MegagameClass, number[]>> {
         gt(user.wizardLevel, 0),
         gt(user.pirateLevel, 0),
         gt(user.alienLevel, 0),
+        unique.length > 0 ? inArray(user.id, unique) : undefined,
       ),
-    )
-    .groupBy(user.wizardLevel, user.pirateLevel, user.alienLevel);
-  const grid = Object.fromEntries(
-    MEGAGAME_CLASSES.map((c) => [c, new Array(MAX_LEVEL + 1).fill(0)]),
-  ) as Record<MegagameClass, number[]>;
-  for (const row of rows) {
-    for (const c of MEGAGAME_CLASSES) {
-      const level = row[c];
-      if (level >= 1 && level <= MAX_LEVEL) grid[c][level] += row.n;
-    }
-  }
-  return grid;
+    );
+  return rows.map(({ wizard, pirate, alien, ...rest }) => ({
+    ...rest,
+    levels: { wizard, pirate, alien },
+  }));
 }
 
-/** Accounts that have claimed a paid ticket: the dashboard's denominator. */
-export async function claimedTicketHolderCount(): Promise<number> {
+/** Accounts that have claimed a paid ticket: the page's denominator. */
+export async function claimedTicketHolderIds(): Promise<string[]> {
   const { tickets } = schema;
-  const [row] = await getDb()
-    .select({ n: sql<number>`count(distinct ${tickets.ownerUserId})::int` })
+  const rows = await getDb()
+    .select({ id: tickets.ownerUserId })
     .from(tickets)
     .where(
       and(
@@ -968,76 +998,9 @@ export async function claimedTicketHolderCount(): Promise<number> {
         isNotNull(tickets.ownerUserId),
         eq(tickets.status, "paid"),
       ),
-    );
-  return row?.n ?? 0;
-}
-
-export type QuestCount = {
-  id: string;
-  code: string;
-  title: string;
-  class: string | null;
-  active: boolean;
-  n: number;
-};
-
-/** Live completions per quest, quests with none included, most first. */
-export async function questCompletionCounts(): Promise<QuestCount[]> {
-  const { quests, questCompletions } = schema;
-  const n = sql<number>`count(${questCompletions.id})::int`;
-  return getDb()
-    .select({
-      id: quests.id,
-      code: quests.code,
-      title: quests.title,
-      class: quests.class,
-      active: quests.active,
-      n,
-    })
-    .from(quests)
-    .leftJoin(
-      questCompletions,
-      and(
-        eq(questCompletions.questId, quests.id),
-        isNull(questCompletions.voidedAt),
-      ),
     )
-    .groupBy(quests.id)
-    .orderBy(desc(n), asc(quests.code));
-}
-
-/** Players with at least one live completion; deleted accounts count as one. */
-export async function distinctCompletingPlayers(): Promise<number> {
-  const { questCompletions } = schema;
-  const [row] = await getDb()
-    .select({
-      n: sql<number>`count(distinct coalesce(${questCompletions.userId}, ''))::int`,
-    })
-    .from(questCompletions)
-    .where(isNull(questCompletions.voidedAt));
-  return row?.n ?? 0;
-}
-
-export type VolunteerCount = {
-  userId: string | null;
-  name: string | null;
-  n: number;
-};
-
-export async function completionsByVolunteer(): Promise<VolunteerCount[]> {
-  const { questCompletions, confirmations, user } = schema;
-  const n = sql<number>`count(*)::int`;
-  return getDb()
-    .select({ userId: confirmations.confirmedBy, name: user.name, n })
-    .from(questCompletions)
-    .innerJoin(
-      confirmations,
-      eq(confirmations.id, questCompletions.confirmationId),
-    )
-    .leftJoin(user, eq(user.id, confirmations.confirmedBy))
-    .where(isNull(questCompletions.voidedAt))
-    .groupBy(confirmations.confirmedBy, user.name)
-    .orderBy(desc(n));
+    .groupBy(tickets.ownerUserId);
+  return rows.flatMap((r) => (r.id ? [r.id] : []));
 }
 
 // The interval comes only from bucketIntervalSql's whitelist, and goes in as a
@@ -1112,69 +1075,6 @@ export async function levelEventSeries(
     .groupBy(sql`1`, sql`2`, sql`3`)
     .orderBy(sql`1`);
   return rows.map((r) => ({ ...r, bucket: new Date(r.bucket) }));
-}
-
-/** Live level events awarded before `to`, for the cumulative level view. */
-export async function liveLevelEventsBefore(
-  to: Date,
-): Promise<DatedLevelEvent[]> {
-  const { levelEvents } = schema;
-  const rows = await getDb()
-    .select({
-      userId: levelEvents.userId,
-      class: levelEvents.class,
-      level: levelEvents.level,
-      awardedAt: levelEvents.awardedAt,
-    })
-    .from(levelEvents)
-    .where(
-      and(
-        isNull(levelEvents.voidedAt),
-        isNotNull(levelEvents.userId),
-        lt(levelEvents.awardedAt, to),
-      ),
-    );
-  return rows.filter((r): r is DatedLevelEvent => r.userId !== null);
-}
-
-export type OverrideRow = {
-  id: string;
-  playerName: string | null;
-  class: string;
-  level: number;
-  awardedByName: string | null;
-  awardedAt: Date;
-  overrideReason: string | null;
-  voidedAt: Date | null;
-};
-
-/** Volunteer level-ups recorded despite failing checks, newest first. */
-export async function recentOverrides(limit = 20): Promise<OverrideRow[]> {
-  const { levelEvents } = schema;
-  const player = alias(schema.user, "player");
-  const awarder = alias(schema.user, "awarder");
-  return getDb()
-    .select({
-      id: levelEvents.id,
-      playerName: player.name,
-      class: levelEvents.class,
-      level: levelEvents.level,
-      awardedByName: awarder.name,
-      awardedAt: levelEvents.awardedAt,
-      overrideReason: levelEvents.overrideReason,
-      voidedAt: levelEvents.voidedAt,
-    })
-    .from(levelEvents)
-    .leftJoin(player, eq(player.id, levelEvents.userId))
-    .leftJoin(awarder, eq(awarder.id, levelEvents.awardedBy))
-    .where(
-      and(
-        eq(levelEvents.checksPassed, false),
-        eq(levelEvents.source, "volunteer"),
-      ),
-    )
-    .orderBy(desc(levelEvents.awardedAt))
-    .limit(limit);
 }
 
 export type VoidRow = {
