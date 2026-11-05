@@ -43,7 +43,7 @@ export default function SpeakersSection({
           </div>
         </div>
         <p className="mt-8 text-center text-base text-ink/70">
-          And many more coming soon&hellip;
+          And many more&hellip;
         </p>
       </div>
     </section>
