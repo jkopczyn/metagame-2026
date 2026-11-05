@@ -58,7 +58,7 @@ Rules for the value:
 
 - `start` and `end` are ISO 8601 timestamps with an offset. `end` is exclusive. (The example above is fake. Examples and fixtures in the repo must use 2020 dates and must not be the real schedule; a decoy weekend shape is fine, for example 4-hour shifts Friday, 2-hour Saturday, 20-minute Sunday, with long overnight shifts.)
 - `hats` is a non-empty array of hat ids; at most two per shift.
-- Shifts must not overlap. Gaps are allowed and mean no hat is stealable.
+- Shifts are contiguous: each one starts at the instant the previous one ends. A gap or an overlap between consecutive shifts is rejected, so between the first start and the last end every instant is inside a shift.
 - The schedule must cover the whole event, including past shifts, because scoring reads past shift changes from it. Editing a past entry changes past scores; that is intended.
 
 Parsing is strict: a malformed value or an unknown hat id throws at parse time with a message naming the problem. The page then renders its error state (see below) rather than crashing the whole site. An unset variable is treated as an empty schedule.
@@ -136,9 +136,9 @@ Display names come from `user.name`. Every user with at least one steal appears;
 
 ## Testing
 
-- Unit tests (vitest) for schedule parsing (valid, malformed JSON, unknown hat, overlapping shifts, more than two hats, empty), shift state at various instants (inside, in a gap, before first, after last, at an exact boundary), `shiftChangesBetween`, and scoring as listed above.
+- Unit tests (vitest) for schedule parsing (valid, malformed JSON, unknown hat, overlapping shifts, more than two hats, empty), shift state at various instants (inside, before first, after last, at an exact boundary), `shiftChangesBetween`, and scoring as listed above.
 - A rendering test is not required; verify the page with the preview screenshot script against the Vercel preview, on mobile and desktop, per the repo CLAUDE.md.
-- Tests use fake schedules on 2020 dates. A decoy weekend shape (shortening shifts, long nights, gaps, two-hat shifts) is encouraged as long as it is not the real schedule.
+- Tests use fake schedules on 2020 dates. A decoy weekend shape (shortening shifts, long nights, two-hat shifts) is encouraged as long as it is not the real schedule.
 
 ## Out of scope
 

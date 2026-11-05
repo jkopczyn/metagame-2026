@@ -80,17 +80,15 @@ export const DECOY_JSON: string; // JSON.stringify(DECOY_SHIFTS), one line
 
 It is a fake weekend, Friday 2020-01-03 to Sunday 2020-01-05, all times with offset `-08:00`. Build it with a small helper from this list of blocks, in order:
 
-| #   | from      | to        | shift length    | count |
-| --- | --------- | --------- | --------------- | ----- |
-| 1   | Fri 14:00 | Fri 22:00 | 4 h             | 2     |
-| 2   | Fri 22:00 | Sat 04:00 | 6 h (overnight) | 1     |
-|     | Sat 04:00 | Sat 08:00 | gap             | 0     |
-| 3   | Sat 08:00 | Sat 22:00 | 2 h             | 7     |
-| 4   | Sat 22:00 | Sun 04:00 | 6 h (overnight) | 1     |
-|     | Sun 04:00 | Sun 09:00 | gap             | 0     |
-| 5   | Sun 09:00 | Sun 13:00 | 20 min          | 12    |
+| #   | from      | to        | shift length     | count |
+| --- | --------- | --------- | ---------------- | ----- |
+| 1   | Fri 14:00 | Fri 22:00 | 4 h              | 2     |
+| 2   | Fri 22:00 | Sat 08:00 | 10 h (overnight) | 1     |
+| 3   | Sat 08:00 | Sat 22:00 | 2 h              | 7     |
+| 4   | Sat 22:00 | Sun 09:00 | 11 h (overnight) | 1     |
+| 5   | Sun 09:00 | Sun 13:00 | 20 min           | 12    |
 
-That is 23 shifts. Hats for shift i (0-based over the whole list): `[HAT_IDS[i % 6]]`, plus `HAT_IDS[(i + 3) % 6]` as a second hat when `i % 3 === 2`. So shift 0 is `["wizard"]`, shift 2 (the Friday overnight) is `["fuzzy", "crown"]`, and shift 3 (Sat 08:00) is `["slouch"]`. The distinct change instants are 26: 4 in Fri 14:00 to Sat 04:00, 9 in Sat 08:00 to Sun 04:00, and 13 in Sun 09:00 to 13:00.
+That is 23 shifts. Hats for shift i (0-based over the whole list): `[HAT_IDS[i % 6]]`, plus `HAT_IDS[(i + 3) % 6]` as a second hat when `i % 3 === 2`. So shift 0 is `["wizard"]`, shift 2 (the Friday overnight) is `["fuzzy", "crown"]`, and shift 3 (Sat 08:00) is `["slouch"]`. The shifts are contiguous from Fri 14:00 to Sun 13:00, so the distinct change instants are 24.
 
 Interface:
 
@@ -145,18 +143,18 @@ Parsing rules. Each failure throws `ScheduleParseError`. Errors about one entry 
 - Calendar-invalid values. Build the wall time with `Date.UTC(y, m - 1, d, h, mi, s, ms)` and reject unless `getUTCFullYear/Month/Date/Hours/Minutes/Seconds` give back the same components (this rejects 2020-02-30, 2021-02-29, hour 25, minute 60). Reject offsets with hours above 14 or minutes above 59. Then subtract the offset to get the instant. Do not use `new Date(string)` for validation, since it rolls invalid days over.
 - `end <= start`.
 - `hats` not an array, empty, longer than 2, containing an unknown id (the message names the id), or containing a duplicate.
-- For consecutive entries, `prev.end > next.start` (overlap or out of order). Equal is allowed; gaps are allowed.
+- For consecutive entries, `prev.end !== next.start` (a gap, an overlap, or out of order). Shifts are contiguous.
 - Unknown keys on an entry are ignored, so a harmless extra key does not blank the page.
 
-Shift state: empty schedule gives `unposted`. Inside shift i gives `on` with `next = schedule[i + 1] ? { startsAt, endsAt } : null`, whether or not there is a gap before shift i+1. Otherwise, if `nextShift` exists, `off` with its start. Otherwise `done`.
+Shift state: empty schedule gives `unposted`. Inside shift i gives `on` with `nextEndsAt = schedule[i + 1]?.end ?? null`; since shifts are contiguous the next start is the current end. Otherwise, if `nextShift` exists, `off` with its start. Otherwise `done`.
 
 Tests first. Fixture helper `shift(startHHMM, endHHMM, hats)` building ISO strings on `2020-01-01` with offset `-08:00`.
 
-- `parseSchedule`: a valid two-shift value gives the right Dates and hat arrays; `undefined`, `""`, `"   "`, and `"[]"` give `[]`; an extra key is ignored. Error cases, each `toThrow(ScheduleParseError)`: malformed JSON; non-array; unknown hat id (message contains the id); three hats; empty hats; duplicate hat; overlapping shifts; out-of-order shifts; `end` equal to `start`; no offset (`"2020-01-01T10:00:00"`); `2020-02-30T10:00:00-08:00`; `2021-02-29T10:00:00-08:00`; hour `25`; offset `+25:00`. One test checks that an error in the second entry has a message starting `shift 2:`. One test checks that `2020-02-29T10:00:00-08:00` (a valid leap day) parses.
-- `currentShift`/`nextShift`: inside, in a gap, before first, after last, at a shift's exact start (current is that shift), at an exact end that is the next shift's start (current is the next shift), at an exact end followed by a gap (current is null).
-- `shiftState`: `unposted` for `[]`; `on` with `next` set when the next shift is back to back; `on` with `next` set when the next shift comes after a gap (its `startsAt` differs from `endsAt`); `on` in the last shift with `next: null`; `off` before the first shift and in a gap; `done` at and after the last end.
-- Decoy: `parseSchedule(DECOY_JSON)` gives 23 shifts; `shiftChangesBetween` from Fri 13:00 to Sun 13:00 gives 26 instants; `shiftState` at Sat 03:00 is `on` (overnight) with `next` starting Sat 08:00 (gap); at Sat 05:00 is `off` with `nextStartsAt` Sat 08:00; at Sun 12:50 is `on` with `next: null`; at Sun 13:00 is `done`.
-- `shiftChangesBetween`: back-to-back shifts produce one change at the shared instant; a gap produces both the end and the next start; with default bounds, `from` is excluded and `to` included when either equals a change; with `{ from: "closed", to: "open" }` the reverse; with both closed, both included; `from > to` gives `[]`; empty schedule gives `[]`.
+- `parseSchedule`: a valid two-shift value gives the right Dates and hat arrays; `undefined`, `""`, `"   "`, and `"[]"` give `[]`; an extra key is ignored. Error cases, each `toThrow(ScheduleParseError)`: malformed JSON; non-array; unknown hat id (message contains the id); three hats; empty hats; duplicate hat; overlapping shifts; a gap between shifts; out-of-order shifts; `end` equal to `start`; no offset (`"2020-01-01T10:00:00"`); `2020-02-30T10:00:00-08:00`; `2021-02-29T10:00:00-08:00`; hour `25`; offset `+25:00`. One test checks that an error in the second entry has a message starting `shift 2:`. One test checks that `2020-02-29T10:00:00-08:00` (a valid leap day) parses.
+- `currentShift`/`nextShift`: inside, before first, after last, at a shift's exact start (current is that shift), at an exact end that is the next shift's start (current is the next shift), at the last end (current is null).
+- `shiftState`: `unposted` for `[]`; `on` with `nextEndsAt` set when a shift follows; `on` in the last shift with `nextEndsAt: null`; `off` before the first shift; `done` at and after the last end.
+- Decoy: `parseSchedule(DECOY_JSON)` gives 23 shifts; `shiftChangesBetween` from Fri 13:00 to Sun 13:00 gives 24 instants; `shiftState` at Sat 03:00 is `on` (overnight) ending Sat 08:00 with `nextEndsAt` Sat 10:00; at Fri 13:00 is `off` with `nextStartsAt` Fri 14:00; at Sun 12:50 is `on` with `nextEndsAt: null`; at Sun 13:00 is `done`.
+- `shiftChangesBetween`: back-to-back shifts produce one change at the shared instant; with default bounds, `from` is excluded and `to` included when either equals a change; with `{ from: "closed", to: "open" }` the reverse; with both closed, both included; `from > to` gives `[]`; empty schedule gives `[]`.
 
 Commits: `test: hat tricks schedule parsing and shift state`, then `feat: hat tricks schedule parsing and shift state`.
 
@@ -395,14 +393,14 @@ Tests first (fixture on 2020-01-01: shift 1 10:00-11:00 `["wizard"]`, shift 2 11
 
 - `formatShiftTime("2020-01-04T15:45:00-08:00")` is `"Sat 3:45 PM"`; `formatClockTime` adds seconds; output contains no U+202F.
 - at 10:30: state `on`, one card for wizard with `photo === art`, `endsAt` 11:00, `nextLine` "The shift after that ends at Wed 12:00 PM"; `perHat` has only wizard.
-- at 11:30: `nextLine` is "The next shift runs Wed 1:00 PM to Wed 2:00 PM" (gap case).
-- at 14:30: `nextLine` is `null`.
+- at 11:30: `nextLine` is "The shift after that ends at Wed 1:00 PM".
+- at 13:30: `nextLine` is `null`.
 - secrecy, on state: at 10:30 with steals only of wizard, `JSON.stringify(view)` does not contain `"crown"`, `"fuzzy"`, `"Spiked crown"`, or `"Sparkly fuzzy hat"`.
-- secrecy, off state: at 12:30 with steals only of wizard, state `off` with next start 13:00, `perHat` is `[]`, and `JSON.stringify(view)` does not contain `"tricorn"` or `"Tricorn"`.
-- before 10:00: `off`. At 15:00: `done`, and `perHat` lists all six hats in order.
+- secrecy, off state: at 09:30 with steals only of wizard, state `off` with next start 10:00, `perHat` is `[]`, and `JSON.stringify(view)` does not contain `"tricorn"` or `"Tricorn"`.
+- At 14:00: `done`, and `perHat` lists all six hats in order.
 - invalid raw schedule: `onScheduleError` called once, state `unposted`, `perHat` `[]`, and a seeded steal still yields 5 points in `overall`.
 - `lastStolen` shows the thief's name and `atLabel`, or `null` when the hat has no steals.
-- Decoy: at Sat 05:00 (gap) with steals only of wizard, state `off` with `nextStartsAtLabel` "Sat 8:00 AM", and `JSON.stringify(view)` contains neither `"slouch"` nor `"Satin slouch hat"` (the hat of the Sat 08:00 shift). At Sun 09:10, `endsAtLabel` is "Sun 9:20 AM" and `nextLine` is "The shift after that ends at Sun 9:40 AM".
+- Decoy: at Fri 13:00 (before the first shift) with steals only of crown, state `off` with `nextStartsAtLabel` "Fri 2:00 PM", and `JSON.stringify(view)` contains neither `"wizard"` nor `"Wizard hat"` (the hat of the first shift). At Sun 09:10, `endsAtLabel` is "Sun 9:20 AM" and `nextLine` is "The shift after that ends at Sun 9:40 AM".
 - `previewOverrides`: `"production"` returns `null` even with every parameter set; `now` without `schedule` returns `null`; `schedule` alone returns only `rawSchedule`; a valid `now` is returned, an invalid one dropped; `steals` and `names` parse, unknown hat ids are dropped, malformed `steals` gives an empty list; `vercelEnv` `"preview"` and `undefined` both allow overrides.
 
 Commits: `test: hat tricks view model`, then `feat: hat tricks view model`.
@@ -439,7 +437,7 @@ Files: create `src/v2/hat-tricks/HatClock.tsx`, `src/v2/hat-tricks/HatCard.tsx`,
 Verification: `pnpm check` passes. Then push and follow the repo CLAUDE.md "Looking at UI changes" section against the Vercel preview, on mobile and desktop, using the preview-only overrides so every state can be seen. Build the paths with `encodeURIComponent` in a short Node one-liner, using `DECOY_JSON` as the schedule and fake steals and names:
 
 - `on` with one hat (`now` Fri 15:00) and with two hats (`now` Sat 00:00, the overnight shift), each with a populated leaderboard (several fake users and steals);
-- `off` (`now` Sat 05:00, in the gap);
+- `off` (`now` Fri 13:00, before the first shift);
 - `done` (`now` Sun 14:00, all six per-hat tables);
 - `unposted` (`schedule=[]`, or `schedule=notjson`);
 - the plain path with no parameters.
@@ -453,7 +451,7 @@ Pass each path to `node scripts/preview-shot.mjs <preview-url> <path…>`. Surfa
 1. Module layout: `src/lib/hat-tricks-hats.ts`, `-schedule.ts`, `-score.ts`, `-format.ts`, `-view.ts`, `-store.ts`; UI in `src/v2/hat-tricks/`.
 2. `shiftChangesBetween` takes an optional `bounds` argument; scoring uses closed-start intervals through it instead of adjusting times.
 3. Parse error messages name the entry as `shift N` (1-based). Parsing also rejects `end <= start`, duplicate hats in a shift, out-of-order entries, timestamps without an offset, calendar-invalid timestamps, and offsets above 14 hours. Unknown keys are ignored.
-4. `next` in the `on` state is the next shift in the list even when a gap comes first; the gap changes the wording only.
+4. Shifts are contiguous (user decision 2026-11-04: reject gaps). `nextEndsAt` in the `on` state is the following shift's end; its start is always the current end.
 5. Steals with `stolenAt` after `now` are ignored in scoring and in "Last stolen by".
 6. Grace: a steal within `graceMs` (inclusive) after the latest change is scored from that change, but only for the first steal of that hat after the change. This ordering rule is my choice; the user's decision did not cover two steals inside one grace window.
 7. Same-instant steals of one hat are ordered by `createdAt`, then `id` (store order); the pure code keeps input order.
