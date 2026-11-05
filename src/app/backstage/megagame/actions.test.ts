@@ -17,6 +17,7 @@ const { auth, store, blob, nav } = vi.hoisted(() => ({
     findLevelEvent: vi.fn(),
     recordLevelUp: vi.fn(),
     voidLevelEvent: vi.fn(),
+    recordQuestAttempt: vi.fn(),
   },
   blob: {
     LARGE_IMAGE_MAX_BYTES: 900 * 1024,
@@ -38,6 +39,7 @@ import {
   confirmCompletions,
   findPlayers,
   levelUp,
+  logAnswerAttempt,
   lookupPlayer,
   undoCompletions,
   undoLevelUp,
@@ -439,5 +441,104 @@ describe("undoLevelUp", () => {
     expect((await undoLevelUp({}, form({ id: ID }))).error).toMatch(
       /faction picker/,
     );
+  });
+});
+
+describe("logAnswerAttempt", () => {
+  const quest = {
+    id: QUEST,
+    code: "A2C4EF",
+    kind: "answer",
+    answers: ["Fire", "Flame"],
+  };
+
+  const players = ["u1", "u2"];
+
+  it("needs megagame.verify and writes nothing without it", async () => {
+    holds();
+    expect(await logAnswerAttempt("A2C4EF", "fire", players)).toEqual({
+      error: auth.EXPIRED,
+    });
+    expect(store.findQuestByCode).not.toHaveBeenCalled();
+    expect(store.recordQuestAttempt).not.toHaveBeenCalled();
+  });
+
+  it("records an attempt for the listed players, judged against the stored answers", async () => {
+    store.findQuestByCode.mockResolvedValue(quest);
+    expect(await logAnswerAttempt("A2C4EF", "  FLAME! ", players)).toEqual({
+      correct: true,
+    });
+    expect(store.recordQuestAttempt).toHaveBeenCalledWith({
+      questId: QUEST,
+      userIds: ["u1", "u2"],
+      correct: true,
+      enteredBy: "v1",
+    });
+  });
+
+  it("records a wrong answer as incorrect", async () => {
+    store.findQuestByCode.mockResolvedValue(quest);
+    expect(await logAnswerAttempt("A2C4EF", "water", players)).toEqual({
+      correct: false,
+    });
+    expect(store.recordQuestAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({ correct: false }),
+    );
+  });
+
+  it("judges but does not record when nobody is listed", async () => {
+    store.findQuestByCode.mockResolvedValue(quest);
+    expect(await logAnswerAttempt("A2C4EF", "fire", [])).toEqual({
+      correct: true,
+    });
+    expect(store.recordQuestAttempt).not.toHaveBeenCalled();
+  });
+
+  it("skips blank input and answers with nothing to match", async () => {
+    store.findQuestByCode.mockResolvedValue(quest);
+    expect(await logAnswerAttempt("A2C4EF", " -- ", players)).toEqual({});
+    expect(store.recordQuestAttempt).not.toHaveBeenCalled();
+  });
+
+  it("refuses an unknown quest or one checked by evidence", async () => {
+    store.findQuestByCode.mockResolvedValue(null);
+    expect(await logAnswerAttempt("A2C4EF", "fire", players)).toEqual({
+      error: "That quest was not found.",
+    });
+    store.findQuestByCode.mockResolvedValue({ ...quest, kind: "evidence" });
+    expect(await logAnswerAttempt("A2C4EF", "fire", players)).toEqual({
+      error: "That quest was not found.",
+    });
+    expect(store.recordQuestAttempt).not.toHaveBeenCalled();
+  });
+
+  it("normalizes the quest code and skips the lookup for a malformed one", async () => {
+    store.findQuestByCode.mockResolvedValue(quest);
+    await logAnswerAttempt("a2c4-ef", "fire", players);
+    expect(store.findQuestByCode).toHaveBeenCalledWith("A2C4EF");
+    store.findQuestByCode.mockClear();
+    expect(await logAnswerAttempt("x".repeat(500), "fire", players)).toEqual({
+      error: "That quest was not found.",
+    });
+    expect(store.findQuestByCode).not.toHaveBeenCalled();
+  });
+
+  it("refuses input that is not a string, or players that are not ids", async () => {
+    store.findQuestByCode.mockResolvedValue(quest);
+    const stale = { error: "This form is out of date. Reload and try again." };
+    expect(
+      await logAnswerAttempt(
+        "A2C4EF",
+        { toString: () => "fire" } as never,
+        players,
+      ),
+    ).toEqual(stale);
+    expect(await logAnswerAttempt("A2C4EF", "fire", "u1" as never)).toEqual(
+      stale,
+    );
+    expect(await logAnswerAttempt("A2C4EF", "fire", [1] as never)).toEqual(
+      stale,
+    );
+    expect(store.recordQuestAttempt).not.toHaveBeenCalled();
   });
 });

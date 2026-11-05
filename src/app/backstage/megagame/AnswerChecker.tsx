@@ -2,13 +2,37 @@
 
 import { useState } from "react";
 import { fieldClass, smallButtonClass } from "../ui";
+import { logAnswerAttempt } from "./actions";
+import { attemptLog } from "./attempt-log";
 import { matchAnswer } from "@/lib/megagame-rules";
 
-/** A helper only: the volunteer decides. Answers stay hidden until revealed. */
-export default function AnswerChecker({ answers }: { answers: string[] }) {
+/**
+ * A helper only: the volunteer decides. Answers stay hidden until revealed.
+ * What was typed is logged when the volunteer presses Enter or leaves the
+ * field, not on each keystroke. Leaving the field includes tapping "Reveal
+ * answers" or switching apps, so an unfinished answer can be logged then.
+ */
+export default function AnswerChecker({
+  questCode,
+  answers,
+  players,
+}: {
+  questCode: string;
+  answers: string[];
+  /** The listed players, whose attempt counts the log updates. */
+  players: string[];
+}) {
   const [entered, setEntered] = useState("");
   const [revealed, setRevealed] = useState(false);
+  const [log] = useState(attemptLog);
   const match = matchAnswer(entered, answers);
+
+  const record = () => {
+    if (log.take(entered)) {
+      // A failed log must not get in the volunteer's way.
+      logAnswerAttempt(questCode, entered, players).catch(() => {});
+    }
+  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -22,6 +46,13 @@ export default function AnswerChecker({ answers }: { answers: string[] }) {
         spellCheck={false}
         value={entered}
         onChange={(e) => setEntered(e.target.value)}
+        onBlur={record}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            record();
+          }
+        }}
         enterKeyHint="done"
         className={fieldClass}
       />
