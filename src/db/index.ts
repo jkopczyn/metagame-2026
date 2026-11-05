@@ -1,6 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle, type NeonHttpDatabase } from "drizzle-orm/neon-http";
 import { env } from "@/env";
+import { routeLocalDatabase } from "./local-endpoint.mjs";
 import * as schema from "./schema";
 
 export type Db = NeonHttpDatabase<typeof schema>;
@@ -18,6 +19,7 @@ export function getDb(): Db {
   if (!url) {
     throw new Error("DATABASE_URL is not set — see .env.example");
   }
+  routeLocalDatabase(url);
   cached = drizzle({ client: neon(url), schema, casing: "snake_case" });
   return cached;
 }

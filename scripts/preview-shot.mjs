@@ -1,7 +1,9 @@
-// Screenshot a preview deployment at phone and desktop widths, signed in as
-// the seed admin, and flag any page wider than its viewport.
+// Screenshot a preview deployment or `pnpm dev:local` at phone and desktop
+// widths, signed in as the seed admin, and flag any page wider than its viewport.
 //   node scripts/preview-shot.mjs https://metagame-2026-xxx.vercel.app /backstage/tickets [/more/paths]
-// Reads the Vercel bypass key from VERCEL_BYPASS or ~/.config/vercel/metagame-2026-bypass.
+// Exits 1 if sign-in fails; SHOT_EMAIL= (empty) skips it to shoot signed out.
+// Previews read the Vercel bypass key from VERCEL_BYPASS or
+// ~/.config/vercel/metagame-2026-bypass; localhost doesn't need one.
 // Screenshots land in preview-shots/ (gitignored). Tap a selector before the
 // phone shot with TAP='ul li button' to capture a modal. SHOT_BROWSER points
 // at a Chromium binary when the one `npx playwright install` fetches is absent.
@@ -15,12 +17,22 @@ if (!base || paths.length === 0) {
   console.error("usage: preview-shot.mjs <base-url> <path> [path...]");
   process.exit(2);
 }
-const bypass =
-  process.env.VERCEL_BYPASS ??
-  readFileSync(
-    join(homedir(), ".config/vercel/metagame-2026-bypass"),
-    "utf8",
-  ).trim();
+function readBypass() {
+  if (["localhost", "127.0.0.1", "[::1]"].includes(new URL(base).hostname)) {
+    return null;
+  }
+  if (process.env.VERCEL_BYPASS) return process.env.VERCEL_BYPASS;
+  try {
+    return readFileSync(
+      join(homedir(), ".config/vercel/metagame-2026-bypass"),
+      "utf8",
+    ).trim();
+  } catch {
+    console.warn("no Vercel bypass key; a protected preview will refuse this");
+    return null;
+  }
+}
+const bypass = readBypass();
 const email = process.env.SHOT_EMAIL ?? "admin@metagame.games";
 const password = process.env.SHOT_PASSWORD ?? "metagame";
 const out = "preview-shots";
@@ -39,43 +51,62 @@ const sizes = [
 const browser = await chromium.launch({
   executablePath: process.env.SHOT_BROWSER,
 });
-let overflow = 0;
-for (const size of sizes) {
-  const ctx = await browser.newContext({
-    ...size,
-    deviceScaleFactor: 2,
-    extraHTTPHeaders: {
-      "x-vercel-protection-bypass": bypass,
-      "x-vercel-set-bypass-cookie": "true",
-    },
-  });
-  const r = await ctx.request.post(`${base}/api/auth/sign-in/email`, {
-    data: { email, password },
-    headers: { Origin: base },
-  });
-  if (!r.ok())
-    console.warn(`sign-in ${r.status()} — pages will show the sign-in card`);
-  const page = await ctx.newPage();
-  for (const path of paths) {
-    const slug = (path.replace(/^\/+/, "") || "index").replace(/[^\w-]+/g, "_");
-    await page.goto(base + path, { waitUntil: "networkidle", timeout: 60_000 });
-    await page.waitForTimeout(400);
-    if (size.name === "phone" && process.env.TAP) {
-      await page.locator(process.env.TAP).first().click();
-      await page.waitForTimeout(500);
+let failed = false;
+try {
+  for (const size of sizes) {
+    const ctx = await browser.newContext({
+      ...size,
+      deviceScaleFactor: 2,
+      extraHTTPHeaders: bypass
+        ? {
+            "x-vercel-protection-bypass": bypass,
+            "x-vercel-set-bypass-cookie": "true",
+          }
+        : {},
+    });
+    if (email) {
+      const r = await ctx.request.post(`${base}/api/auth/sign-in/email`, {
+        data: { email, password },
+        headers: { Origin: base },
+      });
+      if (!r.ok()) {
+        throw new Error(
+          `sign-in as ${email} failed with ${r.status()}, so screenshots would only show the sign-in card`,
+        );
+      }
     }
-    const width = await page.evaluate(
-      () => document.documentElement.scrollWidth,
-    );
-    const wide = width > size.viewport.width;
-    if (wide) overflow++;
-    const file = `${out}/${slug}-${size.name}.png`;
-    await page.screenshot({ path: file, fullPage: !process.env.TAP });
-    console.log(
-      `${wide ? "OVERFLOW" : "ok"} ${size.name} ${path} width=${width} → ${file}`,
-    );
+    const page = await ctx.newPage();
+    for (const path of paths) {
+      const slug = (path.replace(/^\/+/, "") || "index").replace(
+        /[^\w-]+/g,
+        "_",
+      );
+      await page.goto(base + path, {
+        waitUntil: "networkidle",
+        timeout: 60_000,
+      });
+      await page.waitForTimeout(400);
+      if (size.name === "phone" && process.env.TAP) {
+        await page.locator(process.env.TAP).first().click();
+        await page.waitForTimeout(500);
+      }
+      const width = await page.evaluate(
+        () => document.documentElement.scrollWidth,
+      );
+      const wide = width > size.viewport.width;
+      if (wide) failed = true;
+      const file = `${out}/${slug}-${size.name}.png`;
+      await page.screenshot({ path: file, fullPage: !process.env.TAP });
+      console.log(
+        `${wide ? "OVERFLOW" : "ok"} ${size.name} ${path} width=${width} → ${file}`,
+      );
+    }
+    await ctx.close();
   }
-  await ctx.close();
+} catch (error) {
+  console.error(error.message);
+  failed = true;
+} finally {
+  await browser.close();
 }
-await browser.close();
-process.exit(overflow ? 1 : 0);
+process.exit(failed ? 1 : 0);

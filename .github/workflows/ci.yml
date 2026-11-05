@@ -18,10 +18,22 @@ jobs:
           version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "24"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm format:check
+      - run: pnpm test
+      - run: pnpm db:check
+      # Fork PRs get no preview, so otherwise their migrations first run on prod.
+      - name: Replay migrations and seed, fail on schema drift
+        env:
+          DATABASE_URL: postgres://local:local@127.0.0.1:5433/local
+        run: |
+          node scripts/local-db-server.mjs "$(mktemp -d)" 5433 &
+          curl -so /dev/null --retry 60 --retry-delay 1 --retry-connrefused http://127.0.0.1:5433/
+          pnpm db:migrate
+          pnpm db:seed --yes
+          node scripts/db-drift.mjs
       - run: pnpm build

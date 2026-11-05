@@ -43,34 +43,19 @@
 import { createHash, scryptSync } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { neon } from "@neondatabase/serverless";
+import { routeLocalDatabase } from "../src/db/local-endpoint.mjs";
 import { textDoc } from "../src/lib/notice-doc.ts";
 import { SPEAKER_ACCOUNTS } from "../src/v2/data/speaker-accounts.ts";
+import { loadDbEnv, refuseProductionDatabase } from "./lib/db-env.mjs";
 
-for (const file of [
-  ".env.local",
-  ".vercel/.env.production.local",
-  ".vercel/.env.preview.local",
-]) {
-  try {
-    process.loadEnvFile(file);
-  } catch {
-    // file absent
-  }
-}
-
-// Compute endpoint of the Neon `main` branch (prod).
-const PROD_ENDPOINT = "ep-crimson-sky-b8tcqhxv";
+loadDbEnv();
 
 const url = process.env.DATABASE_URL;
 if (!url) {
   console.log("[db:seed] DATABASE_URL not set — nothing to seed");
   process.exit(0);
 }
-const host = new URL(url).hostname;
-if (host.startsWith(PROD_ENDPOINT)) {
-  console.error(`[db:seed] refusing to seed the production endpoint (${host})`);
-  process.exit(1);
-}
+const host = refuseProductionDatabase("db:seed", url);
 if (!process.argv.includes("--yes")) {
   console.error(
     `[db:seed] would seed ${host}; pass --yes to confirm (this writes rows)`,
@@ -78,6 +63,7 @@ if (!process.argv.includes("--yes")) {
   process.exit(1);
 }
 
+routeLocalDatabase(url);
 const sql = neon(url);
 
 // Matches better-auth's scrypt settings (src/lib/auth.ts leaves the default
