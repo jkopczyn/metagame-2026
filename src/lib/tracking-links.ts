@@ -326,12 +326,13 @@ const escapeFormula = (s: string) =>
 
 export async function findTrackingLink(
   slug: string,
+  signal?: AbortSignal,
 ): Promise<TrackingLink | null> {
   const params = new URLSearchParams({
     filterByFormula: `LOWER({Slug})='${escapeFormula(slug)}'`,
     maxRecords: "1",
   });
-  const page = (await airtable(`${tableUrl()}?${params}`)) as {
+  const page = (await airtable(`${tableUrl()}?${params}`, { signal })) as {
     records: AirtableRecord[];
   };
   return page.records[0] ? toLink(page.records[0]) : null;
@@ -437,16 +438,26 @@ export async function loadLinkOptions(): Promise<LinkOptions> {
 
 // Redirect lookups are cached briefly per server instance: a link posted in a
 // busy channel gets a burst of preview-bot hits, and Airtable's rate limit is
-// 5 req/s per base.
+// 5 req/s per base. Concurrent misses share one lookup, and a stalled one gives
+// up so /go can fall back to the homepage; failures aren't cached.
 const CACHE_TTL_MS = 60_000;
+const LOOKUP_TIMEOUT_MS = 5_000;
 const cache = new Map<string, { at: number; link: TrackingLink | null }>();
+const inFlight = new Map<string, Promise<TrackingLink | null>>();
 
 export async function resolveTrackingLink(
   slug: string,
 ): Promise<TrackingLink | null> {
   const hit = cache.get(slug);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.link;
-  const link = await findTrackingLink(slug);
-  cache.set(slug, { at: Date.now(), link });
-  return link;
+  const pending = inFlight.get(slug);
+  if (pending) return pending;
+  const lookup = findTrackingLink(slug, AbortSignal.timeout(LOOKUP_TIMEOUT_MS))
+    .then((link) => {
+      cache.set(slug, { at: Date.now(), link });
+      return link;
+    })
+    .finally(() => inFlight.delete(slug));
+  inFlight.set(slug, lookup);
+  return lookup;
 }

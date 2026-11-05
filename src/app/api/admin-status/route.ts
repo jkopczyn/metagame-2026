@@ -9,7 +9,9 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   const [session, access] = accountsConfigured()
-    ? await Promise.all([currentSession().catch(() => null), teamAccess()])
+    ? // A failed read stays a 500: the nav keeps its last answer for minutes, and
+      // must not remember a signed-in visitor as signed out.
+      await Promise.all([currentSession(), teamAccess()])
     : [null, null];
   return Response.json(
     {

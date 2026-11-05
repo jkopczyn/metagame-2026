@@ -92,7 +92,7 @@ export default function AccountMenu({
               e.preventDefault();
               start(async () => {
                 await signOutInPlace();
-                // The nav only re-asks on a path change, so tell it; the
+                // The nav doesn't re-ask on its own here, so tell it; the
                 // refresh re-renders whatever server content was personal.
                 notifyAccountChanged();
                 router.push("/");

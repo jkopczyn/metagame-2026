@@ -29,7 +29,10 @@ export const teamAccess = cache(async (): Promise<TeamAccess | null> => {
   try {
     const session = await getAuth().api.getSession({
       headers: await headers(),
-      query: { disableCookieCache: true },
+      // disableRefresh keeps this read from writing cookies: a cookie set during
+      // a server action makes Next re-render the whole route behind it.
+      // currentSession() still does the refreshing.
+      query: { disableCookieCache: true, disableRefresh: true },
     });
     const user = session?.user;
     if (!user || user.banned) return null;
