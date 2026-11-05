@@ -109,7 +109,7 @@ function buildStateView(
       hats: state.hats.map(card),
       endsAt: state.endsAt.toISOString(),
       endsAtLabel,
-      nextLine: nextLineFor(state.next, state.endsAt),
+      nextLine: nextLineFor(state.nextEndsAt),
     };
   }
   if (state.kind === "off") {
@@ -122,15 +122,9 @@ function buildStateView(
   return { kind: state.kind };
 }
 
-function nextLineFor(
-  next: { startsAt: Date; endsAt: Date } | null,
-  endsAt: Date,
-): string | null {
-  if (!next) return null;
-  if (next.startsAt.getTime() === endsAt.getTime()) {
-    return `The shift after that ends at ${formatShiftTime(next.endsAt)}`;
-  }
-  return `The next shift runs ${formatShiftTime(next.startsAt)} to ${formatShiftTime(next.endsAt)}`;
+function nextLineFor(nextEndsAt: Date | null): string | null {
+  if (!nextEndsAt) return null;
+  return `The shift after that ends at ${formatShiftTime(nextEndsAt)}`;
 }
 
 export type PreviewOverrides = {

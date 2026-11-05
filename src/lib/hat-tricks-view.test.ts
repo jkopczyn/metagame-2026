@@ -24,13 +24,13 @@ const RAW_SCHEDULE = JSON.stringify([
     hats: ["crown", "fuzzy"],
   },
   {
-    start: "2020-01-01T13:00:00-08:00",
-    end: "2020-01-01T14:00:00-08:00",
+    start: "2020-01-01T12:00:00-08:00",
+    end: "2020-01-01T13:00:00-08:00",
     hats: ["tricorn"],
   },
   {
-    start: "2020-01-01T14:00:00-08:00",
-    end: "2020-01-01T15:00:00-08:00",
+    start: "2020-01-01T13:00:00-08:00",
+    end: "2020-01-01T14:00:00-08:00",
     hats: ["saucer"],
   },
 ]);
@@ -113,17 +113,17 @@ describe("buildHatTricksView", () => {
     expect(view.perHat.map((entry) => entry.id)).toEqual(["wizard"]);
   });
 
-  it("words the next line as a range when a gap comes first", () => {
+  it("names the following shift's end in the next line", () => {
     const view = build(at("11:30"));
     if (view.state.kind !== "on") throw new Error("expected on");
     expect(view.state.nextLine).toBe(
-      "The next shift runs Wed 1:00 PM to Wed 2:00 PM",
+      "The shift after that ends at Wed 1:00 PM",
     );
     expect(view.perHat.map((entry) => entry.id)).toEqual(["crown", "fuzzy"]);
   });
 
   it("has no next line in the last shift", () => {
-    const view = build(at("14:30"));
+    const view = build(at("13:30"));
     if (view.state.kind !== "on") throw new Error("expected on");
     expect(view.state.nextLine).toBeNull();
   });
@@ -147,11 +147,11 @@ describe("buildHatTricksView", () => {
   });
 
   it("keeps every hat out of the off-state view", () => {
-    const view = build(at("12:30"));
+    const view = build(at("09:30"));
     expect(view.state.kind).toBe("off");
     if (view.state.kind !== "off") return;
-    expect(view.state.nextStartsAt).toBe(at("13:00").toISOString());
-    expect(view.state.nextStartsAtLabel).toBe("Wed 1:00 PM");
+    expect(view.state.nextStartsAt).toBe(at("10:00").toISOString());
+    expect(view.state.nextStartsAtLabel).toBe("Wed 10:00 AM");
     expect(view.perHat).toEqual([]);
 
     const serialized = JSON.stringify(view);
@@ -174,14 +174,8 @@ describe("buildHatTricksView", () => {
     }
   });
 
-  it("is off before the first shift", () => {
-    const view = build(at("09:00"));
-    expect(view.state.kind).toBe("off");
-    expect(view.perHat).toEqual([]);
-  });
-
   it("lists all six hats once the weekend is done", () => {
-    const view = build(at("15:00"));
+    const view = build(at("14:00"));
     expect(view.state.kind).toBe("done");
     expect(view.perHat.map((entry) => entry.id)).toEqual([...HAT_IDS]);
     expect(view.perHat.map((entry) => entry.name)).toContain("Spiked crown");
@@ -252,25 +246,25 @@ describe("buildHatTricksView on the decoy weekend", () => {
       rawSchedule: DECOY_JSON,
       steals: [
         {
-          hatId: "wizard",
+          hatId: "crown",
           userId: "u1",
-          stolenAt: pacific("2020-01-03T15:00:00"),
+          stolenAt: pacific("2020-01-03T12:00:00"),
         },
       ],
       names: NAMES,
       now,
     });
 
-  it("is off in the Saturday morning gap and names no hat", () => {
-    const view = decoy(pacific("2020-01-04T05:00:00"));
+  it("is off before the first shift and names no hat", () => {
+    const view = decoy(pacific("2020-01-03T13:00:00"));
     expect(view.state.kind).toBe("off");
     if (view.state.kind !== "off") return;
-    expect(view.state.nextStartsAtLabel).toBe("Sat 8:00 AM");
+    expect(view.state.nextStartsAtLabel).toBe("Fri 2:00 PM");
     expect(view.perHat).toEqual([]);
 
     const serialized = JSON.stringify(view);
-    expect(serialized).not.toContain("slouch");
-    expect(serialized).not.toContain("Satin slouch hat");
+    expect(serialized).not.toContain("wizard");
+    expect(serialized).not.toContain("Wizard hat");
   });
 
   it("reads the short Sunday shifts", () => {
