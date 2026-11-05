@@ -270,7 +270,7 @@ describe("the decoy weekend", () => {
     const scores = scoreHats(
       schedule,
       [steal("wizard", "a", pacific("2020-01-03T15:00:00"))],
-      pacific("2020-01-04T09:00:00"),
+      pacific("2020-01-04T11:00:00"),
     );
     expect(points(scores.overall, "a")).toBe(21);
   });
