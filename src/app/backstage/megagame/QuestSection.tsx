@@ -27,9 +27,11 @@ const SMALL_LINK =
 export default async function QuestSection({
   params,
   viewer,
+  notice,
 }: {
   params: BoardParams;
   viewer: Viewer;
+  notice: string | null;
 }) {
   const lookup = params.quest ? await loadQuest(params.quest) : null;
   const quest = lookup?.status === "open" ? lookup.quest : null;
@@ -76,11 +78,11 @@ export default async function QuestSection({
               viewer={viewer}
             />
           ) : (
-            <CheckAndConfirm quest={shown} params={params} />
+            <CheckAndConfirm quest={shown} params={params} notice={notice} />
           )}
         </>
       ) : (
-        <PlayerList params={params} quest={null} />
+        <PlayerList params={params} quest={null} notice={notice} />
       )}
     </Section>
   );
@@ -108,21 +110,25 @@ function QuestHeader({ quest }: { quest: Quest }) {
 async function PlayerList({
   params,
   quest,
+  notice,
 }: {
   params: BoardParams;
   quest: Quest | null;
+  notice: string | null;
 }) {
   const rows = await loadPlayerRows(params.players, quest);
-  return <PlayerListView rows={rows} params={params} />;
+  return <PlayerListView rows={rows} params={params} notice={notice} />;
 }
 
 function PlayerListView({
   rows,
   params,
+  notice,
   children,
 }: {
   rows: Awaited<ReturnType<typeof loadPlayerRows>>;
   params: BoardParams;
+  notice: string | null;
   children?: React.ReactNode;
 }) {
   return (
@@ -140,6 +146,11 @@ function PlayerListView({
           </Link>
         )}
       </div>
+      {notice && (
+        <p role="alert" className="text-sm text-meeple">
+          {notice}
+        </p>
+      )}
       <PlayerRows rows={rows} params={params} />
       <ListAdder params={params} />
       {children}
@@ -150,9 +161,11 @@ function PlayerListView({
 async function CheckAndConfirm({
   quest,
   params,
+  notice,
 }: {
   quest: Quest;
   params: BoardParams;
+  notice: string | null;
 }) {
   const rows = await loadPlayerRows(params.players, quest);
   const recordable = rows
@@ -175,7 +188,7 @@ async function CheckAndConfirm({
           <AnswerChecker key={quest.code} answers={quest.answers} />
         )}
       </div>
-      <PlayerListView rows={rows} params={params}>
+      <PlayerListView rows={rows} params={params} notice={notice}>
         <ConfirmForm
           questId={quest.id}
           questCode={quest.code}
