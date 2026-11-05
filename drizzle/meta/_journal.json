@@ -232,6 +232,13 @@
       "when": 1793837886763,
       "tag": "0032_graceful_amphibian",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793857410959,
+      "tag": "0033_megagame_tables",
+      "breakpoints": true
     }
   ]
 }
