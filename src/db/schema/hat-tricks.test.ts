@@ -1,9 +1,18 @@
+import { is, SQL, StringChunk } from "drizzle-orm";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 import { HAT_IDS } from "../../lib/hat-tricks-hats";
 import { hatSteals } from "./hat-tricks";
 
 const config = getTableConfig(hatSteals);
+
+// Renders a SQL expression's literal text, descending into nested SQL
+// (sql.raw) chunks.
+function flatten(value: unknown): string {
+  if (is(value, SQL)) return value.queryChunks.map(flatten).join("");
+  if (is(value, StringChunk)) return value.value.join("");
+  return "";
+}
 
 describe("hatSteals", () => {
   it("is the hat_steals table with the expected columns", () => {
@@ -29,14 +38,9 @@ describe("hatSteals", () => {
     expect(config.checks).toHaveLength(1);
     const check = config.checks[0];
     expect(check.name).toBe("hat_steals_hat_id_known");
-    const sql = check.value.queryChunks
-      .map((chunk) =>
-        "value" in chunk && Array.isArray(chunk.value)
-          ? chunk.value.join("")
-          : "",
-      )
-      .join("");
-    for (const id of HAT_IDS) expect(sql).toContain(`'${id}'`);
+    const text = flatten(check.value);
+    for (const id of HAT_IDS) expect(text).toContain(`'${id}'`);
+    expect(text.match(/'/g)).toHaveLength(HAT_IDS.length * 2);
   });
 
   it("has no updatedAt column", () => {
