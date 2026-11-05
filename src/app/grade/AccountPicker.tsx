@@ -26,9 +26,6 @@ const LABELS: Record<PickerField, string> = {
  * account by name or email, with the committee offered before anything is
  * typed. Saves on pick, optimistically, the way InlineSelect does.
  *
- * Each column keeps its own actions, since the shepherd is also set from
- * /grade, which the shared password still reaches.
- *
  * The menu is portalled and fixed because the table clips its overflow.
  */
 export default function AccountPicker({

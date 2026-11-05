@@ -2,7 +2,7 @@
  * Central environment-variable contract. validateEnv() (wired into next.config.ts)
  * warns on missing required vars locally so dev works without creds, but throws on
  * Vercel so a misconfigured deploy fails the build instead of silently shipping.
- * Keep in sync with .env.example.
+ * Keep in sync with .env.example, which also covers the public and per-person vars.
  */
 
 type EnvSpec = {
@@ -16,13 +16,13 @@ const ENV_SPEC: EnvSpec[] = [
     name: "AIRTABLE_API_KEY",
     required: true,
     description:
-      "Airtable personal access token (data.records:write) — destination for email signups + ticket purchases. Base/table ids live in src/lib/airtable-config.ts.",
+      "Airtable personal access token (data.records:read and write, schema.bases:read) — email signups, ticket purchases, RFPs, discount codes, tracking links. Base/table ids live in src/lib/airtable-config.ts.",
   },
   {
     name: "STRIPE_SECRET_KEY",
     required: false,
     description:
-      "Stripe secret key (sk_…) — used server-side by the ticket webhook to verify events and read purchase details. Without it the webhook no-ops.",
+      "Stripe secret key (sk_…) — used server-side by USD checkout and the ticket webhook. Without it checkout is unavailable and the webhook no-ops.",
   },
   {
     name: "STRIPE_WEBHOOK_SECRET",
@@ -58,7 +58,7 @@ const ENV_SPEC: EnvSpec[] = [
     name: "RESEND_API_KEY",
     required: false,
     description:
-      "Resend API key — sends ticket-confirmation + admin-alert emails from the Stripe webhook. Without it email sends no-op with a warning.",
+      "Resend API key — sends sign-in codes, ticket emails and admin alerts. Without it sends no-op with a warning, and sign-in codes go to the server log.",
   },
   {
     name: "DISCORD_ERROR_WEBHOOK_URL",
@@ -89,6 +89,12 @@ const ENV_SPEC: EnvSpec[] = [
     required: false,
     description:
       "Neon Postgres connection string (set by the Neon integration on Vercel; a personal branch locally). Without it, anything that touches the database throws a clear error.",
+  },
+  {
+    name: "BLOB_READ_WRITE_TOKEN",
+    required: false,
+    description:
+      "Vercel Blob read-write token, read by @vercel/blob itself, for profile and room image uploads. Without it uploads fail.",
   },
   {
     name: "XERO_CLIENT_ID",
@@ -135,7 +141,7 @@ const ENV_SPEC: EnvSpec[] = [
     name: "BETTER_AUTH_SECRET",
     required: false,
     description:
-      "Signs Better Auth session cookies and hashes sign-in codes. Any long random string; rotating it signs everyone out. Without it, /login and /account throw a clear error.",
+      "Signs Better Auth session cookies. Any long random string; rotating it signs everyone out. Without it, /login and /account throw a clear error.",
   },
 ];
 

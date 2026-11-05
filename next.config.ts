@@ -13,7 +13,7 @@ import {
   NIGHT_PARTIFUL_URL,
 } from "./src/v2/lib/links";
 
-// Warn (don't fail) on missing required env vars at build / dev start.
+// Missing required env vars warn locally and fail the build on Vercel.
 validateEnv();
 
 const nextConfig: NextConfig = {
@@ -121,7 +121,7 @@ const nextConfig: NextConfig = {
 };
 
 export default function config(phase: string): NextConfig {
-  // The ER diagram under /backstage/schema/erd is generated from drizzle/*.sql.
+  // The ER diagram under /backstage/schema is generated from drizzle/*.sql.
   // Done here rather than in a package.json script so it runs however the
   // site is built (pnpm build, next build, Vercel).
   if (phase === PHASE_PRODUCTION_BUILD || phase === PHASE_DEVELOPMENT_SERVER) {

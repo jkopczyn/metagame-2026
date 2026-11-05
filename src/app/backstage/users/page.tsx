@@ -23,7 +23,6 @@ const joinedExact = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/Los_Angeles",
 });
 
-// Account-only, no password fallback: it lists every email.
 export default async function AdminUsersPage(
   props: PageProps<"/backstage/users">,
 ) {

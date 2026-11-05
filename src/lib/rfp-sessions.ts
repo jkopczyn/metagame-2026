@@ -426,7 +426,7 @@ export async function searchAccounts(query: string): Promise<Account[]> {
 
 /**
  * The account behind a committee name, matched by email the way the Airtable
- * import did. For the shared-password sign-in, which identifies by name.
+ * import did. For the grader select, which identifies by name.
  */
 export async function committeeUserId(name: string): Promise<string | null> {
   if (!Object.hasOwn(COMMITTEE_EMAILS, name)) return null;

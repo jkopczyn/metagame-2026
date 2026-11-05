@@ -1,12 +1,20 @@
 # Emails
 
-Hand-pasted EmailOctopus templates. The app only reads them to list them on
-`/backstage/emails` (`src/lib/sent-emails.ts`; the `.min.html` and `.txt`
-variants hang off their `.html`); sending is still manual. Unsent emails live
-in `emails/drafts/`; `git mv` one (with its variants) to the top level once
-it's been sent, which is what marks it sent in the tool. After editing one,
-paste it into EmailOctopus again (the `.min.html` variant for the
+Hand-pasted EmailOctopus templates, plus one live send (below). The app reads
+them to list them on `/backstage/emails` (`src/lib/sent-emails.ts`; the
+`.min.html` and `.txt` variants hang off their `.html`); sending is manual.
+Unsent emails live in `emails/drafts/`; `git mv` one (with its variants) to the
+top level once it's been sent, which is what marks it sent in the tool. After
+editing one, paste it into EmailOctopus again (the `.min.html` variant for the
 announcements, which sit near Gmail's ~102 KB clipping limit).
+
+## `drafts/one-week-out.html` is live
+
+Despite its folder, `followUpTicketPurchase()` (`src/lib/ticket-followup.ts`)
+sends this file through Resend to each new paying buyer, so a merged edit reaches
+buyers on deploy. That send strips the EmailOctopus footer tags. If the opening
+paragraph's start changes or another merge tag appears, the send fails (reported
+through `reportError`; the ticket is unaffected).
 
 ## EmailOctopus facts
 

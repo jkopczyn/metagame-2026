@@ -15,7 +15,6 @@ const when = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/Los_Angeles",
 });
 
-// Account-only: a key acts as an account, so the password fallback can't mint one.
 export default async function AdminApiKeysPage() {
   await connection();
   const access = await teamAccess();

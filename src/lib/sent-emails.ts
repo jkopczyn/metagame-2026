@@ -3,7 +3,8 @@ import path from "node:path";
 
 // The mailing-list emails saved as templates under emails/ (see its
 // CLAUDE.md): the top level holds the ones we've sent, emails/drafts/ the
-// ones still being written. Each `.html` is one email; a `.min.html` is the
+// ones still being written, except one-week-out, which ticket-followup.ts
+// sends to buyers live. Each `.html` is one email; a `.min.html` is the
 // same email collapsed for pasting into EmailOctopus and a `.txt` is a
 // plain-text copy. Read per request so a merged edit shows without a cache
 // to bust.
