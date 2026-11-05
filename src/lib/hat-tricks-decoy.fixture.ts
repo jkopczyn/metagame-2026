@@ -25,9 +25,9 @@ const h = (hours: number) => hours * 60;
 
 const BLOCKS: { from: number; to: number; lengthMin: number }[] = [
   { from: h(14), to: h(22), lengthMin: 240 }, // Fri 14:00-22:00, 4 h
-  { from: h(22), to: h(28), lengthMin: 360 }, // Fri 22:00-Sat 04:00, overnight
+  { from: h(22), to: h(32), lengthMin: 600 }, // Fri 22:00-Sat 08:00, overnight
   { from: h(32), to: h(46), lengthMin: 120 }, // Sat 08:00-22:00, 2 h
-  { from: h(46), to: h(52), lengthMin: 360 }, // Sat 22:00-Sun 04:00, overnight
+  { from: h(46), to: h(57), lengthMin: 660 }, // Sat 22:00-Sun 09:00, overnight
   { from: h(57), to: h(61), lengthMin: 20 }, // Sun 09:00-13:00, 20 min
 ];
 
