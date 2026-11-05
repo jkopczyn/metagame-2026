@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, lte, sql, type SQL } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { can } from "./access";
 import { currentSession } from "./auth";
@@ -42,7 +42,6 @@ const noteColumns = {
   sessionEndsAt: sessions.endsAt,
   title: unconferenceNotes.title,
   sticky: unconferenceNotes.sticky,
-  poster: unconferenceNotes.poster,
   color: unconferenceNotes.color,
   x: unconferenceNotes.x,
   y: unconferenceNotes.y,
@@ -194,20 +193,37 @@ async function hydrate(
   );
 }
 
-const selectNotes = () =>
+// All the board's listing wants of a plain notice's poster is its text, for
+// the list view's line (see boardNote), and pen strokes are nearly all of its
+// bytes. A session poster is drawn on the board, so it comes whole.
+export const listedPoster = sql<NoticeDoc>`case
+  when ${unconferenceNotes.sessionId} is not null then ${unconferenceNotes.poster}
+  else jsonb_set(
+    ${unconferenceNotes.poster},
+    '{items}',
+    jsonb_path_query_array(${unconferenceNotes.poster}, '$.items[*] ? (@.kind == "text")')
+  )
+end`;
+
+const selectNotes = (
+  poster: SQL<NoticeDoc> = sql`${unconferenceNotes.poster}`,
+) =>
   getDb()
-    .select(noteColumns)
+    .select({ ...noteColumns, poster })
     .from(unconferenceNotes)
     .innerJoin(user, eq(user.id, unconferenceNotes.authorUserId))
     .leftJoin(sessions, eq(sessions.id, unconferenceNotes.sessionId));
 
-/** Every note in these rooms, oldest first. The board restacks for painting. */
+/**
+ * Every note in these rooms, oldest first. The board restacks for painting.
+ * A plain notice's poster comes without its strokes; noteById has it whole.
+ */
 export async function listNotesIn(
   locationIds: readonly string[],
   viewerId: string | null,
 ): Promise<UnconferenceNote[]> {
   if (locationIds.length === 0) return [];
-  const rows = await selectNotes()
+  const rows = await selectNotes(listedPoster)
     .where(inArray(unconferenceNotes.locationId, [...locationIds]))
     .orderBy(asc(unconferenceNotes.createdAt), asc(unconferenceNotes.id));
   return hydrate(rows.filter(shownPoster), viewerId);

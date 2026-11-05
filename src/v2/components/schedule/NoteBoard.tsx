@@ -84,11 +84,22 @@ export const NEEDS_TICKET_HINT = "A claimed ticket is needed to pin a note up.";
 
 const FAILED = "Couldn’t save. Try again.";
 
+let inFlight = 0;
+let started = 0;
+
+/** A new server read would undo the optimistic state of any of these. */
+export const noteWritesInFlight = () => inFlight;
+export const noteWritesStarted = () => started;
+
 const safely = async (run: () => Promise<NoteState>): Promise<NoteState> => {
+  inFlight += 1;
+  started += 1;
   try {
     return await run();
   } catch {
     return { error: FAILED };
+  } finally {
+    inFlight -= 1;
   }
 };
 

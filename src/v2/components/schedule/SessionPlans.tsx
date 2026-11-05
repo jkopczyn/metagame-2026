@@ -1,14 +1,16 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type {
   PlanConflict,
   RsvpStatus,
   RsvpTicket,
   SessionRsvps,
 } from "@/lib/schedule";
+import { sessionPageSlug } from "@/lib/session-link";
 import PlanButtons from "./PlanButtons";
+import { announcePlanChange, countsAsMine } from "./plan-sync";
 
 /** A session page's RSVP controls and attendee list, updated together in place. */
 export default function SessionPlans({
@@ -22,6 +24,7 @@ export default function SessionPlans({
   rsvps: initial,
   ticket,
   plan,
+  ownSession,
   signIn,
 }: {
   sessionId: string;
@@ -36,15 +39,23 @@ export default function SessionPlans({
   ticket?: RsvpTicket;
   /** The viewer's own plan, or null when signed out. */
   plan: { status: RsvpStatus | null; bookmarked: boolean } | null;
+  /** The viewer hosts or shepherds it, so it stays theirs whatever they click. */
+  ownSession: boolean;
   signIn: ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [rsvps, setRsvps] = useState(initial);
   const [prev, setPrev] = useState(initial);
   if (prev !== initial) {
     setPrev(initial);
     setRsvps(initial);
   }
+  // A ref: an in-flight click's handler was made on an earlier render.
+  const saved = useRef(plan);
+  useEffect(() => {
+    saved.current = plan;
+  }, [plan]);
 
   return (
     <>
@@ -76,9 +87,21 @@ export default function SessionPlans({
           ticket={ticket}
           onSettled={(result) => {
             if (result.rsvps) setRsvps(result.rsvps);
-            // The page underneath (My sessions, the account lists) didn't
-            // see the change.
-            router.refresh();
+            const now = {
+              ...plan,
+              ...saved.current,
+              ...(result.status !== undefined && { status: result.status }),
+              ...(result.bookmarked !== undefined && {
+                bookmarked: result.bookmarked,
+              }),
+            };
+            saved.current = now;
+            // A schedule underneath keeps the viewer's plans itself; other
+            // pages (the account lists, a session's own page, whose plan is
+            // this modal's prop) render them on the server.
+            const mine = countsAsMine(now, ownSession);
+            const held = announcePlanChange({ sessionId, mine });
+            if (!held || sessionPageSlug(pathname)) router.refresh();
           }}
         />
       ) : (
