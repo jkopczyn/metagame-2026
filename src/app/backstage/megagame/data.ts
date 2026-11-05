@@ -1,4 +1,6 @@
 import "server-only";
+import { fillSeries, type SeriesRow } from "./over-time/series";
+import type { OverTimeView } from "./over-time/view";
 import { MEGAGAME_CLASSES, type MegagameClass } from "@/lib/megagame-levels";
 import {
   isCompleteMegagameCode,
@@ -7,9 +9,11 @@ import {
   type QuestWindow,
 } from "@/lib/megagame-rules";
 import {
+  completionSeries,
   completionsByIds,
   completionsInClass,
   findQuestByCode,
+  levelEventSeries,
   liveCompletions,
   playersByIds,
   recentCompletions,
@@ -210,4 +214,14 @@ export async function loadLevelUpTarget(
     player,
     completions: Object.fromEntries(counts) as Record<MegagameClass, number>,
   };
+}
+
+/** Empty when the range has too many buckets, without querying. */
+export async function loadOverTime(view: OverTimeView): Promise<SeriesRow[]> {
+  if (view.tooMany) return [];
+  const [completions, levelEvents] = await Promise.all([
+    completionSeries(view.size, view.from, view.to),
+    levelEventSeries(view.size, view.from, view.to),
+  ]);
+  return fillSeries(view.buckets, completions, levelEvents);
 }

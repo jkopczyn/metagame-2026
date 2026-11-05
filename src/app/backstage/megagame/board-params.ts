@@ -20,6 +20,8 @@ export type BoardParams = {
   done: string[] | null;
   levelUp: string | null;
   recent: number;
+  range: string | null;
+  bucket: string | null;
 };
 
 export type SearchParams = Record<string, string | string[] | undefined>;
@@ -41,6 +43,8 @@ export function parseBoardParams(sp: SearchParams): BoardParams {
     done: sp.done === undefined ? null : parsePlayerIds(sp.done).filter(isUuid),
     levelUp: first(sp.levelup).slice(0, 100) || null,
     recent: parseRecent(first(sp.recent)),
+    range: first(sp.range) || null,
+    bucket: first(sp.bucket) || null,
   };
 }
 
@@ -53,6 +57,8 @@ export function boardHref(p: Partial<BoardParams>): string {
   if (p.levelUp) params.set("levelup", p.levelUp);
   if (p.recent && p.recent !== RECENT_STEP)
     params.set("recent", String(p.recent));
+  if (p.range) params.set("range", p.range);
+  if (p.bucket) params.set("bucket", p.bucket);
   const query = params.toString();
   return query ? `${BOARD}?${query}` : BOARD;
 }

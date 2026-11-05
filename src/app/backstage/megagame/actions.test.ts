@@ -195,16 +195,16 @@ describe("confirmCompletions", () => {
     );
   });
 
-  it("keeps the level-up and recent choices on the board", async () => {
+  it("keeps the level-up, recent, range and bucket choices on the board", async () => {
     store.confirmCompletions.mockResolvedValue(ok([ID]));
     await expect(
       submit(
         ["u1"],
         "u1",
-        "quest=ZZZZZZ&players=u9&done=old&levelup=u2&recent=60",
+        "quest=ZZZZZZ&players=u9&done=old&levelup=u2&recent=60&range=7d&bucket=hour",
       ),
     ).rejects.toThrow(
-      `REDIRECT /backstage/megagame?quest=A2C4EF&players=u1&done=${ID}&levelup=u2&recent=60`,
+      `REDIRECT /backstage/megagame?quest=A2C4EF&players=u1&done=${ID}&levelup=u2&recent=60&range=7d&bucket=hour`,
     );
   });
 

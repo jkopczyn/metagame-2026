@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import SignIn from "../SignIn";
 import { boardHref, parseBoardParams } from "./board-params";
 import LevelUpSection from "./LevelUpSection";
+import OverTime from "./OverTime";
 import QuestSection from "./QuestSection";
 import RecentActions from "./RecentActions";
 import { toolAccess } from "@/lib/admin-auth";
@@ -32,6 +33,7 @@ export default async function QuestBoard(
         </div>
       </div>
       <RecentActions params={params} viewer={viewer} />
+      <OverTime params={params} />
     </>
   );
 }

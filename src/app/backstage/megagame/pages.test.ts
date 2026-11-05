@@ -9,6 +9,7 @@ const { auth, data, nav } = vi.hoisted(() => ({
     loadLevelUpTarget: vi.fn(),
     loadListedPlayers: vi.fn(),
     loadRecentActions: vi.fn(),
+    loadOverTime: vi.fn(),
   },
   nav: {
     redirect: vi.fn((to: string) => {
@@ -68,7 +69,7 @@ describe("Quest Board for a volunteer", () => {
     );
   });
 
-  it("renders the three sections in order with the viewer's undo rights", async () => {
+  it("renders the four sections in order with the viewer's undo rights", async () => {
     type Node = { type: unknown; props: Record<string, unknown> };
     const el = (await QuestBoard(props({ quest: "A2C4EF" }))) as {
       props: { children: Node[] };
@@ -83,6 +84,7 @@ describe("Quest Board for a volunteer", () => {
       "QuestSection",
       "LevelUpSection",
       "RecentActions",
+      "OverTime",
     ]);
     expect(sections[0].props.viewer).toEqual({ userId: "v1", manager: false });
     expect(auth.toolAccess).toHaveBeenCalledWith("megagame.manage");
@@ -121,6 +123,8 @@ describe("QuestSection", () => {
     done,
     levelUp: null,
     recent: 30,
+    range: null,
+    bucket: null,
   });
 
   it("loads no quest without a code", async () => {
