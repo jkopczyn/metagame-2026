@@ -33,6 +33,9 @@ jobs:
     name: Deploy
     runs-on: ubuntu-latest
     steps:
+      # First, because the alert step below runs from these files.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: Check for the Vercel token
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -41,8 +44,6 @@ jobs:
             echo "::error::VERCEL_TOKEN repo secret is not set."
             exit 1
           fi
-
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
@@ -69,15 +70,18 @@ jobs:
       # Vercel needs it unique per project, so the run id goes in alongside
       # the commit; max 32 chars.
       - name: Build
+        id: build
         run: DEPLOYMENT_ID="${SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" vercel build --prod
 
       # After Build so node_modules exist; before Deploy so the schema is ahead
       # of the code. Reads DATABASE_URL from the env `vercel pull` wrote, and
       # no-ops while that's unset.
       - name: Run database migrations
+        id: migrate
         run: pnpm db:migrate
 
       - name: Deploy
+        id: deploy
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         # `shell: bash` for pipefail — the default `bash -e` takes the pipeline's
@@ -92,3 +96,15 @@ jobs:
             exit 1
           fi
           echo "Deployed → $url" >> "$GITHUB_STEP_SUMMARY"
+
+      # The webhook comes from the repo secret, else from what `vercel pull` wrote
+      # (not available if that step failed or the var is Sensitive on Vercel).
+      # With neither, this warns and skips.
+      - name: Alert the error channel
+        if: failure()
+        env:
+          DISCORD_ERROR_WEBHOOK_URL: ${{ secrets.DISCORD_ERROR_WEBHOOK_URL }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          MIGRATE_OUTCOME: ${{ steps.migrate.outcome }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+        run: node scripts/notify-deploy-failure.mjs

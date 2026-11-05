@@ -4,6 +4,7 @@
 //
 // Exits 0 without touching anything when DATABASE_URL is unset, so a deploy
 // still works before the database is provisioned.
+import { reportMigrationFailure } from "./lib/deploy-failure.mjs";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { migrate } from "drizzle-orm/neon-http/migrator";
@@ -20,6 +21,21 @@ if (!url) {
   process.exit(0);
 }
 
-routeLocalDatabase(url);
-await migrate(drizzle({ client: neon(url) }), { migrationsFolder: "drizzle" });
+// neon-http has no transactions: each statement commits alone and nothing is
+// recorded until all pending migrations succeed, so a failure can leave work
+// that blocks every later run. The log of attempts says how far this one got.
+const attempted = [];
+try {
+  routeLocalDatabase(url);
+  await migrate(
+    drizzle({
+      client: neon(url),
+      logger: { logQuery: (query) => attempted.push(query) },
+    }),
+    { migrationsFolder: "drizzle" },
+  );
+} catch (error) {
+  reportMigrationFailure(error, attempted, "drizzle");
+  process.exit(1);
+}
 console.log("[db:migrate] migrations applied");
