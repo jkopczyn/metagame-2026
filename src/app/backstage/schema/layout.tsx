@@ -22,11 +22,11 @@ export default async function AdminSchemaLayout({
       <header className="sticky top-0 z-10 border-b border-line bg-cream/95 backdrop-blur">
         {/* Fixed height: the diagram page sizes its iframe to the viewport minus this bar. */}
         <div className="flex h-14 items-center justify-between gap-4 pr-4 pl-20 md:pl-24">
-          <nav className="flex items-center gap-4">
+          <nav className="flex min-w-0 items-center gap-3 sm:gap-4">
             <BackToTools />
             <Link
               href="/backstage/schema"
-              className="font-bebas text-xl tracking-wide text-navy"
+              className="font-bebas hidden truncate text-xl tracking-wide whitespace-nowrap text-navy sm:inline"
             >
               Database Schema
             </Link>

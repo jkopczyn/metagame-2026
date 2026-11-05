@@ -900,6 +900,15 @@ export function openingDayKey(days: { key: string }[]): string {
   return days.some((d) => d.key === first) ? first : (days[0]?.key ?? first);
 }
 
+/** The tab for `now`: today's during the conference, else the opening day. */
+export function currentDayKey(days: { key: string }[], now: Date): string {
+  const today = pacificDayKey(now.toISOString());
+  const live =
+    CONFERENCE_DAYS.some((d) => d.key === today) &&
+    days.some((d) => d.key === today);
+  return live ? today : openingDayKey(days);
+}
+
 /**
  * The tab selected by key, or the opening day once that day is gone. Tabs are
  * picked by key, not position, because a session saved on an earlier day adds

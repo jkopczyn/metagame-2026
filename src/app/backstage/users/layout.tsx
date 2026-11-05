@@ -12,7 +12,7 @@ export default function AdminUsersLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ToolLayout title="Users" href="/backstage/users">
+    <ToolLayout title="Users" href="/backstage/users" wide>
       {children}
     </ToolLayout>
   );

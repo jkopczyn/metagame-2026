@@ -9,6 +9,11 @@ import { toolAccess } from "@/lib/admin-auth";
 export default async function DiceLabPage() {
   await connection();
   const access = await toolAccess("misc.dice_lab");
-  if (!access) return <SignIn next="/backstage/dice-lab" />;
+  if (!access)
+    return (
+      <div className="px-4 py-8">
+        <SignIn next="/backstage/dice-lab" />
+      </div>
+    );
   return <DiceLabLoader />;
 }

@@ -326,8 +326,8 @@ export default function DiceLab() {
     PRESETS.find((p) => JSON.stringify(p.dice) === diceJson)?.name ?? "";
 
   return (
-    <div className="flex h-[calc(100dvh-3.5rem)] w-full bg-neutral-950 font-[family-name:var(--font-inter)] text-sm text-neutral-200">
-      <aside className="flex w-[340px] shrink-0 flex-col gap-5 overflow-y-auto border-r border-neutral-800 p-4">
+    <div className="flex h-[calc(100dvh-3.5rem)] w-full flex-col bg-neutral-950 font-[family-name:var(--font-inter)] text-sm text-neutral-200 md:flex-row">
+      <aside className="flex min-h-0 shrink-0 flex-col gap-5 overflow-y-auto border-neutral-800 p-4 pt-12 max-md:h-1/2 max-md:border-b md:w-[340px] md:border-r">
         <header>
           <h1 className="font-[family-name:var(--font-bebas)] text-3xl tracking-wide text-white">
             Dice lab

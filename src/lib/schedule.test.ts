@@ -14,6 +14,7 @@ import {
   movedTimes,
   nowLinePx,
   openingDayKey,
+  currentDayKey,
   selectedDay,
   outsideHours,
   overlapLanes,
@@ -643,5 +644,40 @@ describe("boardOnDay / boardRows", () => {
     expect(
       boardOnDay({ boardStartsAt: null, boardEndsAt: null }, "2026-11-07"),
     ).toBe(false);
+  });
+});
+
+describe("currentDayKey", () => {
+  const days = buildDays([]);
+
+  it("opens on today's tab during the event, by Pacific day", () => {
+    expect(currentDayKey(days, new Date("2026-11-06T17:00:00Z"))).toBe(
+      "2026-11-06",
+    );
+    expect(currentDayKey(days, new Date("2026-11-07T17:00:00Z"))).toBe(
+      "2026-11-07",
+    );
+    expect(currentDayKey(days, new Date("2026-11-08T17:00:00Z"))).toBe(
+      "2026-11-08",
+    );
+    // 11pm Friday in Berkeley is already Saturday in UTC.
+    expect(currentDayKey(days, new Date("2026-11-07T07:00:00Z"))).toBe(
+      "2026-11-06",
+    );
+  });
+
+  it("opens on the first day outside the event", () => {
+    for (const now of ["2026-11-04T17:00:00Z", "2026-11-09T17:00:00Z"]) {
+      expect(currentDayKey(days, new Date(now))).toBe("2026-11-06");
+    }
+  });
+
+  it("ignores a non-conference day even when a session put it in the tabs", () => {
+    const withThursday = buildDays([
+      { startsAt: "2026-11-05T17:00:00Z", endsAt: "2026-11-05T18:00:00Z" },
+    ]);
+    expect(currentDayKey(withThursday, new Date("2026-11-05T17:00:00Z"))).toBe(
+      "2026-11-06",
+    );
   });
 });

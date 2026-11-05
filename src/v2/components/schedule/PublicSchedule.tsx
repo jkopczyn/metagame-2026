@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FaStar } from "react-icons/fa";
 import { toast } from "sonner";
 import {
+  currentDayKey,
   onlySessions,
   openingDayKey,
   boardRows,
@@ -67,7 +68,12 @@ export default function PublicSchedule({
   const openSession = useOpenSession();
   // A session's own page shows its day underneath.
   const [dayKey, setDayKey] = useState(
-    () => sessionDayKey(days, sessionPageSlug(pathname)) ?? openingDayKey(days),
+    () =>
+      sessionDayKey(days, sessionPageSlug(pathname)) ??
+      // Not on the home page: it's cached, so "today" would go stale in its HTML.
+      (pathname === "/schedule"
+        ? currentDayKey(days, new Date())
+        : openingDayKey(days)),
   );
   const [view, setView] = useState<View>(initialView ?? "grid");
   const selectView = (v: View) => {
@@ -93,11 +99,17 @@ export default function PublicSchedule({
   const landed = useRef(false);
   useEffect(() => {
     if (landed.current) return;
-    landed.current = true;
     const slug = new URLSearchParams(window.location.search).get(SESSION_PARAM);
     const key = sessionDayKey(days, slug);
-    if (!key) return;
-    const t = setTimeout(() => setDayKey(key), 0);
+    if (!key) {
+      landed.current = true;
+      return;
+    }
+    // Marked inside the timer: Strict Mode's re-run would otherwise skip it.
+    const t = setTimeout(() => {
+      landed.current = true;
+      setDayKey(key);
+    }, 0);
     return () => clearTimeout(t);
   }, [days]);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { ExternalLink } from "lucide-react";
@@ -44,6 +45,7 @@ type Open = Extract<FirstSigninStatus, { needed: true }>;
 // navigation: signing up or in happens client-side and the layout never remounts.
 export default function FirstSigninFlow() {
   const pathname = usePathname();
+  const router = useRouter();
   const hidden = firstSigninHidden(pathname);
   const [status, setStatus] = useState<Open | null>(null);
   const [done, setDone] = useState(false);
@@ -56,6 +58,8 @@ export default function FirstSigninFlow() {
         error: "We couldn't save that. Try again.",
       }));
       if ("saved" in result && result.saved) {
+        // The action's own re-render read the name from the old session cookie.
+        router.refresh();
         setChildrenNudge(formData.get("bringingChildren") === "yes");
         setDone(true);
       }
@@ -424,7 +428,11 @@ function ClaimByCode({ onClaimed }: { onClaimed: (tier: string) => void }) {
   return (
     <form action={action} className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-3">
-        <div role="group" aria-label="Ticket code" className="text-cream">
+        <div
+          role="group"
+          aria-label="Ticket code"
+          className="w-full text-cream sm:w-auto"
+        >
           <PinInput
             name="code"
             length={TICKET_CODE_LENGTH}

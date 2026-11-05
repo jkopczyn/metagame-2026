@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
+import { type ReactNode } from "react";
 import { Tabs } from "radix-ui";
-import { ACCOUNT_TABS, type AccountTab } from "./tabs";
+import { ACCOUNT_TABS, parseAccountTab, type AccountTab } from "./tabs";
 
 const LABELS: Record<AccountTab, string> = {
   profile: "Profile",
@@ -12,23 +13,21 @@ const LABELS: Record<AccountTab, string> = {
 };
 
 export default function AccountTabs({
-  initial,
   tabs = ACCOUNT_TABS,
   panels,
   trailing,
 }: {
-  initial: AccountTab;
   /** Which tabs to show, in order; a tab with nothing to show is left out. */
   tabs?: readonly AccountTab[];
   panels: Record<AccountTab, ReactNode>;
   /** Sits at the right end of the tab row; not a tab. */
   trailing?: ReactNode;
 }) {
-  const [tab, setTab] = useState(initial);
+  // The URL is the state: replaceState below updates useSearchParams too.
+  const tab = parseAccountTab(useSearchParams().get("tab") ?? undefined);
 
   const select = (value: string) => {
     const next = value as AccountTab;
-    setTab(next);
     const params = new URLSearchParams(window.location.search);
     params.delete("notice");
     if (next === "profile") params.delete("tab");

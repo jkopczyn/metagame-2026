@@ -238,26 +238,31 @@ export default function UserSessions({
                     No sessions {ROLE_LABELS[role].toLowerCase()}.
                   </EmptyPanel>
                 )}
-                {minePlaced.length > 0 && (
-                  <SessionRows>
-                    {minePlaced.map((s) => (
-                      <SessionRow
-                        key={s.id}
-                        session={s}
-                        roomName={roomName}
-                        href={href}
-                        badge={(row) => (
-                          <>
-                            {roleNote(row, role) && (
-                              <Note>{roleNote(row, role)}</Note>
-                            )}
-                            <RoleTags session={row} roles={others} />
-                          </>
-                        )}
-                      />
-                    ))}
-                  </SessionRows>
-                )}
+                {buildDays(minePlaced, []).map((d) => (
+                  <div key={d.key} className="flex flex-col gap-2">
+                    <h4 className="font-grotesk text-sm font-bold text-navy">
+                      {d.name}, {d.dateLabel}
+                    </h4>
+                    <SessionRows>
+                      {d.sessions.map((s) => (
+                        <SessionRow
+                          key={s.id}
+                          session={s}
+                          roomName={roomName}
+                          href={href}
+                          badge={(row) => (
+                            <>
+                              {roleNote(row, role) && (
+                                <Note>{roleNote(row, role)}</Note>
+                              )}
+                              <RoleTags session={row} roles={others} />
+                            </>
+                          )}
+                        />
+                      ))}
+                    </SessionRows>
+                  </div>
+                ))}
                 {mineLater.length > 0 && (
                   <UnscheduledRows
                     sessions={mineLater}

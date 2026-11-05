@@ -152,11 +152,13 @@ export const megagame: FormDef = {
           label: "Who's it for?",
           required: true,
           options: [
-            ...opts(
-              "All ages",
-              "Primarily for children/teens?",
-              "Adults only (18+)",
-            ),
+            ...opts("All ages"),
+            // The Airtable option keeps its "?"; only the page text drops it.
+            {
+              value: "Primarily for children/teens?",
+              label: "Primarily for children/teens",
+            },
+            ...opts("Adults only (18+)"),
             {
               value: "Other",
               more: {

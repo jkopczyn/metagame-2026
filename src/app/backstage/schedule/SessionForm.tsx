@@ -24,6 +24,7 @@ import {
   selectStyle,
   smallButtonClass,
 } from "../ui";
+import { cn } from "@/v2/lib/utils";
 import {
   AGES,
   CATEGORIES,
@@ -346,7 +347,7 @@ export default function SessionForm({
               type="submit"
               form={formId}
               disabled={pending}
-              className={`${buttonClass} w-auto`}
+              className={cn(buttonClass, "w-auto")}
             >
               {pending ? "Saving…" : session ? "Save" : "Create"}
             </button>
@@ -362,7 +363,7 @@ export default function SessionForm({
             e.preventDefault();
             submit(new FormData(e.currentTarget));
           }}
-          className="grid gap-4 sm:grid-cols-2"
+          className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2"
         >
           {session && <input type="hidden" name="id" value={session.id} />}
 
@@ -418,8 +419,13 @@ export default function SessionForm({
             </select>
           </Field>
 
-          <div className="grid grid-cols-3 gap-3 sm:col-span-2">
-            <Field label="Day" name="day" state={state}>
+          <div className="grid grid-cols-2 gap-3 sm:col-span-2 sm:grid-cols-3">
+            <Field
+              label="Day"
+              name="day"
+              state={state}
+              className="max-sm:col-span-2"
+            >
               <select
                 value={day}
                 onChange={(e) => pickDay(e.target.value)}

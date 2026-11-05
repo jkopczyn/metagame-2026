@@ -193,7 +193,7 @@ export default function AccountPicker({
           onKeyDown={onKeyDown}
           // Menu buttons prevent mousedown focus, so blur means "left".
           onBlur={close}
-          placeholder="Search accounts"
+          placeholder="Search"
           className={`${pillClass} border border-line bg-white text-ink ring-2 ring-ring/60`}
         />
       ) : (

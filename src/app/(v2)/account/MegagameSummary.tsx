@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   activeClasses,
   MEGAGAME_CLASSES,
@@ -6,8 +7,6 @@ import {
 import ClassBadges from "@/v2/components/megagame/ClassBadges";
 import { FactionMedal } from "@/v2/components/megagame/FactionPatch";
 
-// A plain link, not next/link: AccountTabs keeps the open tab in state, so only
-// a full load picks up ?tab=megagame.
 const TAB_LINK =
   "font-space-mono text-xs font-bold tracking-[0.12em] text-navy uppercase underline-offset-4 hover:text-meeple hover:underline";
 
@@ -21,14 +20,14 @@ export default function MegagameSummary({
     return (
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <ClassBadges levels={levels} />
-        <a href="/account?tab=megagame" className={TAB_LINK}>
+        <Link href="/account?tab=megagame" className={TAB_LINK}>
           Megagame →
-        </a>
+        </Link>
       </div>
     );
   }
   return (
-    <a
+    <Link
       href="/account?tab=megagame"
       className="group flex w-fit items-center gap-4 rounded-2xl border-2 border-navy bg-[#FFFBF2] py-3 pr-6 pl-3 transition-colors hover:bg-white"
     >
@@ -49,6 +48,6 @@ export default function MegagameSummary({
           The Adventurers Guild is recruiting →
         </span>
       </span>
-    </a>
+    </Link>
   );
 }
