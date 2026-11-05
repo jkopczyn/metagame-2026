@@ -119,9 +119,9 @@ export function parseSchedule(raw: string | undefined): Schedule {
     }
     const hats = parseHats(fields.hats, prefix);
     const previous = shifts[shifts.length - 1];
-    if (previous && previous.end.getTime() > start.getTime()) {
+    if (previous && previous.end.getTime() !== start.getTime()) {
       throw new ScheduleParseError(
-        `${prefix}starts before the previous shift ends`,
+        `${prefix}must start when the previous shift ends (shifts are contiguous)`,
       );
     }
     shifts.push({ start, end, hats });
@@ -145,12 +145,7 @@ export function nextShift(schedule: Schedule, now: Date): Shift | null {
 }
 
 export type ShiftState =
-  | {
-      kind: "on";
-      hats: HatId[];
-      endsAt: Date;
-      next: { startsAt: Date; endsAt: Date } | null;
-    }
+  | { kind: "on"; hats: HatId[]; endsAt: Date; nextEndsAt: Date | null }
   | { kind: "off"; nextStartsAt: Date }
   | { kind: "done" }
   | { kind: "unposted" };
@@ -169,9 +164,7 @@ export function shiftState(schedule: Schedule, now: Date): ShiftState {
       kind: "on",
       hats: current.hats,
       endsAt: current.end,
-      next: following
-        ? { startsAt: following.start, endsAt: following.end }
-        : null,
+      nextEndsAt: following ? following.end : null,
     };
   }
 
