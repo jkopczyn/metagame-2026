@@ -6,7 +6,14 @@ import { EXPIRED, requireAccess, type Access } from "@/lib/admin-auth";
 import { formatBadgeCode } from "@/lib/badge-code";
 import { LARGE_IMAGE_MAX_BYTES, uploadImage } from "@/lib/blob";
 import { isMegagameClass } from "@/lib/megagame-levels";
-import { checkLevelUp, normalizeBadgeNumber } from "@/lib/megagame-rules";
+import {
+  checkLevelUp,
+  isCompleteMegagameCode,
+  matchAnswer,
+  normalizeAnswer,
+  normalizeBadgeNumber,
+  normalizeMegagameCode,
+} from "@/lib/megagame-rules";
 import {
   completionsByIds,
   completionsInClass,
@@ -16,6 +23,7 @@ import {
   findQuestByCode,
   playersByIds,
   recordLevelUp,
+  recordQuestAttempt,
   searchPlayers,
   undoCompletions as undoCompletionRows,
   voidLevelEvent,
@@ -123,6 +131,44 @@ export async function confirmCompletions(
       done: result.recorded.map((r) => r.id),
     }),
   );
+}
+
+const MAX_ANSWER_CHARS = 200;
+
+/** Logs an attempt for the listed players. The match is judged here, not by the browser. */
+export async function logAnswerAttempt(
+  questCode: string,
+  answer: string,
+  players: string[],
+): Promise<{ correct?: boolean; error?: string }> {
+  const access = await verify();
+  if (!access) return { error: EXPIRED };
+  if (
+    typeof questCode !== "string" ||
+    typeof answer !== "string" ||
+    !Array.isArray(players) ||
+    !players.every((p) => typeof p === "string")
+  ) {
+    return { error: STALE };
+  }
+  const userIds = players.filter(Boolean).slice(0, MAX_PLAYERS);
+  const entered = answer.trim().slice(0, MAX_ANSWER_CHARS);
+  if (normalizeAnswer(entered) === "") return {};
+  const code = normalizeMegagameCode(questCode);
+  const quest = isCompleteMegagameCode(code)
+    ? await findQuestByCode(code)
+    : null;
+  if (quest?.kind !== "answer") return { error: "That quest was not found." };
+  const { matched } = matchAnswer(entered, quest.answers);
+  if (userIds.length > 0) {
+    await recordQuestAttempt({
+      questId: quest.id,
+      userIds,
+      correct: matched,
+      enteredBy: access.userId,
+    });
+  }
+  return { correct: matched };
 }
 
 export type UndoState = { error?: string; done?: boolean };

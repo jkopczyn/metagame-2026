@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import CodeEntry from "./CodeEntry";
 import { boardHref, type BoardParams } from "./board-params";
+import ScanCodes from "./ScanCodes";
 
 export default function QuestCodeEntry({ params }: { params: BoardParams }) {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function QuestCodeEntry({ params }: { params: BoardParams }) {
           return false;
         }}
       />
+      <ScanCodes label="Scan a quest label" onQuest={open} />
     </div>
   );
 }

@@ -185,7 +185,12 @@ async function CheckAndConfirm({
             </p>
           </div>
         ) : (
-          <AnswerChecker key={quest.code} answers={quest.answers} />
+          <AnswerChecker
+            key={quest.code}
+            questCode={quest.code}
+            answers={quest.answers}
+            players={params.players}
+          />
         )}
       </div>
       <PlayerListView rows={rows} params={params} notice={notice}>
