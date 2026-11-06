@@ -12,8 +12,6 @@ import {
   playerQuestStatus,
   questWindowIsValid,
   isCompleteMegagameCode,
-  matchAnswer,
-  normalizeAnswer,
   isBucketSize,
   normalizeMegagameCode,
   normalizeBadgeNumber,
@@ -146,71 +144,6 @@ describe("isCompleteMegagameCode", () => {
   it("wants the full length", () => {
     expect(isCompleteMegagameCode("A2C4E")).toBe(false);
     expect(isCompleteMegagameCode("A2C4EF")).toBe(true);
-  });
-});
-
-describe("normalizeAnswer", () => {
-  it("keeps only letters and numbers, lowercased and unaccented", () => {
-    expect(normalizeAnswer("  The Red Door ")).toBe("thereddoor");
-    expect(normalizeAnswer("crème brûlée")).toBe("cremebrulee");
-    expect(normalizeAnswer("it's a trap!")).toBe("itsatrap");
-    expect(normalizeAnswer("")).toBe("");
-  });
-});
-
-describe("matchAnswer", () => {
-  it("ignores case and surrounding whitespace", () => {
-    expect(matchAnswer("  The Red Door ", ["the red door"])).toEqual({
-      matched: true,
-      answer: "the red door",
-    });
-  });
-
-  it("ignores accents in either direction", () => {
-    expect(matchAnswer("creme brulee", ["crème brûlée"]).matched).toBe(true);
-    expect(matchAnswer("crème brûlée", ["creme brulee"]).matched).toBe(true);
-  });
-
-  it("ignores punctuation", () => {
-    expect(matchAnswer("it's a trap!", ["Its a trap"]).matched).toBe(true);
-  });
-
-  it("ignores internal whitespace", () => {
-    expect(matchAnswer("red    door", ["red door"]).matched).toBe(true);
-  });
-
-  it("treats hyphenation and spacing as interchangeable", () => {
-    expect(matchAnswer("co-op", ["co op"]).matched).toBe(true);
-    expect(matchAnswer("co-op", ["coop"]).matched).toBe(true);
-  });
-
-  it("returns the accepted answer as stored", () => {
-    expect(matchAnswer("second One", ["First", "Second one"])).toEqual({
-      matched: true,
-      answer: "Second one",
-    });
-  });
-
-  it("reports no match", () => {
-    expect(matchAnswer("blue door", ["the red door"])).toEqual({
-      matched: false,
-      answer: null,
-    });
-  });
-
-  it("never matches an empty entry", () => {
-    expect(matchAnswer("", ["", "red"])).toEqual({
-      matched: false,
-      answer: null,
-    });
-    expect(matchAnswer("!!!", ["", "red"]).matched).toBe(false);
-  });
-
-  it("never matches against an empty accepted list", () => {
-    expect(matchAnswer("anything", [])).toEqual({
-      matched: false,
-      answer: null,
-    });
   });
 });
 

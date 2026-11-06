@@ -24,12 +24,14 @@ import {
   type MegagameClass,
   type MegagameLevels,
 } from "./megagame-levels";
+import type { QuestInput } from "./megagame-quests";
 import {
   BUCKET_ORIGIN,
   bucketIntervalSql,
   isCompleteMegagameCode,
   normalizeMegagameCode,
 } from "./megagame-rules";
+import { withFreshTicketCode } from "./ticket-code";
 
 // The driver is neon-http: one request per statement and no interactive
 // transactions, so every multi-statement write here is safe to retry and
@@ -127,6 +129,114 @@ export async function findQuestByCode(input: string): Promise<Quest | null> {
     .where(eq(quests.code, code))
     .limit(1);
   return row ?? null;
+}
+
+/** Every quest, withdrawn ones included, by title. */
+export async function listQuests(): Promise<Quest[]> {
+  const { quests } = schema;
+  return getDb().select().from(quests).orderBy(asc(quests.title));
+}
+
+export async function getQuest(id: string): Promise<Quest | null> {
+  const { quests } = schema;
+  const [row] = await getDb()
+    .select()
+    .from(quests)
+    .where(eq(quests.id, id))
+    .limit(1);
+  return row ?? null;
+}
+
+/** The quests behind a list of ids, in that order; unknown ids drop out. */
+export async function questsByIds(ids: readonly string[]): Promise<Quest[]> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return [];
+  const { quests } = schema;
+  const rows = await getDb()
+    .select()
+    .from(quests)
+    .where(inArray(quests.id, unique));
+  const byId = new Map(rows.map((q) => [q.id, q]));
+  return unique.flatMap((id) => byId.get(id) ?? []);
+}
+
+const questRow = (input: QuestInput) => ({
+  title: input.title,
+  bodyText: input.bodyText,
+  bodyImages: input.bodyImages,
+  class: input.class,
+  minLevel: input.minLevel,
+  maxLevel: input.maxLevel,
+  minPlayers: input.minPlayers,
+  stampsWizard: input.stamps.wizard,
+  stampsPirate: input.stamps.pirate,
+  stampsAlien: input.stamps.alien,
+  stampsAny: input.stamps.any,
+  evidence: input.evidence,
+  evidenceImage: input.evidenceImage,
+  hint: input.hint,
+  active: input.active,
+});
+
+/** Inserts a quest under a fresh label code. */
+export async function createQuest(input: QuestInput): Promise<Quest> {
+  const { quests } = schema;
+  return withFreshTicketCode(async (code) => {
+    const [row] = await getDb()
+      .insert(quests)
+      .values({ ...questRow(input), code })
+      .returning();
+    return row;
+  });
+}
+
+/** Null when no quest has the id. */
+export async function updateQuest(
+  id: string,
+  input: QuestInput,
+): Promise<Quest | null> {
+  const { quests } = schema;
+  const [row] = await getDb()
+    .update(quests)
+    .set({ ...questRow(input), updatedAt: new Date() })
+    .where(eq(quests.id, id))
+    .returning();
+  return row ?? null;
+}
+
+export type DeleteQuestResult = "deleted" | "missing" | "has-progress";
+
+/**
+ * Deletes a quest nobody has progress on. A quest with progress rows is
+ * history and can only be withdrawn (active = false).
+ */
+export async function deleteQuest(id: string): Promise<DeleteQuestResult> {
+  const { quests, questProgress } = schema;
+  const db = getDb();
+  const [{ n }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(questProgress)
+    .where(eq(questProgress.questId, id));
+  if (n > 0) return "has-progress";
+  const rows = await db
+    .delete(quests)
+    .where(eq(quests.id, id))
+    .returning({ id: quests.id });
+  return rows.length > 0 ? "deleted" : "missing";
+}
+
+/** Live (not undone) completions per quest, for the editor's list. */
+export async function completionCountsByQuest(): Promise<Map<string, number>> {
+  const { questProgress } = schema;
+  const rows = await getDb()
+    .select({
+      questId: questProgress.questId,
+      n: sql<number>`count(*)::int`,
+    })
+    .from(questProgress)
+    .where(eq(questProgress.status, "completed"))
+    .groupBy(questProgress.questId);
+  return new Map(rows.map((r) => [r.questId, r.n]));
 }
 
 // ---- Players ----
