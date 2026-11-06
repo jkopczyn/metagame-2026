@@ -40,6 +40,7 @@ const SHAPES = {
 export const LINK_QR_STYLES = {
   ...SHAPES,
   logo: { ...SHAPES.dots, label: "Logo", image: "/images/logo_square.png" },
+  wifi: { ...SHAPES.dots, label: "Wi-Fi", image: "/images/wifi.svg" },
 } as const;
 
 // Posters pick dots, corners and a centre logo independently, and draw them
