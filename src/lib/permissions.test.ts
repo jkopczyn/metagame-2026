@@ -75,6 +75,15 @@ describe("unconference.post", () => {
   it("implies nothing, so it can't drag a team permission along", () => {
     expect([...expand(["unconference.post"])]).toEqual(["unconference.post"]);
   });
+
+  it("keeps session notes off the backstage index", () => {
+    expect(PERMISSIONS["schedule.session_notes"].audience).toBe("attendee");
+    expect(
+      hasTeamPermission(
+        expand(["schedule.session_notes", "schedule.volunteer_rooms"]),
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("expand", () => {
@@ -84,6 +93,7 @@ describe("expand", () => {
       "schedule.view",
       "schedule.preview",
       "schedule.volunteer_rooms",
+      "schedule.session_notes",
     ]);
     expect(expand([]).size).toBe(0);
   });
@@ -103,6 +113,7 @@ describe("effectivePermissions", () => {
       "promo.view",
       "schedule.manage",
       "schedule.preview",
+      "schedule.session_notes",
       "schedule.view",
       "schedule.volunteer_rooms",
       "tickets.view",
@@ -114,6 +125,7 @@ describe("effectivePermissions", () => {
     expect([...got].sort()).toEqual([
       "schedule.manage",
       "schedule.preview",
+      "schedule.session_notes",
       "schedule.view",
       "schedule.volunteer_rooms",
     ]);

@@ -103,6 +103,16 @@ export const PERMISSIONS = {
     description:
       "Rooms marked volunteer-only, such as ops desks, alongside the public ones.",
   },
+  // Attendee, not team, like volunteer_rooms: meant for volunteers and hosts
+  // who need to know what a session needs, without opening /backstage.
+  "schedule.session_notes": {
+    audience: "attendee",
+    group: "Schedule",
+    level: "view",
+    label: "Session notes",
+    description:
+      "A session's needs and shepherd on its schedule page. Not grader notes or grading links.",
+  },
   // Read-only API access, e.g. for pulling needs into a supplies list.
   "schedule.view": {
     audience: "team",
@@ -119,7 +129,7 @@ export const PERMISSIONS = {
     level: "edit",
     label: "Edit schedule",
     description: "On the admin grid and over the API.",
-    implies: ["schedule.view"],
+    implies: ["schedule.view", "schedule.session_notes"],
   },
   // Kept off schedule.manage: column order is one shared view, so only
   // people who know that should move it.
