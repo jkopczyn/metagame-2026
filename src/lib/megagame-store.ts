@@ -4,6 +4,7 @@ import {
   asc,
   desc,
   eq,
+  gt,
   gte,
   ilike,
   inArray,
@@ -11,6 +12,7 @@ import {
   isNull,
   lt,
   ne,
+  or,
   sql,
   type SQLWrapper,
 } from "drizzle-orm";
@@ -24,6 +26,11 @@ import {
   type MegagameClass,
   type MegagameLevels,
 } from "./megagame-levels";
+import type {
+  ProgressCompletion,
+  ProgressLevelEvent,
+  ProgressPlayer,
+} from "./megagame-progress";
 import type { QuestInput } from "./megagame-quests";
 import {
   BUCKET_ORIGIN,
@@ -32,6 +39,7 @@ import {
   normalizeMegagameCode,
 } from "./megagame-rules";
 import { withFreshTicketCode } from "./ticket-code";
+import { visible as visibleTickets } from "./ticket-store";
 
 // The driver is neon-http: one request per statement and no interactive
 // transactions, so every multi-statement write here is safe to retry and
@@ -1025,4 +1033,85 @@ export async function recentVoids(limit = 20): Promise<VoidRow[]> {
     .orderBy(desc(levelEvents.voidedAt))
     .limit(limit);
   return rows.filter((r): r is VoidRow => r.voidedAt !== null);
+}
+
+// ---- Progress dashboard ----
+
+/** Every completed quest with its class, for the progress page. */
+export async function liveCompletionLog(): Promise<ProgressCompletion[]> {
+  const { questProgress, quests } = schema;
+  const rows = await getDb()
+    .select({
+      userId: questProgress.userId,
+      class: quests.class,
+      completedAt: questProgress.completedAt,
+    })
+    .from(questProgress)
+    .innerJoin(quests, eq(quests.id, questProgress.questId))
+    .where(eq(questProgress.status, "completed"));
+  return rows.flatMap(({ completedAt, ...rest }) =>
+    completedAt ? [{ ...rest, completedAt }] : [],
+  );
+}
+
+/** Every live level event, deleted accounts included, for the progress page. */
+export async function liveLevelEventLog(): Promise<ProgressLevelEvent[]> {
+  const { levelEvents } = schema;
+  return getDb()
+    .select({
+      userId: levelEvents.userId,
+      class: levelEvents.class,
+      level: levelEvents.level,
+      source: levelEvents.source,
+      awardedAt: levelEvents.awardedAt,
+    })
+    .from(levelEvents)
+    .where(isNull(levelEvents.voidedAt));
+}
+
+/** Names and levels of everyone with a level in any class, plus these ids. */
+export async function progressPlayers(
+  ids: readonly string[],
+): Promise<ProgressPlayer[]> {
+  const { user, profiles } = schema;
+  const unique = [...new Set(ids)];
+  const rows = await getDb()
+    .select({
+      id: user.id,
+      name: user.name,
+      wizard: profiles.wizardLevel,
+      pirate: profiles.pirateLevel,
+      alien: profiles.alienLevel,
+    })
+    .from(user)
+    .leftJoin(profiles, eq(profiles.userId, user.id))
+    .where(
+      or(
+        gt(profiles.wizardLevel, 0),
+        gt(profiles.pirateLevel, 0),
+        gt(profiles.alienLevel, 0),
+        unique.length > 0 ? inArray(user.id, unique) : undefined,
+      ),
+    );
+  return rows.map(({ wizard, pirate, alien, ...rest }) => ({
+    ...rest,
+    levels: { wizard: wizard ?? 0, pirate: pirate ?? 0, alien: alien ?? 0 },
+  }));
+}
+
+/** Accounts that have claimed a paid ticket: the page's denominator. */
+export async function claimedTicketHolderIds(): Promise<string[]> {
+  const { tickets } = schema;
+  const rows = await getDb()
+    .select({ id: tickets.ownerUserId })
+    .from(tickets)
+    .where(
+      and(
+        visibleTickets,
+        isNotNull(tickets.ownerUserId),
+        eq(tickets.status, "paid"),
+      ),
+    )
+    .groupBy(tickets.ownerUserId);
+  return rows.flatMap((r) => (r.id ? [r.id] : []));
 }
