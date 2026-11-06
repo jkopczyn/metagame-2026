@@ -9,6 +9,7 @@ import {
   bucketStart,
   checkLevelUp,
   checkQuestWindow,
+  cumulativeLevelDistribution,
   playerQuestStatus,
   questWindowIsValid,
   isCompleteMegagameCode,
@@ -592,5 +593,65 @@ describe("playerQuestStatus", () => {
         "No claimed ticket.",
       ],
     });
+  });
+});
+
+describe("cumulativeLevelDistribution", () => {
+  const at = (iso: string) => new Date(iso);
+  const ev = (userId: string, cls: string, level: number, iso: string) => ({
+    userId,
+    class: cls,
+    level,
+    awardedAt: at(iso),
+  });
+
+  it("counts each player once per class at their highest level before each end", () => {
+    const events = [
+      ev("a", "wizard", 1, "2026-11-07T10:00:00.000Z"),
+      ev("b", "wizard", 1, "2026-11-07T10:20:00.000Z"),
+      ev("a", "wizard", 2, "2026-11-07T10:40:00.000Z"),
+      ev("a", "pirate", 1, "2026-11-07T10:50:00.000Z"),
+    ];
+    const ends = [
+      at("2026-11-07T10:30:00.000Z"),
+      at("2026-11-07T11:00:00.000Z"),
+    ];
+    const [first, second] = cumulativeLevelDistribution(events, ends);
+    expect(first.wizard).toEqual([0, 2, 0, 0, 0, 0]);
+    expect(first.pirate).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(second.wizard).toEqual([0, 1, 1, 0, 0, 0]);
+    expect(second.pirate).toEqual([0, 1, 0, 0, 0, 0]);
+    expect(second.alien).toHaveLength(MAX_LEVEL + 1);
+  });
+
+  it("excludes an event awarded exactly at the end, since the end opens the next bucket", () => {
+    const [d] = cumulativeLevelDistribution(
+      [ev("a", "alien", 1, "2026-11-07T11:00:00.000Z")],
+      [at("2026-11-07T11:00:00.000Z")],
+    );
+    expect(d.alien).toEqual([0, 0, 0, 0, 0, 0]);
+  });
+
+  it("ignores unknown classes and out-of-range levels", () => {
+    const [d] = cumulativeLevelDistribution(
+      [
+        ev("a", "bard", 1, "2026-11-07T10:00:00.000Z"),
+        ev("b", "wizard", 9, "2026-11-07T10:00:00.000Z"),
+        ev("c", "wizard", 0, "2026-11-07T10:00:00.000Z"),
+      ],
+      [at("2026-11-07T11:00:00.000Z")],
+    );
+    expect(d.wizard).toEqual([0, 0, 0, 0, 0, 0]);
+  });
+
+  it("does not depend on the events being sorted", () => {
+    const events = [
+      ev("a", "wizard", 3, "2026-11-07T12:00:00.000Z"),
+      ev("a", "wizard", 1, "2026-11-07T10:00:00.000Z"),
+    ];
+    const [d] = cumulativeLevelDistribution(events, [
+      at("2026-11-07T11:00:00.000Z"),
+    ]);
+    expect(d.wizard).toEqual([0, 1, 0, 0, 0, 0]);
   });
 });

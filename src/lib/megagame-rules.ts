@@ -5,6 +5,7 @@
 
 import {
   MAX_LEVEL,
+  MEGAGAME_CLASSES,
   isMegagameClass,
   type MegagameClass,
   type MegagameLevels,
@@ -245,6 +246,53 @@ export function bucketSeries(from: Date, to: Date, size: BucketSize): Date[] {
   const out: Date[] = [];
   for (let t = bucketStart(from, size).getTime(); t <= last; t += ms) {
     out.push(new Date(t));
+  }
+  return out;
+}
+
+export type DatedLevelEvent = {
+  userId: string;
+  class: string;
+  level: number;
+  awardedAt: Date;
+};
+
+/**
+ * For each end, players per level in each class (index = level), counting a
+ * player at their highest level from events awarded before that end.
+ */
+export function cumulativeLevelDistribution(
+  events: readonly DatedLevelEvent[],
+  ends: readonly Date[],
+): Record<MegagameClass, number[]>[] {
+  const valid = events
+    .filter(
+      (e) =>
+        isMegagameClass(e.class) &&
+        Number.isInteger(e.level) &&
+        e.level >= 1 &&
+        e.level <= MAX_LEVEL,
+    )
+    .sort((a, b) => a.awardedAt.getTime() - b.awardedAt.getTime());
+  const order = ends
+    .map((end, i) => ({ end: end.getTime(), i }))
+    .sort((a, b) => a.end - b.end);
+  const best = new Map<string, number>();
+  const out: Record<MegagameClass, number[]>[] = new Array(ends.length);
+  let next = 0;
+  for (const { end, i } of order) {
+    while (next < valid.length && valid[next].awardedAt.getTime() < end) {
+      const e = valid[next++];
+      const key = `${e.class}\u0000${e.userId}`;
+      best.set(key, Math.max(best.get(key) ?? 0, e.level));
+    }
+    const counts = Object.fromEntries(
+      MEGAGAME_CLASSES.map((c) => [c, new Array(MAX_LEVEL + 1).fill(0)]),
+    ) as Record<MegagameClass, number[]>;
+    for (const [key, level] of best) {
+      counts[key.split("\u0000")[0] as MegagameClass][level]++;
+    }
+    out[i] = counts;
   }
   return out;
 }
