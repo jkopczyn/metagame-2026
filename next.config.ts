@@ -9,6 +9,8 @@ import { boothLinks, stripeMode } from "./src/lib/tickets";
 import {
   CON_PARTIFUL_PATH,
   CON_PARTIFUL_URL,
+  HOUSING_PATH,
+  HOUSING_URL,
   NIGHT_PARTIFUL_PATH,
   NIGHT_PARTIFUL_URL,
 } from "./src/v2/lib/links";
@@ -118,6 +120,12 @@ const nextConfig: NextConfig = {
     {
       source: NIGHT_PARTIFUL_PATH,
       destination: NIGHT_PARTIFUL_URL,
+      permanent: false,
+    },
+    // Short link to on-site housing at Lighthaven.
+    {
+      source: HOUSING_PATH,
+      destination: HOUSING_URL,
       permanent: false,
     },
     // Short link to the booth-only Night Market purchase.

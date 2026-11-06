@@ -16,9 +16,10 @@ export const JOIN_TEAM_FORM_URL = "/team/join";
 export const SPONSOR_FORM_URL = "/sponsor/interest";
 export const FINANCIAL_AID_FORM_URL = "/financial-aid";
 
-// On-site housing at Lighthaven.
+// On-site housing at Lighthaven. /housing redirects to it.
 export const HOUSING_URL =
   "https://www.havenbookings.space/events/metagame-2026";
+export const HOUSING_PATH = "/housing";
 
 // Manifund fiscal-sponsorship page for tax-deductible donations.
 export const MANIFUND_URL = "https://manifund.org/projects/metagame-2026";
