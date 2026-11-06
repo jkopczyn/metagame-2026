@@ -16,6 +16,7 @@ import {
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { getDb, schema } from "@/db";
+import { isBadgeCode } from "./badge-code";
 import {
   MAX_LEVEL,
   NO_LEVELS,
@@ -173,7 +174,7 @@ const toPlayer = ({ wizard, pirate, alien, ...rest }: PlayerRow) => ({
 export async function findPlayerByBadgeNumber(
   n: number,
 ): Promise<PlayerSummary | null> {
-  if (!Number.isInteger(n) || n < 0 || n > 9999) return null;
+  if (!isBadgeCode(n)) return null;
   const { user, profiles, tickets } = schema;
   const [row] = await getDb()
     .select(playerColumns())

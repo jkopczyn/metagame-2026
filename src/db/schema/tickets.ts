@@ -49,6 +49,7 @@ export const tickets = pgTable(
     purchaserDiscord: text(),
     ownerUserId: text().references(() => user.id, { onDelete: "set null" }),
     claimedAt: timestamp({ withTimezone: true }),
+    claimedBy: text().references(() => user.id, { onDelete: "set null" }),
     holderUserId: text().references(() => user.id, { onDelete: "set null" }),
     // Minted when the holder first looks for it on /account; a friend's
     // /invite link carries it.
@@ -60,6 +61,8 @@ export const tickets = pgTable(
       { onDelete: "set null" },
     ),
     badgeCode: integer().unique(),
+    checkedInAt: timestamp({ withTimezone: true }),
+    checkedInBy: text().references(() => user.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) => [
@@ -67,7 +70,7 @@ export const tickets = pgTable(
     index("tickets_owner_user_id_idx").on(t.ownerUserId),
     index("tickets_holder_user_id_idx").on(t.holderUserId),
     index("tickets_referred_by_payment_id_idx").on(t.referredByPaymentId),
-    // The printed QR stickers encode four digits.
+    // The QR stickers encode four digits.
     check("tickets_badge_code_range", sql`${t.badgeCode} between 0 and 9999`),
   ],
 );

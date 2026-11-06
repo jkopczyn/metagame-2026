@@ -35,7 +35,7 @@ export function randomCode(length: number): string {
 export const randomTicketCode = () => randomCode(TICKET_CODE_LENGTH);
 
 // Drizzle wraps the driver's error, so the Postgres code can sit on a cause.
-const isUniqueViolation = (e: unknown): boolean =>
+export const isUniqueViolation = (e: unknown): boolean =>
   e instanceof Error &&
   ((e as { code?: unknown }).code === "23505" || isUniqueViolation(e.cause));
 

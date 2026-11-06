@@ -1,8 +1,7 @@
 // The permission catalog and the pure resolution over it. One entry per gate
 // the code enforces; the roles and per-user grants that hold them live in
 // Postgres (src/db/schema/permissions.ts) and are read by src/lib/access.ts.
-// Adding a gate means adding its key here, nothing else. Keys with no gate
-// yet wait for their page: checkin.manage lands with the check-in page.
+// Adding a gate means adding its key here, nothing else.
 
 /** Display only: how much a permission lets its holder change. */
 export type PermissionLevel = "view" | "edit" | "delete";
@@ -68,6 +67,14 @@ export const PERMISSIONS = {
     label: "Edit tickets",
     description: "Set or clear which ticket referred a ticket, after the fact.",
     implies: ["tickets.view"],
+  },
+  "checkin.manage": {
+    audience: "team",
+    group: "Check-in",
+    level: "edit",
+    label: "Run check-in",
+    description:
+      "Check attendees in at the desk, assign badge numbers, claim a ticket on an attendee's behalf and undo a check-in.",
   },
   // Its own permission, not folded into a role: it exposes parents' contact
   // details and children's medical notes.

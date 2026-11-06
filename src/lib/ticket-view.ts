@@ -26,6 +26,7 @@ export type TicketView = {
   referredBy: string | null;
   /** Four-digit badge number, shown to the owner once the ticket has one. */
   badgeCode: string | null;
+  checkedIn: boolean;
 };
 
 export function ticketView(
@@ -53,5 +54,6 @@ export function ticketView(
     referredBy,
     badgeCode:
       mine && t.badgeCode !== null ? formatBadgeCode(t.badgeCode) : null,
+    checkedIn: mine && t.checkedInAt !== null,
   };
 }
