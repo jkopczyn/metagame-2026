@@ -2,6 +2,7 @@ import {
   BabyIcon,
   BookOpenIcon,
   CalendarIcon,
+  ClipboardCheckIcon,
   DatabaseIcon,
   DicesIcon,
   DollarSignIcon,
@@ -76,6 +77,13 @@ const TOOLS: {
     name: "Tickets",
     blurb: "Every ticket with its buyer, holder and attendee.",
     perm: "tickets.view",
+  },
+  {
+    href: "/backstage/checkin",
+    icon: ClipboardCheckIcon,
+    name: "Check-in",
+    blurb: "The desk: find an attendee, hand out a badge, check them in.",
+    perm: "checkin.manage",
   },
   {
     href: "/backstage/children",

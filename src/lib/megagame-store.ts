@@ -17,6 +17,7 @@ import {
 import { alias } from "drizzle-orm/pg-core";
 import { getDb, schema } from "@/db";
 import { isBadgeCode } from "./badge-code";
+import { likeContains } from "./like";
 import {
   MAX_LEVEL,
   NO_LEVELS,
@@ -319,7 +320,7 @@ export async function searchPlayers(
 ): Promise<PlayerSummary[]> {
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
-  const q = `%${trimmed.replace(/[\\%_]/g, "\\$&")}%`;
+  const q = likeContains(trimmed);
   const { user, profiles } = schema;
   const rows = await getDb()
     .select(playerColumns())

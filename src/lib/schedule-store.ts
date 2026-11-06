@@ -16,6 +16,7 @@ import { revalidateTag, unstable_cache } from "next/cache";
 import { getDb, schema } from "@/db";
 import { env } from "@/env";
 import { can } from "./access";
+import { likeContains } from "./like";
 import { currentSession, getAuth } from "./auth";
 import type { HostSessionFields } from "./schedule-input";
 import {
@@ -450,12 +451,18 @@ export async function roomClash(
 /** Accounts whose name or email contains the query. */
 export async function searchAccounts(
   query: string,
+  { banned = true }: { banned?: boolean } = {},
 ): Promise<ScheduleAccount[]> {
-  const q = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
+  const q = likeContains(query);
   return getDb()
     .select(accountColumns)
     .from(user)
-    .where(or(ilike(user.name, q), ilike(user.email, q)))
+    .where(
+      and(
+        or(ilike(user.name, q), ilike(user.email, q)),
+        banned ? undefined : eq(user.banned, false),
+      ),
+    )
     .orderBy(asc(accountName))
     .limit(8);
 }
