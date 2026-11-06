@@ -11,6 +11,7 @@ import {
   MailIcon,
   MicIcon,
   QrCodeIcon,
+  SignpostIcon,
   SwordsIcon,
   TicketIcon,
   UserIcon,
@@ -147,6 +148,14 @@ const TOOLS: {
     name: "QR codes",
     blurb: "Any link or text as a QR code in the poster styles, as SVG or PNG.",
     perm: "misc.qr",
+  },
+  {
+    href: "/backstage/signs",
+    icon: SignpostIcon,
+    name: "Sign maker",
+    blurb:
+      "Print-ready event signs and banners, with drafts shared across the team.",
+    perm: "misc.signs",
   },
 ];
 

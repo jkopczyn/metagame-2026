@@ -257,6 +257,14 @@ export const PERMISSIONS = {
     description:
       "Turn any link or text into a QR code in the poster styles, at /backstage/qr.",
   },
+  "misc.signs": {
+    audience: "team",
+    group: "Misc",
+    level: "edit",
+    label: "Sign maker",
+    description:
+      "Make print-ready event signs and share drafts with the team, at /backstage/signs.",
+  },
   "roles.manage": {
     audience: "team",
     group: "Sensitive",
