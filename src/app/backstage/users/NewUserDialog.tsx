@@ -103,13 +103,12 @@ export default function NewUserDialog({
                     <input
                       type="checkbox"
                       checked={roleIds.includes(r.id)}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const on = e.currentTarget.checked;
                         setRoleIds((ids) =>
-                          e.currentTarget.checked
-                            ? [...ids, r.id]
-                            : ids.filter((id) => id !== r.id),
-                        )
-                      }
+                          on ? [...ids, r.id] : ids.filter((id) => id !== r.id),
+                        );
+                      }}
                       className="size-4 accent-meeple"
                     />
                     {r.name}
