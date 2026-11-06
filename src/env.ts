@@ -169,7 +169,8 @@ export function validateEnv(): void {
       "",
       `⚠  ${summary}`,
       ...lines,
-      "   Copy .env.example to .env.local and fill these in.",
+      "   Copy .env.example to .env.local and fill these in. Local dev runs",
+      "   without them; tools that read Airtable say so instead of loading.",
       "",
     ].join("\n"),
   );

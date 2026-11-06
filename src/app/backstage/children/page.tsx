@@ -1,6 +1,8 @@
 import { connection } from "next/server";
+import AirtableUnavailable from "../AirtableUnavailable";
 import ChildrenTool from "./ChildrenTool";
 import ToolSignIn from "@/components/ToolSignIn";
+import { env } from "@/env";
 import { toolAccess } from "@/lib/admin-auth";
 import { loadChildren, type ChildrenData } from "@/lib/children";
 
@@ -10,6 +12,8 @@ export default async function AdminChildrenPage() {
   const access = await toolAccess("children.view");
   if (!access)
     return <ToolSignIn title="Children" next="/backstage/children" />;
+  if (!env.AIRTABLE_API_KEY)
+    return <AirtableUnavailable title="Children" table="Children" />;
 
   let data: ChildrenData;
   try {
