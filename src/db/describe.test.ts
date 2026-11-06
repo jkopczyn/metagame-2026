@@ -34,6 +34,7 @@ describe("describeSchema", () => {
       "session_grades",
       "session_hosts",
       "sessions",
+      "sign_drafts",
       "tickets",
       "unconference_note_reactions",
       "unconference_notes",
@@ -78,6 +79,10 @@ describe("describeSchema", () => {
       "session_grades",
       "session_hosts",
       "sessions",
+      "sign_drafts",
+      "sign_drafts",
+      "tickets",
+      "tickets",
       "tickets",
       "tickets",
       "unconference_note_reactions",
@@ -186,6 +191,7 @@ describe("describeSchema", () => {
       "Grading",
       "Budget",
       "Megagame",
+      "Signs",
     ]);
     expect(info.groups.flatMap((g) => g.tables.map((t) => t.name))).toEqual([
       "user",
@@ -214,6 +220,7 @@ describe("describeSchema", () => {
       "quests",
       "quest_progress",
       "level_events",
+      "sign_drafts",
     ]);
   });
 
@@ -238,7 +245,11 @@ describe("describeSchema", () => {
     expect(column("level_events", "user_id").references?.onDelete).toBe(
       "set null",
     );
-    expect(column("quests", "answers").type).toBe("text[]");
+    expect(column("quests", "body_images").type).toBe("text[]");
+    expect(column("quests", "min_players").nullable).toBe(false);
+    expect(column("quests", "stamps_any").nullable).toBe(false);
+    expect(column("quests", "evidence_image").nullable).toBe(true);
+    expect(table("quests").columns.map((c) => c.name)).not.toContain("kind");
     expect(
       table("quest_progress").indexes.find(
         (i) => i.name === "quest_progress_user_quest_unique",

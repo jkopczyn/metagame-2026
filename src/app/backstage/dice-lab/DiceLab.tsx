@@ -41,7 +41,7 @@ const LabStage = dynamic(() => import("./LabStage"), { ssr: false });
 
 const STORAGE_KEY = "dice-lab:v1";
 const MAX_DICE = 24;
-const EXPORT_WIDTHS = [1024, 2048, 4096, 8192];
+const EXPORT_WIDTHS = [1024, 2048, 4096, 8192, 16384];
 const ROT_STEPS = [1, 5, 15, 45, 90];
 
 type Saved = {

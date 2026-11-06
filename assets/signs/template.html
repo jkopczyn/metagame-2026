@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Metagame Signs</title>
+<style>
+@font-face { font-family: "Bebas Neue"; src: url(__ASSET:BebasNeue-400.woff2__) format("woff2"); font-weight: 400; }
+@font-face { font-family: "Space Grotesk"; src: url(__ASSET:SpaceGrotesk-300-700.woff2__) format("woff2"); font-weight: 300 700; }
+@font-face { font-family: "Space Mono"; src: url(__ASSET:SpaceMono-400.woff2__) format("woff2"); font-weight: 400; }
+@font-face { font-family: "Space Mono"; src: url(__ASSET:SpaceMono-700.woff2__) format("woff2"); font-weight: 700; }
+@font-face { font-family: "Inter"; src: url(__ASSET:Inter-400-600.woff2__) format("woff2"); font-weight: 400 600; }
+
+:root {
+  --ink: #1b1b1b; --navy: #173059; --navy2: #1f3352; --cream: #fff5f2; --paper: #fffbf2;
+  --blue: #4d9ff7; --tan: #e2a85c; --meeple: #d8502b; --line: rgba(27,27,27,.12);
+  --ui-bg: #14192a; --ui-panel: #1c2338; --ui-border: rgba(255,245,242,.12); --ui-fg: #fff5f2; --ui-muted: rgba(255,245,242,.6);
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { font-family: "Space Grotesk", system-ui, sans-serif; background: var(--ui-bg); color: var(--ui-fg); font-size: 13px; display: grid; grid-template-rows: 48px 1fr; grid-template-columns: 230px 1fr 320px; height: 100vh; overflow: hidden; }
+header { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--ui-border); background: var(--ui-panel); }
+header h1 { font-family: "Bebas Neue"; font-size: 24px; letter-spacing: .04em; margin: 0 12px 0 0; font-weight: 400; }
+header .spacer { flex: 1; }
+.seg { display: inline-flex; border: 1px solid var(--ui-border); border-radius: 6px; overflow: hidden; margin-right: 6px; }
+.seg button { border: 0; border-radius: 0; background: transparent; }
+.seg button.on { background: var(--blue); color: #fff; }
+/* simple mode hides the advanced controls */
+body.simple [data-adv] { display: none !important; }
+aside { background: var(--ui-panel); overflow-y: auto; border-right: 1px solid var(--ui-border); }
+aside.right { border-right: 0; border-left: 1px solid var(--ui-border); }
+main { position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #0e1220 radial-gradient(circle at 50% 40%, #1a2140, #0e1220 70%); }
+#preview { max-width: calc(100% - 48px); max-height: calc(100% - 48px); box-shadow: 0 20px 60px rgba(0,0,0,.6); cursor: grab; image-rendering: auto; }
+#preview.dragging { cursor: grabbing; }
+#hint { position: absolute; bottom: 6px; padding: 0 16px; left: 0; right: 0; text-align: center; color: var(--ui-muted); font-size: 11px; pointer-events: none; }
+
+button, select, input, textarea { font: inherit; color: inherit; }
+button { background: rgba(255,245,242,.08); border: 1px solid var(--ui-border); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+button:hover { background: rgba(255,245,242,.15); }
+button.primary { background: var(--meeple); border-color: transparent; color: #fff; font-weight: 600; }
+button.primary:hover { background: #b8431f; }
+button.tiny { padding: 2px 6px; font-size: 11px; }
+button.icon { padding: 3px 7px; }
+select, input[type=text], input[type=number], textarea { background: rgba(0,0,0,.25); border: 1px solid var(--ui-border); border-radius: 6px; padding: 5px 7px; width: 100%; }
+textarea { resize: vertical; min-height: 44px; line-height: 1.3; }
+input[type=range] { width: 100%; accent-color: var(--tan); }
+input[type=color] { width: 34px; height: 26px; padding: 0; border: 1px solid var(--ui-border); border-radius: 6px; background: none; cursor: pointer; }
+input[type=checkbox] { accent-color: var(--meeple); }
+label { color: var(--ui-muted); display: block; margin-bottom: 3px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row > * { flex: 1; min-width: 0; }
+.row > .fix { flex: 0 0 auto; }
+.field { margin-bottom: 10px; }
+.field .val { float: right; color: var(--ui-muted); text-transform: none; letter-spacing: 0; }
+section { padding: 12px 14px; border-bottom: 1px solid var(--ui-border); }
+section h2 { cursor: pointer; user-select: none; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--tan); margin: 0 0 10px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
+section h2 { justify-content: flex-start; gap: 6px; }
+section h2 .right-ctl { display: flex; gap: 4px; align-items: center; margin-left: auto; }
+section h2::before { content: "▾"; display: inline-block; width: 12px; color: var(--ui-muted); transition: transform .15s; }
+section.closed h2::before { transform: rotate(-90deg); }
+section.closed > :not(h2) { display: none; }
+section.closed h2 { margin-bottom: 0; }
+
+/* sign list */
+#signs { list-style: none; margin: 0; padding: 6px; }
+#signs li { display: flex; align-items: center; gap: 6px; padding: 7px 8px; border-radius: 6px; cursor: pointer; margin-bottom: 2px; }
+#signs li:hover { background: rgba(255,245,242,.06); }
+#signs li.active { background: rgba(77,159,247,.22); }
+#signs li .thumb { width: 36px; height: 36px; flex: 0 0 auto; background: #222 center/cover; border-radius: 3px; border: 1px solid rgba(255,255,255,.1); }
+#signs li .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#signs li .meta { color: var(--ui-muted); font-size: 10px; }
+#signs li .x { opacity: 0; color: var(--ui-muted); padding: 0 3px; }
+#signs li:hover .x { opacity: 1; }
+#signs li .x:hover { color: var(--meeple); }
+.shared { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.shared li { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 6px; cursor: pointer; }
+.shared li:hover { background: rgba(255,245,242,.06); }
+.shared li .thumb { width: 32px; height: 32px; flex: 0 0 auto; background: #222 center/cover; border-radius: 3px; }
+.shared li .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shared li .meta { color: var(--ui-muted); font-size: 10px; }
+.shared li .x { opacity: 0; color: var(--ui-muted); padding: 0 3px; }
+.shared li:hover .x { opacity: 1; }
+.shared li .x:hover { color: var(--meeple); }
+.swatches { display: flex; flex-wrap: wrap; gap: 5px; }
+.swatches .sw { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,.15); cursor: pointer; }
+.swatches .sw:hover { border-color: #fff; }
+.themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.themes button { padding: 6px 4px; font-size: 11px; font-weight: 600; }
+
+/* text lines */
+.line { background: rgba(0,0,0,.2); border: 1px solid var(--ui-border); border-radius: 8px; padding: 8px; margin-bottom: 8px; }
+.line .top { display: flex; gap: 4px; align-items: center; margin-bottom: 6px; }
+.line .top .kind { flex: 1; }
+.line.sel { border-color: var(--blue); }
+.assets { display: flex; gap: 6px; }
+.assets button { flex: 1; padding: 6px; background: #fff; border-radius: 6px; }
+.assets button img { width: 100%; height: 34px; object-fit: contain; display: block; }
+.imgcard .top img { width: 56px; height: 40px; object-fit: contain; background: repeating-conic-gradient(#444 0 25%, #666 0 50%) 0 0/10px 10px; border-radius: 4px; flex: 0 0 auto; }
+.imgcard .top .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.line textarea { margin-bottom: 6px; }
+.line .mini { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.line .mini label { margin: 0; }
+.line details { margin-top: 6px; }
+.line summary { color: var(--ui-muted); cursor: pointer; font-size: 11px; }
+.line details .mini { margin-top: 6px; }
+.muted { color: var(--ui-muted); }
+small.help { display: block; color: var(--ui-muted); margin-top: 4px; font-size: 11px; }
+#toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--navy); color: var(--cream); padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+#toast.show { opacity: 1; }
+.pos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.pos-grid button { padding: 4px; font-size: 11px; }
+.pos-grid button.on { background: var(--blue); color: #fff; border-color: transparent; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Metagame Signs</h1>
+  <div class="seg" id="mode"><button data-mode="simple">Simple</button><button data-mode="advanced">Advanced</button></div>
+  <button id="btn-new">+ New sign</button>
+  <button id="btn-template">+ From template ▾</button>
+  <select id="tpl-select" style="width:auto;display:none"></select>
+  <span class="spacer"></span>
+  <button id="btn-load">Open project…</button>
+  <button id="btn-save">Save project</button>
+  <select id="export-dpi" title="Export resolution" style="width:auto"><option value="300">300 dpi</option><option value="200">200 dpi</option><option value="150">150 dpi</option></select>
+  <button id="btn-export">Export PNG</button>
+  <button id="btn-export-all" class="primary">Export all (zip)</button>
+  <input type="file" id="file-project" accept=".json" hidden>
+</header>
+
+<aside class="left">
+  <ul id="signs"></ul>
+</aside>
+
+<main>
+  <canvas id="preview"></canvas>
+  <div id="hint">Drag elements to place them (snap to center, double-click resets) · Delete removes the selected element · Scroll or pull a corner to resize · Drag empty space to pan the photo (or move the text block when there's no photo; Shift+drag always moves the block)</div>
+</main>
+
+<aside class="right" id="controls">
+  <section data-sec="shared" id="shared-sec" style="display:none">
+    <h2>Shared drafts <span class="right-ctl"><button class="tiny" id="shared-refresh" title="Reload the list">↻</button></span></h2>
+    <div class="field row"><button id="shared-save" class="primary">Save to shared</button><button id="shared-save-new">Save as new</button></div>
+    <div id="shared-status" class="muted" style="font-size:11px;margin:-4px 0 8px"></div>
+    <ul id="shared-list" class="shared"></ul>
+    <small class="help">Everyone on the team sees these. Opening one makes a local copy; Save to shared writes it back.</small>
+  </section>
+  <section data-sec="sign">
+    <h2>Sign</h2>
+    <div class="field"><label>Name (also the file name)</label><input type="text" id="s-name"></div>
+    <div class="field row">
+      <div><label>Size</label><select id="s-size"></select></div>
+      <div class="fix"><label>&nbsp;</label><button id="s-rotate" title="Swap width and height">⟲ Rotate</button></div>
+    </div>
+    <div class="field row" id="custom-size" style="display:none">
+      <div><label>Width (in)</label><input type="number" id="s-w" step="0.5" min="1"></div>
+      <div><label>Height (in)</label><input type="number" id="s-h" step="0.5" min="1"></div>
+    </div>
+    <div class="field"><label>Theme</label><div class="themes" id="themes"></div></div>
+  </section>
+
+  <section data-sec="bg">
+    <h2>Background</h2>
+    <div class="field row">
+      <div><label>Fill</label><select id="bg-type"><option value="solid">Solid</option><option value="gradient">Gradient</option><option value="image">Photo</option></select></div>
+      <div class="fix"><label>Color</label><input type="color" id="bg-color"></div>
+      <div class="fix" id="bg-color2-wrap"><label>Color 2</label><input type="color" id="bg-color2"></div>
+    </div>
+    <div class="field"><div class="swatches" id="bg-swatches"></div></div>
+    <div id="bg-image-ctl">
+      <div class="field row">
+        <div><button id="bg-upload">Choose photo…</button><input type="file" id="bg-file" accept="image/*" hidden></div>
+        <div><button id="bg-clear">Remove</button></div>
+      </div>
+      <div class="field"><label>Darker ◂ ▸ Lighter <span class="val" id="v-bg-dim"></span></label><input type="range" id="bg-dim" min="-100" max="100"></div>
+      <div class="field" data-adv><label>Blur <span class="val" id="v-bg-blur"></span></label><input type="range" id="bg-blur" min="0" max="40"></div>
+      <div class="field"><label>Zoom <span class="val" id="v-bg-zoom"></span></label><input type="range" id="bg-zoom" min="100" max="400"></div>
+      <div class="field row" data-adv><div class="fix"><input type="checkbox" id="bg-gray"></div><div class="muted">Black &amp; white</div></div>
+    </div>
+    <div class="field row" data-adv><div class="fix"><input type="checkbox" id="border-on"></div><div class="muted">Border</div><div class="fix"><input type="color" id="border-color"></div><div><input type="range" id="border-w" min="4" max="120"></div></div>
+  </section>
+
+  <section data-sec="panel" class=closed>
+    <h2>Panel behind text <span class="right-ctl"><label style="margin:0;display:flex;gap:6px;align-items:center;text-transform:none;letter-spacing:0"><input type="checkbox" id="panel-on"> on</label></span></h2>
+    <div class="field row"><div class="muted">Panel color</div><div class="fix"><input type="color" id="panel-color"></div></div>
+    <div class="field"><label>Opacity <span class="val" id="v-panel-opacity"></span></label><input type="range" id="panel-opacity" min="0" max="100"></div>
+    <div class="field"><label>Width <span class="val" id="v-panel-width"></span></label><input type="range" id="panel-width" min="30" max="100"></div>
+    <div class="field" data-adv><label>Corner radius <span class="val" id="v-panel-radius"></span></label><input type="range" id="panel-radius" min="0" max="300"></div>
+    <div class="field" data-adv><label>Padding <span class="val" id="v-panel-pad"></span></label><input type="range" id="panel-pad" min="0" max="400"></div>
+  </section>
+
+  <section data-sec="text">
+    <h2>Text <span class="right-ctl"><button class="tiny" id="line-add">+ Line</button></span></h2>
+    <small class="help" style="margin:-6px 0 8px" data-adv>Sizes are as on a Letter sheet and scale with the sign, so a template looks the same at any size.</small>
+    <div id="lines"></div>
+    <div class="field" data-adv><label>Line gap <span class="val" id="v-text-gap"></span></label><input type="range" id="text-gap" min="0" max="200"></div>
+    <div class="field"><label>Vertical position <span class="val" id="v-text-y"></span></label><input type="range" id="text-y" min="-50" max="50"></div>
+  </section>
+
+  <section data-sec="fonts" data-adv class=closed>
+    <h2>Fonts</h2>
+    <div class="field row">
+      <div><button id="font-add" style="width:100%">Add font file…</button><input type="file" id="font-file" accept=".ttf,.otf,.woff,.woff2" multiple hidden></div>
+    </div>
+    <div class="field row">
+      <div><input type="text" id="gfont-name" placeholder="Any Google font, e.g. Chewy"></div>
+      <div class="fix"><button id="gfont-add">Add</button></div>
+    </div>
+    <div id="font-list" class="muted" style="font-size:11px"></div>
+    <small class="help">Pick fonts per line in the Text section. Uploaded fonts are saved in the project; Google fonts need internet.</small>
+  </section>
+  <section data-sec="images" data-adv class=closed>
+    <h2>Images &amp; logos <span class="right-ctl"><button class="tiny" id="img-add">+ Image…</button></span></h2>
+    <input type="file" id="img-file" accept="image/*" multiple hidden>
+    <div class="field"><label>Metagame assets (click to add)</label><div class="assets" id="asset-strip"></div></div>
+    <div id="images"></div>
+    <small class="help">Top of the list is in front. ↑ brings forward, ↓ sends back; "Above text" puts a layer over the text stack. PNGs keep transparency; you can also drop image files onto the sign.</small>
+  </section>
+
+  <section data-sec="footer" data-adv class=closed>
+    <h2>Footer</h2>
+    <div class="field"><input type="text" id="footer-text" placeholder="e.g. metagame.games · Nov 6–8, 2026"></div>
+    <div class="field row"><div><label>Size <span class="val" id="v-footer-size"></span></label><input type="range" id="footer-size" min="10" max="80"></div><div class="fix"><label>Color</label><input type="color" id="footer-color"></div></div>
+    <div class="field row"><button class="tiny" id="footer-cx">↔ Center</button><button class="tiny" id="footer-cy">↕ Center</button><button class="tiny" id="footer-reset">⌖ Reset</button></div>
+  </section>
+  <section data-sec="roll" data-adv class=closed>
+    <h2>Roll printer</h2>
+    <div class="field row">
+      <div><label>Roll width (in)</label><input type="number" id="roll-w" step="0.5" min="1"></div>
+      <div><label>Strip overlap (in)</label><input type="number" id="roll-overlap" step="0.25" min="0"></div>
+    </div>
+    <div class="field row"><div class="fix"><input type="checkbox" id="roll-guides"></div><div class="muted">Dashed cut guides on strips</div></div>
+    <div class="field row"><div class="fix"><input type="checkbox" id="roll-preview"></div><div class="muted">Show how it will be cut</div></div>
+    <div class="field"><button id="btn-export-roll" style="width:100%">Export for roll</button><small class="help" id="roll-plan"></small><button class="tiny" id="roll-nudge" style="display:none;margin-top:6px"></button></div>
+  </section>
+  <section class="muted" style="font-size:11px;line-height:1.5" data-adv>
+    Exports are 300 dpi PNGs. The project autosaves in this browser; use <b>Save project</b> to keep a .json you can reopen later (photos are embedded, so it can get large).
+  </section>
+</aside>
+
+<div id="toast"></div>
+
+<script>
+const ASSET_META = { wide: { name: "METAGAME logo", w: 3000, h: 841 }, square: { name: "MG die", w: 560, h: 560 }, die2025: { name: "2025 die", w: 1006, h: 1146 } };
+const imgSrc = (data) => data.startsWith("asset:") ? ASSETS[data.slice(6)] : data;
+const ASSETS = {
+  wide: "__ASSET:dice_logo.png__",
+  square: "__ASSET:logo_square.png__",
+  die2025: "__ASSET:die_2025.png__",
+};
+const DPI = 300;
+// Under /backstage/signs the page is served by the metagame site, which also
+// offers shared drafts and file uploads at ../api. Standalone, neither exists.
+const HOSTED = location.pathname.startsWith("/backstage/signs");
+const API = "/backstage/signs/api";
+async function api(method, query, body) {
+  const r = await fetch(API + (query || ""), { method, credentials: "same-origin", ...(body instanceof FormData ? { body } : body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `${r.status}`);
+  return j;
+}
+// Vercel Blob client upload: our API signs a short-lived token, then the file goes
+// straight from the browser to Blob, so a 40 MB banner photo never touches a
+// serverless function (whose request bodies are capped at 4.5 MB). Mirrors
+// @vercel/blob/client's upload() for API version 13.
+const BLOB_API = "https://vercel.com/api/blob", BLOB_API_VERSION = "13";
+async function uploadFile(file, name) {
+  const pathname = `signs/${(name || "file").replace(/[^\w.\-]+/g, "_")}`;
+  const { clientToken } = await api("POST", "", { type: "blob.generate-client-token", payload: { pathname, clientPayload: null, multipart: false } });
+  const storeId = clientToken.split("_")[3] || "";
+  const r = await fetch(`${BLOB_API}/?pathname=${encodeURIComponent(pathname)}`, {
+    method: "PUT", body: file,
+    headers: { authorization: `Bearer ${clientToken}`, "x-api-version": BLOB_API_VERSION, "x-vercel-blob-store-id": storeId, "x-vercel-blob-access": "public", "x-content-length": String(file.size), ...(file.type ? { "x-content-type": file.type } : {}) },
+  });
+  if (!r.ok) throw new Error(`Blob upload failed (${r.status})`);
+  return (await r.json()).url;
+}
+const PALETTE = { cream:"#fff5f2", paper:"#fffbf2", white:"#ffffff", ink:"#1b1b1b", navy:"#173059", navy2:"#1f3352", blue:"#4d9ff7", logoBlue:"#2b9bf0", tan:"#e2a85c", orange:"#ffa83f", meeple:"#d8502b", salmon:"#fa8072", sky:"#cee1ff", peach:"#ffd8a5", moss:"#6a9a6b" };
+const SIZES = [
+  ["letter", "Letter 8.5×11", 8.5, 11], ["letter-l", "Letter 11×8.5", 11, 8.5],
+  ["tabloid", "Tabloid 11×17", 11, 17], ["tabloid-l", "Tabloid 17×11", 17, 11],
+  ["a4", "A4 8.27×11.69", 8.27, 11.69], ["half", "Half letter 5.5×8.5", 5.5, 8.5],
+  ["square", "Square 8×8", 8, 8],
+  ["roll-12x24", "Roll 12×24", 12, 24], ["roll-24x12", "Roll 24×12", 24, 12], ["roll-24x24", "Roll 24×24", 24, 24],
+  ["roll-24x36", "Roll 24×36", 24, 36], ["roll-36x24", "Roll 36×24", 36, 24], ["roll-24x48", "Roll 24×48", 24, 48], ["roll-24x72", "Roll 24×72 banner", 24, 72],
+  ["custom", "Custom…", 0, 0],
+];
+const BUNDLED_FONTS = ["Bebas Neue", "Space Grotesk", "Space Mono", "Inter"];
+// Google fonts fetched on first use; value = CSS2 family spec (weights that exist for that family)
+const GOOGLE_FONTS = {
+  "Anton": "Anton", "Oswald": "Oswald:wght@300..700", "Archivo Black": "Archivo+Black", "Barlow Condensed": "Barlow+Condensed:wght@400;600;700;800",
+  "Bungee": "Bungee", "Righteous": "Righteous", "Lilita One": "Lilita+One", "Rubik Mono One": "Rubik+Mono+One", "Press Start 2P": "Press+Start+2P",
+  "Bangers": "Bangers", "Permanent Marker": "Permanent+Marker", "Pacifico": "Pacifico", "Fredoka": "Fredoka:wght@300..700",
+  "Montserrat": "Montserrat:wght@300..900", "Poppins": "Poppins:wght@300;400;500;600;700", "Playfair Display": "Playfair+Display:wght@400..900",
+  "DM Serif Display": "DM+Serif+Display", "Abril Fatface": "Abril+Fatface", "Lora": "Lora:wght@400..700", "Special Elite": "Special+Elite",
+};
+const SYSTEM_FONTS = ["Impact", "Arial Black", "Helvetica Neue", "Georgia", "Courier New", "Futura", "Avenir Next", "Chalkboard SE"];
+const fontLoads = new Map();
+function ensureFont(name) {
+  if (fontLoads.has(name)) return fontLoads.get(name);
+  let pr;
+  if (BUNDLED_FONTS.includes(name)) pr = Promise.resolve();
+  else if (GOOGLE_FONTS[name] || (project.googleFonts || []).includes(name)) {
+    const spec = GOOGLE_FONTS[name] || name.trim().replace(/ /g, "+");
+    pr = new Promise((res) => {
+      const l = document.createElement("link"); l.rel = "stylesheet";
+      l.href = `https://fonts.googleapis.com/css2?family=${spec}&display=swap`;
+      l.onload = () => Promise.all([document.fonts.load(`400 40px "${name}"`), document.fonts.load(`700 40px "${name}"`)]).then(res, res);
+      l.onerror = () => { toast(`Couldn't load "${name}" from Google Fonts`); res(); };
+      document.head.appendChild(l);
+    });
+  } else {
+    const cf = (project.fonts || []).find((f) => f.name === name);
+    pr = cf ? new FontFace(name, `url(${cf.data})`).load().then((ff) => { document.fonts.add(ff); }, () => toast(`Font "${name}" failed to load`)) : Promise.resolve();
+  }
+  fontLoads.set(name, pr); return pr;
+}
+function fontOptions(current) {
+  const g = (label, names) => names.length ? `<optgroup label="${label}">${names.map((n) => `<option value="${esc(n)}"${n === current ? " selected" : ""}>${esc(n)}</option>`).join("")}</optgroup>` : "";
+  return g("Metagame", BUNDLED_FONTS) + g("My fonts", (project.fonts || []).map((f) => f.name)) + g("Google fonts", Object.keys(GOOGLE_FONTS).concat(project.googleFonts || [])) + g("System (this computer only)", SYSTEM_FONTS);
+}
+const THEMES = {
+  Cream:  { bg: PALETTE.paper, bg2: PALETTE.peach, text: PALETTE.navy, accent: PALETTE.meeple, panel: PALETTE.white, border: PALETTE.navy, footer: PALETTE.navy2 },
+  Navy:   { bg: PALETTE.navy, bg2: PALETTE.navy2, text: PALETTE.cream, accent: PALETTE.tan, panel: PALETTE.navy2, border: PALETTE.tan, footer: PALETTE.sky },
+  Ink:    { bg: PALETTE.ink, bg2: "#2a2a2a", text: PALETTE.white, accent: PALETTE.orange, panel: "#2a2a2a", border: PALETTE.blue, footer: PALETTE.sky },
+  Blue:   { bg: PALETTE.logoBlue, bg2: PALETTE.blue, text: PALETTE.white, accent: PALETTE.ink, panel: PALETTE.navy, border: PALETTE.ink, footer: PALETTE.white },
+  Orange: { bg: PALETTE.orange, bg2: PALETTE.tan, text: PALETTE.ink, accent: PALETTE.white, panel: PALETTE.peach, border: PALETTE.ink, footer: PALETTE.ink },
+  Alert:  { bg: PALETTE.meeple, bg2: "#b8431f", text: PALETTE.white, accent: PALETTE.peach, panel: "#b8431f", border: PALETTE.white, footer: PALETTE.white },
+};
+
+const uid = () => Math.random().toString(36).slice(2, 9);
+function newLine(text, kind) {
+  const k = kind || "headline";
+  const base = { id: uid(), text, kind: k, font: "Bebas Neue", weight: 700, size: 1.6, color: "#173059", align: "center", stroke: 0, strokeColor: "#ffffff", spacing: 0, upper: k === "headline" };
+  if (k === "sub") Object.assign(base, { font: "Space Grotesk", size: 0.55, weight: 600, upper: false });
+  if (k === "body") Object.assign(base, { font: "Space Grotesk", size: 0.32, weight: 400, upper: false });
+  if (k === "mono") Object.assign(base, { font: "Space Mono", size: 0.3, weight: 400, upper: false });
+  return base;
+}
+function logoLayer(key, s, size = 32) {
+  const m = ASSET_META[key], ih = size / 100 * (m.h / m.w) * (s.w / s.h); // height as a fraction of sign height
+  return { id: uid(), name: m.name, data: "asset:" + key, size, opacity: 100, rot: 0, above: false, dy: 0.5 - 0.11 - ih / 2 };
+}
+function newSign(name, opts = {}) {
+  const t = THEMES.Cream;
+  return Object.assign({
+    id: uid(), name: name || "Untitled", size: "letter", w: 8.5, h: 11,
+    bg: { type: "solid", color: t.bg, color2: t.bg2, image: null, tone: -40, blur: 0, zoom: 100, x: 0, y: 0, gray: false },
+    border: { on: true, color: t.border, width: 30 },
+    panel: { on: false, color: t.panel, opacity: 85, width: 86, radius: 60, pad: 120 },
+    text: { gap: 30, y: 0 },
+    lines: [newLine("YOUR SIGN", "headline"), newLine("Subtitle goes here", "sub")],
+    footer: { text: "metagame.games", size: 24, color: t.footer },
+    images: [],
+  }, opts);
+}
+function applyTheme(s, name) {
+  const t = THEMES[name];
+  s.bg.color = t.bg; s.bg.color2 = t.bg2; s.border.color = t.border; s.panel.color = t.panel; s.footer.color = t.footer;
+  s.lines.forEach((l, i) => { l.color = l.kind === "headline" ? t.text : (i === 1 ? t.accent : t.text); });
+}
+const TEMPLATES = [
+  { name: "No parking", theme: "Alert", lines: [["NO PARKING", "headline"], ["Metagame guests: please use street parking", "sub"]], logo: "wide" },
+  { name: "Quiet please", theme: "Navy", lines: [["QUIET PLEASE", "headline"], ["Session in progress", "sub"]], logo: "square" },
+  { name: "No food beyond this point", theme: "Alert", lines: [["NO FOOD OR DRINK", "headline"], ["beyond this point", "sub"]], logo: "wide" },
+  { name: "Restrooms", theme: "Cream", lines: [["RESTROOMS  →", "headline"]], logo: "wide" },
+  { name: "Registration", theme: "Blue", lines: [["REGISTRATION", "headline"], ["Check in here to get your badge", "sub"]], logo: "wide" },
+  { name: "Game library", theme: "Orange", lines: [["GAME LIBRARY", "headline"], ["Borrow anything. Return it to the shelf you found it on.", "body"]], logo: "square" },
+  { name: "Staff only", theme: "Ink", lines: [["STAFF ONLY", "headline"]], logo: "square" },
+  { name: "Room sign", theme: "Cream", lines: [["ROOM NAME", "headline"], ["9:00  Opening talk\n10:30  Megagame briefing\n13:00  Lunch\n14:00  Puzzle hunt kickoff", "mono"]], logo: "wide" },
+  { name: "Arrow", theme: "Navy", lines: [["→", "headline"], ["THIS WAY TO THE MEGAGAME", "sub"]], logo: "wide" },
+];
+function fromTemplate(t) {
+  const s = newSign(t.name);
+  s.lines = t.lines.map(([txt, kind]) => newLine(txt, kind));
+  if (t.name === "Arrow") s.lines[0].size = 4;
+  s.images.push(logoLayer(t.logo, s));
+  applyTheme(s, t.theme);
+  return s;
+}
+
+// ---------- state ----------
+let project = { signs: [], active: null, roll: { width: 24, overlap: 0.5, guides: true } };
+const imgCache = new Map();
+function loadImg(src) {
+  if (!src) return Promise.resolve(null);
+  if (imgCache.has(src)) return imgCache.get(src);
+  const p = new Promise((res) => { const im = new Image(); if (/^https?:/.test(src)) im.crossOrigin = "anonymous"; im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+  imgCache.set(src, p);
+  return p;
+}
+const active = () => project.signs.find((s) => s.id === project.active);
+
+function save() {
+  try { localStorage.setItem("metagame-signs", JSON.stringify(project)); }
+  catch (e) { toast("Autosave failed (too many photos for browser storage). Use Save project."); }
+}
+function load() {
+  try { const j = localStorage.getItem("metagame-signs"); if (j) project = JSON.parse(j); } catch {}
+  if (!project.roll) project.roll = { width: 24, overlap: 0.5, guides: true };
+  if (!project.exportDpi) project.exportDpi = 300;
+  for (const s of project.signs) {
+    if (!s.images) s.images = [];
+    if (s.bg.tone === undefined) { s.bg.tone = -(s.bg.dim || 0); delete s.bg.dim; }
+    if (s.logo && s.logo.which && s.logo.which !== "none") { const l = logoLayer(s.logo.which, s, s.logo.size); l.dx = s.logo.dx || 0; s.images.push(l); }
+    delete s.logo;
+  }
+  if (!project.signs.length) { project.signs = TEMPLATES.slice(0, 3).map(fromTemplate); }
+  if (!active()) project.active = project.signs[0].id;
+}
+let toastT;
+function toast(msg) { const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 2600); }
+
+// ---------- rendering ----------
+const full = document.createElement("canvas");
+function roundRect(ctx, x, y, w, h, r) { r = Math.min(r, w / 2, h / 2); ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function fontStr(l, px) { return `${l.weight} ${px}px "${l.font}"`; }
+function wrap(ctx, text, maxW) {
+  const out = [];
+  for (const para of text.split("\n")) {
+    const words = para.split(/\s+/).filter(Boolean);
+    if (!words.length) { out.push(""); continue; }
+    let cur = words[0];
+    for (const w of words.slice(1)) {
+      if (ctx.measureText(cur + " " + w).width <= maxW) cur += " " + w; else { out.push(cur); cur = w; }
+    }
+    out.push(cur);
+  }
+  return out;
+}
+
+const MAX_DIM = 16384, MAX_AREA = 268435456; // Chrome's canvas ceilings; past them drawing silently fails
+function fitScale(w, h) { return Math.min(1, MAX_DIM / Math.max(w, h), Math.sqrt(MAX_AREA / (w * h))); }
+const signPx = (s) => ({ W: Math.round(s.w * DPI), H: Math.round(s.h * DPI) });
+
+// Draw sign s into canvas. Sign space is always W×H px at 300 dpi; opts map it onto the canvas:
+// scale (output px per sign px), rotate (90° cw, for roll output), ox/oy (output-px offset, for strips).
+async function renderTo(s, canvas, { scale = 1, rotate = false, ox = 0, oy = 0, cw, ch } = {}) {
+  const { W, H } = signPx(s);
+  canvas.width = cw ?? Math.round((rotate ? H : W) * scale); canvas.height = ch ?? Math.round((rotate ? W : H) * scale);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.translate(-ox, -oy);
+  if (rotate) { ctx.translate(H * scale, 0); ctx.rotate(Math.PI / 2); }
+  ctx.scale(scale, scale);
+  return drawSign(ctx, s, W, H);
+}
+async function drawSign(ctx, s, W, H) {
+  const boxes = []; // hit boxes in sign space, for dragging on the preview
+  // Every size control is defined on a Letter sheet; u scales them so a sign looks the same at any size.
+  const u = Math.sqrt((W * H) / (2550 * 3300)), inch = DPI * u, bw = s.border.width * u;
+
+  // background
+  ctx.fillStyle = s.bg.color; ctx.fillRect(0, 0, W, H);
+  if (s.bg.type === "gradient") {
+    const g = ctx.createLinearGradient(0, 0, W * 0.3, H); g.addColorStop(0, s.bg.color); g.addColorStop(1, s.bg.color2);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  if (s.bg.type === "image" && s.bg.image) {
+    const im = await loadImg(s.bg.image);
+    if (im) {
+      const cover = Math.max(W / im.width, H / im.height) * (s.bg.zoom / 100);
+      const dw = im.width * cover, dh = im.height * cover;
+      bgDims = { dw, dh };
+      ctx.save();
+      ctx.filter = [s.bg.blur ? `blur(${s.bg.blur * W / 2550}px)` : "", s.bg.gray ? "grayscale(1)" : ""].join(" ").trim() || "none";
+      ctx.drawImage(im, (W - dw) / 2 + s.bg.x * W, (H - dh) / 2 + s.bg.y * H, dw, dh);
+      ctx.restore();
+      const tone = s.bg.tone || 0;
+      if (tone) { ctx.fillStyle = tone < 0 ? `rgba(0,0,0,${-tone / 100})` : `rgba(255,255,255,${tone / 100})`; ctx.fillRect(0, 0, W, H); }
+    }
+  }
+  // border
+  if (s.border.on) { ctx.strokeStyle = s.border.color; ctx.lineWidth = bw; ctx.strokeRect(bw / 2, bw / 2, W - bw, H - bw); }
+
+  // footer
+  let footerH = 0;
+  if (s.footer.text) {
+    const px = s.footer.size * inch / 72;
+    ctx.font = `500 ${px}px "Space Mono"`; ctx.fillStyle = s.footer.color; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    const fy = H - Math.max(bw, 0.25 * inch) - 0.25 * inch;
+    const fx = W / 2 + (s.footer.dx || 0) * W, fyy = fy + (s.footer.dy || 0) * H;
+    ctx.fillText(s.footer.text, fx, fyy); footerH = px * 1.6;
+    const fw = ctx.measureText(s.footer.text).width;
+    boxes.push({ kind: "footer", x: fx - fw / 2, y: fyy - px, w: fw, h: px * 1.3 });
+  }
+
+  // image layers: centered on the sign plus a dragged offset, sized as % of sign width
+  const drawImages = async (above) => {
+    for (const im of s.images || []) {
+      if (!!im.above !== above) continue;
+      const img = await loadImg(imgSrc(im.data)); if (!img) continue;
+      const iw = W * im.size / 100, ih = iw * img.height / img.width;
+      const x = (W - iw) / 2 + (im.dx || 0) * W, y = (H - ih) / 2 + (im.dy || 0) * H;
+      ctx.save(); ctx.globalAlpha = im.opacity / 100;
+      if (im.rot) { ctx.translate(x + iw / 2, y + ih / 2); ctx.rotate(im.rot * Math.PI / 180); ctx.drawImage(img, -iw / 2, -ih / 2, iw, ih); }
+      else ctx.drawImage(img, x, y, iw, ih);
+      ctx.restore();
+      boxes.push({ kind: "image", id: im.id, x, y, w: iw, h: ih });
+    }
+  };
+  await drawImages(false);
+
+  // text block
+  const panelW = W * s.panel.width / 100;
+  const pad = s.panel.on ? s.panel.pad * u : 0;
+  const maxW = panelW - 2 * pad - (s.panel.on ? 0 : 0.5 * inch);
+  const gap = s.text.gap * u;
+  const laid = [];
+  let totalH = 0;
+  await Promise.all(s.lines.map((l) => ensureFont(l.font)));
+  for (const l of s.lines) {
+    const px = l.size * inch; ctx.font = fontStr(l, px);
+    ctx.letterSpacing = `${l.spacing * px / 100}px`;
+    const rows = wrap(ctx, l.upper ? l.text.toUpperCase() : l.text, maxW);
+    const lh = px * (l.font === "Bebas Neue" ? 1.0 : 1.2);
+    laid.push({ l, px, rows, lh });
+    totalH += rows.length * lh + gap;
+  }
+  totalH -= gap;
+  const avTop = 0, avBottom = H - footerH;
+  let y = (avTop + avBottom) / 2 - totalH / 2 + s.text.y / 100 * H;
+
+  if (s.panel.on) {
+    ctx.save(); ctx.globalAlpha = s.panel.opacity / 100; ctx.fillStyle = s.panel.color;
+    const ph = totalH + 2 * pad, pw = panelW;
+    roundRect(ctx, (W - pw) / 2, y - pad, pw, ph, s.panel.radius * u); ctx.fill(); ctx.restore();
+  }
+  for (const { l, px, rows, lh } of laid) {
+    ctx.font = fontStr(l, px); ctx.letterSpacing = `${l.spacing * px / 100}px`;
+    ctx.textAlign = l.align; ctx.textBaseline = "middle";
+    const x = (l.align === "left" ? (W - maxW) / 2 : l.align === "right" ? (W + maxW) / 2 : W / 2) + (l.dx || 0) * W;
+    const y0 = y + (l.dy || 0) * H;
+    let ly = y0, bw0 = 0;
+    for (const r of rows) {
+      const cy = ly + lh / 2;
+      if (l.stroke > 0) { ctx.lineJoin = "round"; ctx.strokeStyle = l.strokeColor; ctx.lineWidth = l.stroke * px / 100; ctx.strokeText(r, x, cy); }
+      ctx.fillStyle = l.color; ctx.fillText(r, x, cy);
+      bw0 = Math.max(bw0, ctx.measureText(r).width);
+      ly += lh;
+    }
+    const bx = l.align === "left" ? x : l.align === "right" ? x - bw0 : x - bw0 / 2;
+    boxes.push({ kind: "line", id: l.id, x: bx, y: y0, w: bw0, h: rows.length * lh });
+    y += rows.length * lh + gap;
+  }
+  ctx.letterSpacing = "0px";
+  await drawImages(true);
+  return boxes;
+}
+
+const preview = document.getElementById("preview");
+let bgDims = null; // drawn size of the background photo in sign px, for snapping
+let previewBoxes = [], previewScale = 1, dragGuides = null, hoverBox = null, selected = null; // selected = {kind,id}
+const HANDLE = 14; // screen px, half-size of the resize handle hit area
+const resizable = (b) => b && b.kind === "image";
+let renderQueued = false, rendering = false;
+async function redraw() {
+  if (rendering) { renderQueued = true; return; }
+  rendering = true;
+  const s = active();
+  if (s) {
+    const { W, H } = signPx(s);
+    const box = document.querySelector("main").getBoundingClientRect();
+    const fit = Math.min((box.width - 48) / W, (box.height - 48) / H, 1);
+    const dpr = window.devicePixelRatio || 1;
+    previewBoxes = await renderTo(s, preview, { scale: fit * dpr }); previewScale = fit * dpr;
+    preview.style.width = `${W * fit}px`; preview.style.height = `${H * fit}px`;
+    if (dragGuides) {
+      const c = preview.getContext("2d"); c.setTransform(1, 0, 0, 1, 0, 0); c.save();
+      c.strokeStyle = "rgba(77,159,247,.9)"; c.lineWidth = 1.5 * dpr; c.setLineDash([6 * dpr, 6 * dpr]);
+      if (dragGuides.v) { c.beginPath(); c.moveTo(preview.width / 2, 0); c.lineTo(preview.width / 2, preview.height); c.stroke(); }
+      if (dragGuides.h) { c.beginPath(); c.moveTo(0, preview.height / 2); c.lineTo(preview.width, preview.height / 2); c.stroke(); }
+      for (const e of dragGuides.edges || []) {
+        c.beginPath();
+        if (e === "l") { c.moveTo(1, 0); c.lineTo(1, preview.height); } if (e === "r") { c.moveTo(preview.width - 1, 0); c.lineTo(preview.width - 1, preview.height); }
+        if (e === "t") { c.moveTo(0, 1); c.lineTo(preview.width, 1); } if (e === "b") { c.moveTo(0, preview.height - 1); c.lineTo(preview.width, preview.height - 1); }
+        c.lineWidth = 4 * dpr; c.stroke();
+      }
+      if (dragGuides.box) { const b = dragGuides.box, k = previewScale; c.setLineDash([]); c.strokeStyle = "rgba(77,159,247,.7)"; c.strokeRect(b.x * k, b.y * k, b.w * k, b.h * k); }
+      c.restore();
+    }
+    if (project.roll.preview) drawCutOverlay(preview.getContext("2d"), s, previewScale, dpr);
+    if (!dragGuides) {
+      const sel = selected && previewBoxes.find((x) => x.kind === selected.kind && x.id === selected.id);
+      for (const [b, strong] of [[sel, true], [hoverBox, false]]) {
+        if (!b) continue;
+        const k = previewScale, c = preview.getContext("2d"); c.setTransform(1, 0, 0, 1, 0, 0); c.save();
+        c.strokeStyle = strong ? "rgba(77,159,247,1)" : "rgba(77,159,247,.6)"; c.lineWidth = (strong ? 2 : 1) * dpr; c.strokeRect(b.x * k, b.y * k, b.w * k, b.h * k);
+        if (resizable(b)) { const hs = 5 * dpr; c.fillStyle = "#4d9ff7"; c.fillRect((b.x + b.w) * k - hs, (b.y + b.h) * k - hs, 2 * hs, 2 * hs); }
+        c.restore();
+      }
+    }
+    updateThumb(s);
+  }
+  rendering = false;
+  if (renderQueued) { renderQueued = false; redraw(); }
+}
+// Nudge an element's offset so its box is centered on the sign along one axis.
+const elemOf = (s, kind, id) => kind === "footer" ? s.footer : kind === "image" ? s.images.find((i) => i.id === id) : s.lines.find((l) => l.id === id);
+function centerEl(s, kind, id, axis) {
+  const b = previewBoxes.find((x) => x.kind === kind && (kind !== "line" || x.id === id)); if (!b) return;
+  const el = elemOf(s, kind, id);
+  const { W, H } = signPx(s);
+  if (axis === "x") el.dx = (el.dx || 0) + 0.5 - (b.x + b.w / 2) / W;
+  else el.dy = (el.dy || 0) + 0.5 - (b.y + b.h / 2) / H;
+  renderLines(s); renderImages(s); changed();
+}
+const thumbs = new Map();
+function updateThumb(s) {
+  const c = document.createElement("canvas"); c.width = 72; c.height = 72;
+  const k = Math.min(72 / preview.width, 72 / preview.height);
+  c.getContext("2d").drawImage(preview, (72 - preview.width * k) / 2, (72 - preview.height * k) / 2, preview.width * k, preview.height * k);
+  thumbs.set(s.id, c.toDataURL("image/jpeg", 0.7));
+  const el = document.querySelector(`#signs li[data-id="${s.id}"] .thumb`); if (el) el.style.backgroundImage = `url(${thumbs.get(s.id)})`;
+}
+// Stamp a pHYs chunk (pixels per metre) after IHDR so print software reads the
+// physical size instead of assuming 72 dpi. Browsers never write one.
+const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(b) { let c = 0xffffffff; for (const x of b) c = CRC_TABLE[(c ^ x) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
+async function withDpi(blob, dpi) {
+  const png = new Uint8Array(await blob.arrayBuffer());
+  const ppm = Math.round(dpi / 0.0254);
+  const chunk = new Uint8Array(21), dv = new DataView(chunk.buffer);
+  dv.setUint32(0, 9); chunk.set([112, 72, 89, 115], 4); dv.setUint32(8, ppm); dv.setUint32(12, ppm); chunk[16] = 1;
+  dv.setUint32(17, crc32(chunk.subarray(4, 17)));
+  const ihdrEnd = 8 + 12 + 13; // signature + IHDR chunk
+  return new Blob([png.subarray(0, ihdrEnd), chunk, png.subarray(ihdrEnd)], { type: "image/png" });
+}
+// Export scale: the chosen dpi, lowered only when the canvas would exceed what the browser can allocate.
+function exportScale(w, h) {
+  const want = project.exportDpi / DPI, k = Math.min(want, fitScale(w, h));
+  if (k < want) toast(`Too big for ${project.exportDpi} dpi in a browser; exported at ${Math.round(DPI * k)} dpi`);
+  return k;
+}
+async function renderExport(s) {
+  const { W, H } = signPx(s); const k = exportScale(W, H);
+  await renderTo(s, full, { scale: k });
+  return withDpi(await new Promise((r) => full.toBlob(r, "image/png")), DPI * k);
+}
+function changed() { save(); redraw(); }
+
+// ---------- sign list ----------
+function renderList() {
+  const ul = document.getElementById("signs"); ul.innerHTML = "";
+  for (const s of project.signs) {
+    const li = document.createElement("li"); li.dataset.id = s.id; li.className = s.id === project.active ? "active" : "";
+    li.innerHTML = `<div class="thumb"></div><div class="name">${esc(s.name)}<div class="meta">${s.w}×${s.h} in</div></div><span class="x" title="Duplicate">⧉</span><span class="x del" title="Delete">✕</span>`;
+    if (thumbs.has(s.id)) li.querySelector(".thumb").style.backgroundImage = `url(${thumbs.get(s.id)})`;
+    li.onclick = (e) => {
+      if (e.target.classList.contains("del")) { if (confirm(`Delete "${s.name}"?`)) { project.signs = project.signs.filter((x) => x !== s); if (!project.signs.length) project.signs.push(newSign("Untitled")); if (project.active === s.id) project.active = project.signs[0].id; renderList(); bind(); changed(); } return; }
+      if (e.target.classList.contains("x")) { const c = JSON.parse(JSON.stringify(s)); c.id = uid(); c.name += " copy"; delete c.draftId; project.signs.splice(project.signs.indexOf(s) + 1, 0, c); project.active = c.id; renderList(); bind(); changed(); return; }
+      project.active = s.id; renderList(); bind(); changed(); if (HOSTED) renderShared();
+    };
+    ul.appendChild(li);
+  }
+}
+const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// ---------- controls ----------
+const $ = (id) => document.getElementById(id);
+function sliderVal(id, fmt) { $("v-" + id).textContent = fmt($(id).value); }
+let binding = false;
+function bind() {
+  const s = active(); if (!s) return; binding = true;
+  $("s-name").value = s.name;
+  $("s-size").value = s.size; $("custom-size").style.display = s.size === "custom" ? "" : "none"; $("s-w").value = s.w; $("s-h").value = s.h;
+  $("bg-type").value = s.bg.type; $("bg-color").value = s.bg.color; $("bg-color2").value = s.bg.color2;
+  $("bg-color2-wrap").style.display = s.bg.type === "gradient" ? "" : "none";
+  $("bg-image-ctl").style.display = s.bg.type === "image" ? "" : "none";
+  $("bg-dim").value = s.bg.tone || 0; $("bg-blur").value = s.bg.blur; $("bg-zoom").value = s.bg.zoom; $("bg-gray").checked = s.bg.gray;
+  $("border-on").checked = s.border.on; $("border-color").value = s.border.color; $("border-w").value = s.border.width;
+  $("panel-on").checked = s.panel.on; $("panel-color").value = s.panel.color; $("panel-opacity").value = s.panel.opacity; $("panel-width").value = s.panel.width; $("panel-radius").value = s.panel.radius; $("panel-pad").value = s.panel.pad;
+  $("text-gap").value = s.text.gap; $("text-y").value = s.text.y;
+  $("footer-text").value = s.footer.text; $("footer-size").value = s.footer.size; $("footer-color").value = s.footer.color;
+  $("roll-w").value = project.roll.width; $("roll-overlap").value = project.roll.overlap; $("roll-guides").checked = project.roll.guides; $("roll-preview").checked = !!project.roll.preview;
+  showRollPlan(s);
+  renderLines(s); renderImages(s);
+  refreshVals();
+  binding = false;
+}
+function refreshVals() {
+  sliderVal("bg-dim", (v) => (v < 0 ? "darker " + -v : v > 0 ? "lighter " + v : "0") + "%"); sliderVal("bg-blur", (v) => v); sliderVal("bg-zoom", (v) => v + "%");
+  sliderVal("panel-opacity", (v) => v + "%"); sliderVal("panel-width", (v) => v + "%"); sliderVal("panel-radius", (v) => v + "px"); sliderVal("panel-pad", (v) => v + "px");
+  sliderVal("text-gap", (v) => v + "px"); sliderVal("text-y", (v) => v + "%"); sliderVal("footer-size", (v) => v + "pt");
+}
+function renderLines(s) {
+  const box = $("lines"); box.innerHTML = "";
+  s.lines.forEach((l, i) => {
+    const d = document.createElement("div"); d.className = "line";
+    d.innerHTML = `
+      <div class="top">
+        <select class="kind" data-k="kind"><option value="headline">Headline</option><option value="sub">Subhead</option><option value="body">Body</option><option value="mono">Mono</option></select>
+        <span data-adv><button class="icon" data-act="cx" title="Center horizontally">↔</button><button class="icon" data-act="cy" title="Center vertically">↕</button><button class="icon" data-act="reset" title="Back to automatic position" style="display:${l.dx || l.dy ? "" : "none"}">⌖</button><button class="icon" data-act="up" title="Move up">↑</button><button class="icon" data-act="down" title="Move down">↓</button></span><button class="icon" data-act="del" title="Remove">✕</button>
+      </div>
+      <textarea data-k="text" rows="2"></textarea>
+      <div class="mini">
+        <div data-adv><label>Font</label><select data-k="font">${fontOptions(l.font)}</select></div>
+        <div data-adv><label>Weight</label><select data-k="weight"><option value="300">Light</option><option value="400">Regular</option><option value="500">Medium</option><option value="600">Semibold</option><option value="700">Bold</option></select></div>
+        <div><label>Size <span class="val"></span></label><input type="range" data-k="size" min="0.1" max="4" step="0.05"></div>
+        <div class="row"><div><label>Color</label><input type="color" data-k="color"></div><div data-adv><label>Align</label><select data-k="align"><option value="center">Center</option><option value="left">Left</option><option value="right">Right</option></select></div></div>
+      </div>
+      <details data-adv><summary>Outline, spacing, caps</summary><div class="mini">
+        <div><label>Outline</label><input type="range" data-k="stroke" min="0" max="20" step="0.5"></div>
+        <div><label>Outline color</label><input type="color" data-k="strokeColor"></div>
+        <div><label>Letter spacing</label><input type="range" data-k="spacing" min="-5" max="30" step="0.5"></div>
+        <div class="row"><div class="fix"><input type="checkbox" data-k="upper"></div><div class="muted">ALL CAPS</div></div>
+      </div></details>`;
+    for (const el of d.querySelectorAll("[data-k]")) {
+      const k = el.dataset.k;
+      if (el.type === "checkbox") el.checked = l[k]; else el.value = l[k];
+      el.addEventListener("input", () => {
+        l[k] = el.type === "checkbox" ? el.checked : (el.type === "range" || k === "weight") ? parseFloat(el.value) : el.value;
+        if (k === "size") d.querySelector(".val").textContent = l.size.toFixed(2) + " in";
+        if (k === "kind") { const n = newLine(l.text, l.kind); Object.assign(l, { font: n.font, size: n.size, weight: n.weight, upper: n.upper }); renderLines(s); }
+        changed();
+      });
+    }
+    d.querySelector(".val").textContent = l.size.toFixed(2) + " in";
+    d.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
+      const a = b.dataset.act;
+      if (a === "del") s.lines.splice(i, 1);
+      if (a === "reset") { delete l.dx; delete l.dy; }
+      if (a === "cx" || a === "cy") { centerEl(s, "line", l.id, a === "cx" ? "x" : "y"); return; }
+      if (a === "up" && i > 0) [s.lines[i - 1], s.lines[i]] = [s.lines[i], s.lines[i - 1]];
+      if (a === "down" && i < s.lines.length - 1) [s.lines[i + 1], s.lines[i]] = [s.lines[i], s.lines[i + 1]];
+      renderLines(s); changed();
+    });
+    box.appendChild(d);
+  });
+}
+
+// ---------- shared drafts (hosted only) ----------
+let sharedDrafts = [];
+const ago = (iso) => { const m = (Date.now() - new Date(iso)) / 60000; return m < 1 ? "just now" : m < 60 ? `${Math.round(m)}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`; };
+async function loadShared() {
+  if (!HOSTED) return;
+  try { sharedDrafts = (await api("GET")).drafts; } catch (e) { $("shared-status").textContent = "Couldn't load drafts: " + e.message; return; }
+  renderShared();
+}
+function renderShared() {
+  const ul = $("shared-list"); ul.innerHTML = "";
+  const cur = active();
+  $("shared-status").textContent = cur && cur.draftId ? "This sign is linked to a shared draft; Save to shared updates it." : "This sign isn't shared yet; Save to shared creates a draft.";
+  for (const d of sharedDrafts) {
+    const li = document.createElement("li"); li.title = `by ${d.createdBy || "?"}` + (d.updatedBy && d.updatedBy !== d.createdBy ? `, edited by ${d.updatedBy}` : "");
+    li.innerHTML = `<div class="thumb"></div><div class="name">${esc(d.name)}<div class="meta">${esc(d.updatedBy || d.createdBy || "")} · ${ago(d.updatedAt)}</div></div><span class="x del" title="Delete for everyone">✕</span>`;
+    if (d.thumbnail) li.querySelector(".thumb").style.backgroundImage = `url(${d.thumbnail})`;
+    if (cur && cur.draftId === d.id) li.style.background = "rgba(77,159,247,.18)";
+    li.onclick = async (e) => {
+      if (e.target.classList.contains("del")) { if (!confirm(`Delete "${d.name}" for everyone?`)) return; try { await api("DELETE", `?id=${d.id}`); for (const s of project.signs) if (s.draftId === d.id) delete s.draftId; await loadShared(); } catch (err) { toast(err.message); } return; }
+      try {
+        const i = project.signs.findIndex((x) => x.draftId === d.id);
+        if (i >= 0 && !confirm(`Replace your local copy of "${d.name}" with the shared version? Unsaved local edits are lost.`)) return;
+        const { draft } = await api("GET", `?id=${d.id}`);
+        const s = draft.sign; s.draftId = d.id;
+        for (const f of s.fonts || []) { project.fonts = (project.fonts || []).filter((x) => x.name !== f.name); project.fonts.push(f); fontLoads.delete(f.name); }
+        for (const n of s.googleFonts || []) { project.googleFonts = project.googleFonts || []; if (!project.googleFonts.includes(n) && !GOOGLE_FONTS[n]) project.googleFonts.push(n); }
+        delete s.fonts; delete s.googleFonts;
+        if (i >= 0) { s.id = project.signs[i].id; project.signs[i] = s; project.active = s.id; renderFontList(); renderList(); bind(); changed(); }
+        else { s.id = uid(); renderFontList(); addSign(s); }
+        renderShared();
+      } catch (err) { toast("Couldn't open: " + err.message); }
+    };
+    ul.appendChild(li);
+  }
+}
+async function saveShared(asNew) {
+  const s = active(); await redraw();
+  const used = new Set(s.lines.map((l) => l.font));
+  const fonts = (project.fonts || []).filter((f) => used.has(f.name));
+  const body = { name: s.name, sign: { ...s, fonts, googleFonts: (project.googleFonts || []).filter((n) => used.has(n)) }, thumbnail: thumbs.get(s.id) || null };
+  if (!asNew && s.draftId) body.id = s.draftId;
+  try { const { id } = await api("POST", "", body); s.draftId = id; save(); toast(asNew ? "Saved as a new shared draft" : "Saved to shared"); await loadShared(); }
+  catch (e) { toast("Save failed: " + e.message); }
+}
+function renderFontList() {
+  const mine = (project.fonts || []).map((f) => `<span>${esc(f.name)} <a href="#" data-rm-font="${esc(f.name)}" title="Remove">✕</a></span>`);
+  const goog = (project.googleFonts || []).map((n) => `<span>${esc(n)} <a href="#" data-rm-gfont="${esc(n)}" title="Remove">✕</a></span>`);
+  $("font-list").innerHTML = mine.concat(goog).join(" · ") || "No added fonts yet.";
+  $("font-list").querySelectorAll("a").forEach((a) => a.onclick = (e) => {
+    e.preventDefault();
+    if (a.dataset.rmFont) project.fonts = project.fonts.filter((f) => f.name !== a.dataset.rmFont);
+    if (a.dataset.rmGfont) project.googleFonts = project.googleFonts.filter((n) => n !== a.dataset.rmGfont);
+    renderFontList(); bind(); changed();
+  });
+}
+function renderImages(s) {
+  const box = $("images"); box.innerHTML = "";
+  [...s.images].reverse().forEach((im) => {
+    const i = s.images.indexOf(im);
+    const d = document.createElement("div"); d.className = "line imgcard" + (selected && selected.kind === "image" && selected.id === im.id ? " sel" : "");
+    d.innerHTML = `
+      <div class="top"><img src="${imgSrc(im.data)}"><span class="nm" title="${esc(im.name)}">${esc(im.name)}</span>
+        <button class="icon" data-act="cx" title="Center horizontally">↔</button><button class="icon" data-act="cy" title="Center vertically">↕</button><button class="icon" data-act="reset" title="Back to center" style="display:${im.dx || im.dy ? "" : "none"}">⌖</button>
+        <button class="icon" data-act="up" title="Bring forward">↑</button><button class="icon" data-act="down" title="Send back">↓</button><button class="icon" data-act="del" title="Remove">✕</button></div>
+      <div class="mini">
+        <div><label>Size <span class="val" data-v="size"></span></label><input type="range" data-k="size" min="2" max="150" step="0.5"></div>
+        <div><label>Opacity <span class="val" data-v="opacity"></span></label><input type="range" data-k="opacity" min="0" max="100"></div>
+        <div><label>Rotate <span class="val" data-v="rot"></span></label><input type="range" data-k="rot" min="-180" max="180"></div>
+        <div class="row" style="align-self:end"><div class="fix"><input type="checkbox" data-k="above"></div><div class="muted">Above text</div></div>
+      </div>`;
+    const vals = () => { d.querySelector('[data-v="size"]').textContent = Math.round(im.size * 10) / 10 + "%"; d.querySelector('[data-v="opacity"]').textContent = im.opacity + "%"; d.querySelector('[data-v="rot"]').textContent = (im.rot || 0) + "°"; };
+    for (const el of d.querySelectorAll("[data-k]")) {
+      const k = el.dataset.k; if (el.type === "checkbox") el.checked = !!im[k]; else el.value = im[k] || 0;
+      el.addEventListener("input", () => { im[k] = el.type === "checkbox" ? el.checked : parseFloat(el.value); vals(); changed(); });
+    }
+    vals();
+    d.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
+      const a = b.dataset.act;
+      if (a === "del") s.images.splice(i, 1);
+      if (a === "reset") { delete im.dx; delete im.dy; }
+      if (a === "up" && i < s.images.length - 1) [s.images[i + 1], s.images[i]] = [s.images[i], s.images[i + 1]];
+      if (a === "down" && i > 0) [s.images[i - 1], s.images[i]] = [s.images[i], s.images[i - 1]];
+      if (a === "cx" || a === "cy") { centerEl(s, "image", im.id, a === "cx" ? "x" : "y"); return; }
+      renderImages(s); changed();
+    });
+    box.appendChild(d);
+  });
+}
+async function addImages(files) {
+  const s = active(); if (!files.length) return;
+  for (const f of files) {
+    let data;
+    if (HOSTED) { try { data = await uploadFile(f, f.name); } catch (e) { toast("Upload failed: " + e.message); continue; } }
+    else data = await downscale(f, 3000, true);
+    s.images.push({ id: uid(), name: f.name.replace(/\.[^.]+$/, ""), data, size: 30, opacity: 100, rot: 0, above: false });
+  }
+  renderImages(s); changed();
+}
+function wire() {
+  const on = (id, ev, fn) => $(id).addEventListener(ev, (e) => { if (binding) return; fn(active(), e); refreshVals(); changed(); });
+  on("s-name", "input", (s) => { s.name = $("s-name").value; document.querySelector(`#signs li[data-id="${s.id}"] .name`).childNodes[0].textContent = s.name; });
+  on("s-size", "change", (s) => { s.size = $("s-size").value; const z = SIZES.find((x) => x[0] === s.size); if (z[2]) { s.w = z[2]; s.h = z[3]; } $("custom-size").style.display = s.size === "custom" ? "" : "none"; $("s-w").value = s.w; $("s-h").value = s.h; renderList(); showRollPlan(s); });
+  on("s-w", "change", (s) => { s.w = +$("s-w").value || 8.5; renderList(); showRollPlan(s); });
+  on("s-h", "change", (s) => { s.h = +$("s-h").value || 11; renderList(); showRollPlan(s); });
+  $("s-rotate").onclick = () => { const s = active(); [s.w, s.h] = [s.h, s.w]; const m = SIZES.find((x) => x[2] === s.w && x[3] === s.h); s.size = m ? m[0] : "custom"; bind(); renderList(); changed(); };
+  on("bg-type", "change", (s) => { s.bg.type = $("bg-type").value; bind(); });
+  on("bg-color", "input", (s) => { s.bg.color = $("bg-color").value; });
+  on("bg-color2", "input", (s) => { s.bg.color2 = $("bg-color2").value; });
+  on("bg-dim", "input", (s) => { s.bg.tone = +$("bg-dim").value; });
+  on("bg-blur", "input", (s) => { s.bg.blur = +$("bg-blur").value; });
+  on("bg-zoom", "input", (s) => { s.bg.zoom = +$("bg-zoom").value; });
+  on("bg-gray", "change", (s) => { s.bg.gray = $("bg-gray").checked; });
+  $("bg-upload").onclick = () => $("bg-file").click();
+  $("bg-file").onchange = async () => {
+    const f = $("bg-file").files[0]; if (!f) return;
+    let data;
+    if (HOSTED) { try { data = await uploadFile(f, f.name); } catch (e) { toast("Upload failed: " + e.message); return; } }
+    else data = await downscale(f, 3600);
+    const s = active(); s.bg.image = data; s.bg.type = "image"; s.bg.x = 0; s.bg.y = 0; s.bg.zoom = 100; bind(); changed(); $("bg-file").value = "";
+  };
+  $("bg-clear").onclick = () => { const s = active(); s.bg.image = null; s.bg.type = "solid"; bind(); changed(); };
+  on("border-on", "change", (s) => { s.border.on = $("border-on").checked; });
+  on("border-color", "input", (s) => { s.border.color = $("border-color").value; });
+  on("border-w", "input", (s) => { s.border.width = +$("border-w").value; });
+  on("panel-on", "change", (s) => { s.panel.on = $("panel-on").checked; if (s.panel.on) document.querySelector('[data-sec="panel"]').classList.remove("closed"); });
+  on("panel-color", "input", (s) => { s.panel.color = $("panel-color").value; });
+  on("panel-opacity", "input", (s) => { s.panel.opacity = +$("panel-opacity").value; });
+  on("panel-width", "input", (s) => { s.panel.width = +$("panel-width").value; });
+  on("panel-radius", "input", (s) => { s.panel.radius = +$("panel-radius").value; });
+  on("panel-pad", "input", (s) => { s.panel.pad = +$("panel-pad").value; });
+  on("text-gap", "input", (s) => { s.text.gap = +$("text-gap").value; });
+  on("text-y", "input", (s) => { s.text.y = +$("text-y").value; });
+  on("footer-text", "input", (s) => { s.footer.text = $("footer-text").value; });
+  on("footer-size", "input", (s) => { s.footer.size = +$("footer-size").value; });
+  on("footer-color", "input", (s) => { s.footer.color = $("footer-color").value; });
+  on("roll-w", "change", (s) => { project.roll.width = +$("roll-w").value || 24; showRollPlan(s); });
+  on("roll-overlap", "change", (s) => { project.roll.overlap = Math.max(0, +$("roll-overlap").value || 0); showRollPlan(s); });
+  on("roll-guides", "change", () => { project.roll.guides = $("roll-guides").checked; });
+  on("roll-preview", "change", () => { project.roll.preview = $("roll-preview").checked; });
+  $("btn-export-roll").onclick = exportRoll;
+  $("footer-cx").onclick = () => centerEl(active(), "footer", null, "x"); $("footer-cy").onclick = () => centerEl(active(), "footer", null, "y");
+  $("footer-reset").onclick = () => { const s = active(); delete s.footer.dx; delete s.footer.dy; changed(); };
+  $("font-add").onclick = () => $("font-file").click();
+  $("font-file").onchange = async () => {
+    project.fonts = project.fonts || [];
+    for (const f of $("font-file").files) {
+      const name = f.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
+      let data;
+      if (HOSTED) { try { data = await uploadFile(f, f.name); } catch (e) { toast("Upload failed: " + e.message); continue; } }
+      else data = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(f); });
+      project.fonts = project.fonts.filter((x) => x.name !== name); project.fonts.push({ name, data }); fontLoads.delete(name);
+      await ensureFont(name);
+    }
+    $("font-file").value = ""; renderFontList(); bind(); changed();
+  };
+  $("gfont-add").onclick = async () => {
+    const name = $("gfont-name").value.trim(); if (!name) return;
+    project.googleFonts = project.googleFonts || []; if (!project.googleFonts.includes(name) && !GOOGLE_FONTS[name]) project.googleFonts.push(name);
+    await ensureFont(name);
+    if (!document.fonts.check(`40px "${name}"`)) toast(`"${name}" didn't load; check the spelling on fonts.google.com`);
+    $("gfont-name").value = ""; renderFontList(); bind(); changed();
+  };
+  for (const [key, m] of Object.entries(ASSET_META)) {
+    const b = document.createElement("button"); b.title = m.name; b.innerHTML = `<img src="${ASSETS[key]}" alt="${m.name}">`;
+    b.onclick = () => { const s = active(); const l = logoLayer(key, s); delete l.dy; s.images.push(l); selected = { kind: "image", id: l.id }; renderImages(s); changed(); };
+    $("asset-strip").appendChild(b);
+  }
+  $("img-add").onclick = () => $("img-file").click();
+  $("img-file").onchange = async () => { await addImages([...$("img-file").files]); $("img-file").value = ""; };
+  $("line-add").onclick = () => { const s = active(); s.lines.push(newLine("New line", "body")); renderLines(s); changed(); };
+
+  for (const [name] of Object.entries(THEMES)) { const b = document.createElement("button"); b.textContent = name; b.onclick = () => { applyTheme(active(), name); bind(); changed(); }; $("themes").appendChild(b); }
+  for (const [n, c] of Object.entries(PALETTE)) { const d = document.createElement("div"); d.className = "sw"; d.style.background = c; d.title = n; d.onclick = () => { active().bg.color = c; $("bg-color").value = c; changed(); }; $("bg-swatches").appendChild(d); }
+  for (const z of SIZES) { const o = document.createElement("option"); o.value = z[0]; o.textContent = z[1]; $("s-size").appendChild(o); }
+  for (const t of TEMPLATES) { const o = document.createElement("option"); o.value = t.name; o.textContent = t.name; $("tpl-select").appendChild(o); }
+
+  const setMode = (m) => { document.body.classList.toggle("simple", m === "simple"); document.querySelectorAll("#mode button").forEach((b) => b.classList.toggle("on", b.dataset.mode === m)); try { localStorage.setItem("metagame-signs-mode", m); } catch {} $("hint").textContent = m === "simple" ? "Drag text to move it · Drag the photo to pan it, scroll to zoom · Switch to Advanced for logos, images, fonts and roll export" : HINT_ADV; };
+  const HINT_ADV = $("hint").textContent;
+  document.querySelectorAll("#mode button").forEach((b) => b.onclick = () => setMode(b.dataset.mode));
+  let savedMode = "simple"; try { savedMode = localStorage.getItem("metagame-signs-mode") || "simple"; } catch {}
+  setMode(savedMode);
+  // collapsible sections; clicks on controls inside the header don't toggle
+  let secState = {}; try { secState = JSON.parse(localStorage.getItem("metagame-signs-sections") || "{}"); } catch {}
+  document.querySelectorAll("section[data-sec]").forEach((sec) => {
+    const id = sec.dataset.sec; if (id in secState) sec.classList.toggle("closed", secState[id]);
+    sec.querySelector("h2").addEventListener("click", (e) => {
+      if (e.target.closest("button, input, label, select")) return;
+      sec.classList.toggle("closed"); secState[id] = sec.classList.contains("closed");
+      try { localStorage.setItem("metagame-signs-sections", JSON.stringify(secState)); } catch {}
+    });
+  });
+  if (HOSTED) {
+    $("shared-sec").style.display = "";
+    $("shared-save").onclick = () => saveShared(false);
+    $("shared-save-new").onclick = () => saveShared(true);
+    $("shared-refresh").onclick = loadShared;
+  }
+  $("btn-new").onclick = () => { const s = newSign("Untitled"); s.images.push(logoLayer("wide", s)); addSign(s); };
+  $("btn-template").onclick = () => { const sel = $("tpl-select"); sel.style.display = ""; sel.focus(); sel.showPicker?.(); };
+  $("tpl-select").onchange = () => { const t = TEMPLATES.find((x) => x.name === $("tpl-select").value); if (t) addSign(fromTemplate(t)); $("tpl-select").style.display = "none"; };
+  $("tpl-select").onblur = () => { $("tpl-select").style.display = "none"; };
+  $("export-dpi").value = String(project.exportDpi);
+  $("export-dpi").onchange = () => { project.exportDpi = +$("export-dpi").value; save(); showRollPlan(active()); };
+  $("btn-export").onclick = async () => { const s = active(); download(await renderExport(s), fileName(s) + ".png"); };
+  $("btn-export-all").onclick = exportAll;
+  $("btn-save").onclick = () => download(new Blob([JSON.stringify(project)], { type: "application/json" }), "metagame-signs.json");
+  $("btn-load").onclick = () => $("file-project").click();
+  $("file-project").onchange = async () => { const f = $("file-project").files[0]; if (!f) return; try { project = JSON.parse(await f.text()); if (!active()) project.active = project.signs[0].id; fontLoads.clear(); renderFontList(); renderList(); bind(); changed(); toast("Project loaded"); } catch { toast("Could not read that file"); } $("file-project").value = ""; };
+
+  // drag + wheel on preview: an element under the pointer moves on its own; empty canvas moves the whole
+  // text block; shift pans the photo. Elements snap to the sign's center lines; double-click resets one.
+  let drag = null;
+  const SNAP = 0.012;
+  function elemAt(e) {
+    const r = preview.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    const x = (e.clientX - r.left) * dpr / previewScale, y = (e.clientY - r.top) * dpr / previewScale;
+    for (let i = previewBoxes.length - 1; i >= 0; i--) { const b = previewBoxes[i]; if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return b; }
+    return null;
+  }
+  const target = (s, b) => elemOf(s, b.kind, b.id);
+  function onHandle(e, b) {
+    if (!resizable(b)) return false;
+    const r = preview.getBoundingClientRect(), k = previewScale / (window.devicePixelRatio || 1);
+    const hx = r.left + (b.x + b.w) * k, hy = r.top + (b.y + b.h) * k;
+    return Math.abs(e.clientX - hx) <= HANDLE && Math.abs(e.clientY - hy) <= HANDLE;
+  }
+  const sizeOf = (el, kind) => kind === "line" ? el.size : kind === "footer" ? el.size : el.size;
+  preview.addEventListener("pointerdown", (e) => {
+    const s = active(); const b = e.shiftKey ? null : (hoverBox || elemAt(e));
+    if (!b) selected = null;
+    drag = { x: e.clientX, y: e.clientY, s, shift: e.shiftKey, ty: s.text.y, bx: s.bg.x, by: s.bg.y, box: b, el: b && target(s, b), dx0: b ? (target(s, b).dx || 0) : 0, dy0: b ? (target(s, b).dy || 0) : 0, resize: b && onHandle(e, b), size0: b ? target(s, b).size : 0 };
+    selected = b ? { kind: b.kind, id: b.id } : null; renderImages(s);
+    preview.classList.add("dragging"); preview.setPointerCapture(e.pointerId);
+  });
+  preview.addEventListener("pointermove", (e) => {
+    if (!drag) {
+      const b = hoverBox && onHandle(e, hoverBox) ? hoverBox : elemAt(e);
+      preview.style.cursor = b ? (onHandle(e, b) ? "nwse-resize" : "move") : "grab";
+      if (b !== hoverBox) { hoverBox = b; redraw(); }
+      return;
+    }
+    const r = preview.getBoundingClientRect(); const dx = (e.clientX - drag.x) / r.width, dy = (e.clientY - drag.y) / r.height;
+    const s = drag.s, { W, H } = signPx(s);
+    if (!drag.el && s.bg.type === "image" && s.bg.image && !drag.shift) {
+      let nx = drag.bx + dx, ny = drag.by + dy; const g = { v: false, h: false, edges: [] };
+      if (bgDims) {
+        // snap targets: centered, and each photo edge flush with the sign edge
+        const ex = (bgDims.dw - W) / (2 * W), ey = (bgDims.dh - H) / (2 * H);
+        const sx = [[0, "v"], [ex, "l"], [-ex, "r"]], sy = [[0, "h"], [ey, "t"], [-ey, "b"]];
+        for (const [v, k] of sx) if (Math.abs(nx - v) < SNAP) { nx = v; k === "v" ? g.v = true : g.edges.push(k); break; }
+        for (const [v, k] of sy) if (Math.abs(ny - v) < SNAP) { ny = v; k === "h" ? g.h = true : g.edges.push(k); break; }
+      }
+      s.bg.x = nx; s.bg.y = ny; dragGuides = g;
+    }
+    else if (drag.el && drag.resize) {
+      // corner handle: scale from the element's top-left corner, which stays put
+      const b = drag.box, k = previewScale / (window.devicePixelRatio || 1);
+      const nw = Math.max(W * 0.02, (e.clientX - r.left) / k - b.x), ratio = b.h / b.w;
+      drag.el.size = Math.min(300, nw / W * 100);
+      const nh = nw * ratio;
+      drag.el.dx = (b.x - (W - nw) / 2) / W; drag.el.dy = (b.y - (H - nh) / 2) / H;
+      dragGuides = { box: { x: b.x, y: b.y, w: nw, h: nh } };
+    }
+    else if (drag.el) {
+      let ndx = drag.dx0 + dx, ndy = drag.dy0 + dy; const b = drag.box;
+      // snap the element's center to the sign's center lines
+      const cx = (b.x + b.w / 2) / W + (ndx - drag.dx0), cy = (b.y + b.h / 2) / H + (ndy - drag.dy0);
+      const sv = Math.abs(cx - 0.5) < SNAP, sh = Math.abs(cy - 0.5) < SNAP;
+      if (sv) ndx -= cx - 0.5; if (sh) ndy -= cy - 0.5;
+      drag.el.dx = ndx; drag.el.dy = ndy;
+      dragGuides = { v: sv, h: sh, box: { x: b.x + (ndx - drag.dx0) * W, y: b.y + (ndy - drag.dy0) * H, w: b.w, h: b.h } };
+    }
+    else { s.text.y = Math.max(-50, Math.min(50, Math.round(drag.ty + dy * 100))); $("text-y").value = s.text.y; refreshVals(); }
+    redraw();
+  });
+  const end = () => { if (drag) { drag = null; dragGuides = null; hoverBox = null; preview.classList.remove("dragging"); save(); redraw(); renderLines(active()); renderImages(active()); } };
+  preview.addEventListener("pointerup", end); preview.addEventListener("pointercancel", end);
+  preview.addEventListener("pointerleave", () => { if (!drag && hoverBox) { hoverBox = null; preview.style.cursor = "grab"; redraw(); } });
+  preview.addEventListener("dblclick", (e) => { const s = active(); const b = elemAt(e); if (b) { const el = target(s, b); delete el.dx; delete el.dy; renderLines(s); renderImages(s); changed(); } });
+  // drop image files onto the sign
+  const main = document.querySelector("main");
+  main.addEventListener("dragover", (e) => { e.preventDefault(); });
+  main.addEventListener("drop", async (e) => { e.preventDefault(); await addImages([...e.dataTransfer.files].filter((f) => f.type.startsWith("image/"))); });
+  let wheelT;
+  preview.addEventListener("wheel", (e) => {
+    const s = active(); const b = elemAt(e);
+    if (!b && s.bg.type !== "image") return;
+    e.preventDefault();
+    const f = Math.exp(-Math.sign(e.deltaY) * 0.05);
+    if (b) {
+      const el = target(s, b);
+      if (b.kind === "line") el.size = Math.max(0.1, Math.min(4, el.size * f));
+      else if (b.kind === "footer") el.size = Math.max(10, Math.min(80, el.size * f));
+      else el.size = Math.max(2, Math.min(300, el.size * f));
+      hoverBox = null; redraw(); save();
+      clearTimeout(wheelT); wheelT = setTimeout(() => { bind(); }, 300);
+    } else { s.bg.zoom = Math.max(100, Math.min(400, s.bg.zoom * f)); $("bg-zoom").value = s.bg.zoom; refreshVals(); changed(); }
+  }, { passive: false });
+  window.addEventListener("resize", redraw);
+  window.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); $("btn-export").click(); return; }
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName);
+    if ((e.key === "Delete" || e.key === "Backspace") && selected && !typing) {
+      e.preventDefault(); const s = active();
+      if (selected.kind === "image") s.images = s.images.filter((i) => i.id !== selected.id);
+      else if (selected.kind === "line") s.lines = s.lines.filter((l) => l.id !== selected.id);
+      else if (selected.kind === "footer") s.footer.text = "";
+      selected = null; hoverBox = null; bind(); changed();
+    }
+    if (e.key === "Escape") { selected = null; redraw(); }
+  });
+}
+function addSign(s) { project.signs.push(s); project.active = s.id; renderList(); bind(); changed(); }
+function fileName(s) { return s.name.trim().replace(/[^\w\- ]+/g, "").replace(/\s+/g, "_") || "sign"; }
+// Inside the claude.ai artifact viewer plain <a download> is blocked; use its downloads capability there.
+const dlCap = (window.claude && typeof window.claude.use === "function") ? window.claude.use("downloads").catch(() => null) : Promise.resolve(null);
+async function download(blob, name) {
+  const dl = await dlCap;
+  if (dl) { try { await dl.save({ filename: name, data: blob }); } catch (e) { if (e && e.code !== "declined") toast("Save failed: " + (e.message || e.code)); } return; }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+function downscale(file, max, keepAlpha) {
+  return new Promise((res) => { const im = new Image(); im.onload = () => { let iw = im.width || 1000, ih = im.height || 1000; const k = Math.min(1, max / Math.max(iw, ih)); const c = document.createElement("canvas"); c.width = iw * k; c.height = ih * k; c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); res(keepAlpha && file.type !== "image/jpeg" ? c.toDataURL("image/png") : c.toDataURL("image/jpeg", 0.9)); }; im.src = URL.createObjectURL(file); });
+}
+// Roll output: image width = across the roll, height = along its length. Rotate so the short
+// side spans the roll; only when both sides exceed the roll width do we slice into strips.
+function rollPlan(s) {
+  const R = project.roll.width, ov = project.roll.overlap;
+  if (s.w <= R) return { rotate: false, strips: 1, across: s.w, along: s.h };
+  if (s.h <= R) return { rotate: true, strips: 1, across: s.h, along: s.w };
+  // both > R: slice along whichever axis needs fewer strips
+  const nW = Math.ceil((s.w - ov) / (R - ov)), nH = Math.ceil((s.h - ov) / (R - ov));
+  // across = the full dimension being sliced (strips are cut from it); along = the roll length
+  return nW <= nH ? { rotate: false, strips: nW, across: s.w, along: s.h } : { rotate: true, strips: nH, across: s.h, along: s.w };
+}
+function stripRects(s, p) {
+  const { W, H } = signPx(s); const R = project.roll.width, ov = project.roll.overlap;
+  if (p.strips === 1) return [];
+  const stripPx = Math.round(R * DPI), ovPx = Math.round(ov * DPI), step = stripPx - ovPx, acrossPx = Math.round(p.across * DPI);
+  return Array.from({ length: p.strips }, (_, i) => {
+    const x0 = Math.min(i * step, acrossPx - stripPx);
+    return p.rotate ? { x: 0, y: x0, w: W, h: stripPx } : { x: x0, y: 0, w: stripPx, h: H };
+  });
+}
+function drawCutOverlay(c, s, k, dpr) {
+  const p = rollPlan(s), rects = stripRects(s, p); if (!rects.length) return;
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+  const colors = ["rgba(77,159,247,.95)", "rgba(226,168,92,.95)", "rgba(106,154,107,.95)", "rgba(250,128,114,.95)"];
+  rects.forEach((r, i) => {
+    const col = colors[i % colors.length], inset = (i % 2) * 3 * dpr;
+    c.strokeStyle = col; c.lineWidth = 2 * dpr; c.setLineDash([]);
+    c.strokeRect(r.x * k + inset, r.y * k + inset, r.w * k - 2 * inset, r.h * k - 2 * inset);
+    // overlap with the next strip, hatched
+    const n = rects[i + 1];
+    if (n) {
+      const ox = Math.max(r.x, n.x), oy = Math.max(r.y, n.y), ow = Math.min(r.x + r.w, n.x + n.w) - ox, oh = Math.min(r.y + r.h, n.y + n.h) - oy;
+      c.fillStyle = "rgba(255,255,255,.25)"; c.fillRect(ox * k, oy * k, ow * k, oh * k);
+    }
+    c.font = `600 ${14 * dpr}px "Space Grotesk"`; c.fillStyle = col; c.textBaseline = "top"; c.textAlign = "left";
+    c.fillText(`strip ${i + 1}`, r.x * k + 6 * dpr + inset, r.y * k + 6 * dpr + inset);
+  });
+  c.restore();
+}
+function rollNudge(s, p) {
+  if (p.strips < 2) return null;
+  const R = project.roll.width, ov = project.roll.overlap, n = p.strips - 1;
+  const maxFit = Math.floor((n * R - (n - 1) * ov) * 4) / 4; // largest size n strips can cover, to the quarter inch
+  const over = p.across - maxFit;
+  if (over <= 0 || over > Math.max(2, p.across * 0.06)) return null;
+  return { maxFit, n, axis: p.rotate ? "h" : "w" };
+}
+function showRollPlan(s) {
+  const p = rollPlan(s), nd = rollNudge(s, p), b = $("roll-nudge");
+  $("roll-plan").textContent = describeRollPlan(p);
+  b.style.display = nd ? "" : "none";
+  if (nd) { b.textContent = `Shrink ${nd.axis === "w" ? "width" : "height"} to ${nd.maxFit}″ → ${nd.n} strip${nd.n > 1 ? "s" : ""}`; b.onclick = () => { s[nd.axis] = nd.maxFit; s.size = "custom"; bind(); renderList(); changed(); }; }
+}
+function describeRollPlan(p) {
+  const r = project.roll.width;
+  const dpi = Math.round(DPI * Math.min(project.exportDpi / DPI, fitScale((p.strips === 1 ? p.across : r) * DPI, p.along * DPI)));
+  if (p.strips === 1) return `Prints in one piece: ${p.across}″ across the ${r}″ roll × ${p.along}″ long${p.rotate ? " (rotated)" : ""}, at ${dpi} dpi.`;
+  return `Both sides exceed ${r}″: exports ${p.strips} strips of ${r}″ × ${p.along}″${p.rotate ? " (rotated)" : ""} with ${project.roll.overlap}″ overlap, at ${dpi} dpi.`;
+}
+async function exportRoll() {
+  const s = active(), p = rollPlan(s), R = project.roll.width, ov = project.roll.overlap;
+  const btn = $("btn-export-roll"); btn.disabled = true; btn.textContent = "Rendering…";
+  try {
+    // output space: x across the roll, y along it; each strip is rendered on its own at the best dpi that fits
+    const acrossPx = Math.round(p.across * DPI), alongPx = Math.round(p.along * DPI);
+    const stripPx = p.strips === 1 ? acrossPx : Math.round(R * DPI);
+    const k = exportScale(stripPx, alongPx);
+    const ovPx = Math.round(ov * DPI), step = stripPx - ovPx, rects = stripRects(s, p);
+    const out = document.createElement("canvas"), blobs = [];
+    for (let i = 0; i < p.strips; i++) {
+      const x0 = p.strips === 1 ? 0 : (p.rotate ? rects[i].y : rects[i].x);
+      await renderTo(s, out, { scale: k, rotate: p.rotate, ox: Math.round(x0 * k), oy: 0, cw: Math.round(stripPx * k), ch: Math.round(alongPx * k) });
+      const octx = out.getContext("2d"); octx.setTransform(1, 0, 0, 1, 0, 0);
+      if (p.strips > 1 && project.roll.guides && ovPx > 0) {
+        octx.save(); octx.setLineDash([40 * k, 40 * k]); octx.lineWidth = Math.max(1, 3 * k); octx.strokeStyle = "rgba(0,0,0,.45)";
+        const g = ovPx * k;
+        if (i > 0) { octx.beginPath(); octx.moveTo(g, 0); octx.lineTo(g, out.height); octx.stroke(); }
+        if (i < p.strips - 1) { octx.beginPath(); octx.moveTo(out.width - g, 0); octx.lineTo(out.width - g, out.height); octx.stroke(); }
+        octx.restore();
+      }
+      const name = p.strips === 1 ? fileName(s) + "_roll.png" : `${fileName(s)}_strip${i + 1}of${p.strips}.png`;
+      blobs.push([name, await withDpi(await new Promise((r) => out.toBlob(r, "image/png")), DPI * k)]);
+    }
+    if (blobs.length === 1) await download(blobs[0][1], blobs[0][0]);
+    else {
+      try {
+        await ensureJSZip(); const zip = new JSZip(); for (const [n, b] of blobs) zip.file(n, b);
+        await download(await zip.generateAsync({ type: "blob" }), fileName(s) + "_strips.zip");
+      } catch { for (const [n, b] of blobs) { await download(b, n); await new Promise((r) => setTimeout(r, 400)); } }
+    }
+  } finally { btn.disabled = false; btn.textContent = "Export for roll"; redraw(); }
+}
+function ensureJSZip() {
+  if (window.JSZip) return Promise.resolve();
+  return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+}
+async function exportAll() {
+  const btn = $("btn-export-all"); btn.disabled = true; btn.textContent = "Rendering…";
+  try {
+    await ensureJSZip();
+    const zip = new JSZip(); const used = new Set();
+    for (const s of project.signs) {
+      const blob = await renderExport(s);
+      let n = fileName(s), i = 2; while (used.has(n)) n = fileName(s) + "_" + i++; used.add(n);
+      zip.file(n + ".png", blob);
+    }
+    download(await zip.generateAsync({ type: "blob" }), "metagame-signs.zip");
+  } catch (e) {
+    toast("Zip needs internet for the zip library; exporting one by one instead");
+    for (const s of project.signs) { await download(await renderExport(s), fileName(s) + ".png"); await new Promise((r) => setTimeout(r, 400)); }
+  }
+  btn.disabled = false; btn.textContent = "Export all (zip)"; redraw();
+}
+
+(async function init() {
+  await Promise.all([document.fonts.load('400 40px "Bebas Neue"'), document.fonts.load('700 40px "Space Grotesk"'), document.fonts.load('400 40px "Space Grotesk"'), document.fonts.load('700 40px "Space Mono"'), document.fonts.load('400 40px "Space Mono"'), document.fonts.load('400 40px "Inter"')]);
+  load(); wire(); renderFontList(); renderList(); bind(); await redraw();
+  loadShared();
+  const tc = document.createElement("canvas");
+  for (const s of project.signs) if (s.id !== project.active) { const { W, H } = signPx(s); await renderTo(s, tc, { scale: 144 / Math.max(W, H) }); const c = document.createElement("canvas"); c.width = 72; c.height = 72; const k = Math.min(72 / tc.width, 72 / tc.height); c.getContext("2d").drawImage(tc, (72 - tc.width * k) / 2, (72 - tc.height * k) / 2, tc.width * k, tc.height * k); thumbs.set(s.id, c.toDataURL("image/jpeg", 0.7)); const el = document.querySelector(`#signs li[data-id="${s.id}"] .thumb`); if (el) el.style.backgroundImage = `url(${thumbs.get(s.id)})`; }
+})();
+</script>
+</body>
+</html>

@@ -66,6 +66,7 @@ const TABLE_GROUPS: Record<string, string[]> = {
   Grading: ["session_grades", "session_grade_space_options"],
   Budget: ["xero_connections", "budget_import_runs", "budget_ignored_lines"],
   Megagame: ["quests", "quest_progress", "level_events"],
+  Signs: ["sign_drafts"],
 };
 
 // What each table is for, in one line. Reviewed alongside the columns.
@@ -89,7 +90,7 @@ const TABLE_NOTES: Record<string, string> = {
   profiles:
     'Attendee-editable profile fields, kept apart from user so nothing security-relevant sits next to a form field. image_url is the profile picture, a 512px Vercel Blob URL. is_adult ("18 or older?") and bringing_children are the first sign-in modal\'s required answers; it keeps opening while either is null. share_with_recruiters opts in to the name-and-email list sponsors who are hiring receive. website is a link the person gave (a host\'s RFP "Link"). wizard_level, pirate_level and alien_level are the Megagame class levels, 0–5 (check constraints), set from the Megagame tab on /account and the volunteer level-up; level_events is their audit log.',
   tickets:
-    "One row per purchase, keyed by the payment id the webhooks upsert on. Airtable keeps the finance detail; this holds what admission needs. owner_user_id (the attendee) is set only by claiming the ticket code, never by email match. holder_user_id is who has the code to pass on or claim; null means the buyer (purchaser_email). purchaser_discord is the Discord handle typed at checkout (leading @ stripped), used to prefill an empty profile Discord. Unclaiming clears the owner, makes them the holder and issues a fresh random code. badge_code is the number printed on the attendee's badge and encoded in its pre-printed QR sticker (shown zero-padded to four digits); null until assigned.",
+    "One row per purchase, keyed by the payment id the webhooks upsert on. Airtable keeps the finance detail; this holds what admission needs. owner_user_id (the attendee) is set only by claiming the ticket code, never by email match. holder_user_id is who has the code to pass on or claim; null means the buyer (purchaser_email). purchaser_discord is the Discord handle typed at checkout (leading @ stripped), used to prefill an empty profile Discord. claimed_by is the check-in volunteer who claimed it for the attendee; null for a self-claim. Unclaiming clears the owner, makes them the holder and issues a fresh random code. badge_code is the four-digit number (shown zero-padded) on the QR sticker a check-in volunteer puts on the badge and types in at the desk; null until a volunteer assigns it. checked_in_at and checked_in_by record the check-in (who ran it, null if that account is gone); set when a claimed, paid ticket is checked in, cleared by an undo, and while set the attendee can't unclaim.",
   locations:
     "Rooms and spaces sessions happen in. display_order and visibility (who the room shows up for: everyone, volunteers and team, or team only) drive the schedule columns; board_starts_at and board_ends_at are when the unconference bulletin board takes over the room's column (null end: to the end of the schedule); sessions may still be placed in the room, and the public grid shows them only through a session poster on the board; airtable_record_id ties a room to its Lighthaven Spaces row. thumbnail_url (what the schedule shows) and image_url (a large copy for detail views) are Vercel Blob URLs.",
   sessions:
@@ -107,6 +108,8 @@ const TABLE_NOTES: Record<string, string> = {
     "One committee member's grade of a proposal, one row per session and grader; re-grading overwrites it. A row with submitted_at null is an assignment not yet graded. topic_areas and potential_panels are multi-selects as enum arrays. Deleting a grader's account is refused while they have grades, since these are the only copy.",
   session_grade_space_options:
     "The rooms a grader thinks would suit the session, one row per grade and location.",
+  sign_drafts:
+    "Shared drafts from the sign maker at /backstage/signs, one row per sign. sign is the tool's own JSON document (text lines, layers, background); photos and fonts it uses are Vercel Blob URLs, not stored here. thumbnail is a tiny data URL for the list. Anyone with misc.signs sees and may edit every draft; created_by and updated_by are credit, not enforced.",
   xero_connections:
     "The budget tool's Xero OAuth tokens: one row, id \"metagame\". The refresh token rotates on every use, so it needs a writable home; refresh_locked_at serialises concurrent refreshes, since a single-use token can't be exchanged twice. connected_by names who linked the account. The budget itself lives in the Google Sheet, not here.",
   budget_import_runs:
@@ -114,9 +117,9 @@ const TABLE_NOTES: Record<string, string> = {
   budget_ignored_lines:
     "Xero bank lines the team chose not to import, keyed by the Xero line id so later imports skip them; reason and ignored_by record why and who.",
   quests:
-    "Megagame quests. code is the six-character label code printed with its QR. class null means any class, and only a classed quest may carry a min_level/max_level window (check constraint). kind answer checks the players' answer against answers (normalized); kind evidence shows the volunteer the evidence description. Withdraw a quest with active rather than deleting it.",
+    "Megagame quests, edited and printed at /backstage/quests. code is the six-character label code printed on the card with its /q/<code> QR. body_text and body_images (up to three Vercel Blob URLs) are what the card shows players; min_players is the group size it needs; class null means any class, and only a classed quest may carry a min_level/max_level window (check constraint); the card's background art follows class. stamps_wizard, stamps_pirate, stamps_alien and stamps_any are the reward, where any stamps go to a class the player picks. evidence and evidence_image are what the volunteer at the Quest Board compares against before confirming; hint is a nudge the volunteer may give. Withdraw a quest with active rather than deleting it.",
   quest_progress:
-    "One row per player and quest (unique index). A volunteer's confirm at /backstage/megagame sets status to completed with completed_at and confirmed_by; confirming a row that is already completed changes nothing, so a retry is a no-op. Undo sets status back to attempted and fills undone_at, undone_by and undo_reason; nothing is deleted. attempt_count and first_attempt_at come from the answer checker and survive an undo. Deleting the account deletes its rows.",
+    "One row per player and quest (unique index). A volunteer's confirm at /backstage/megagame sets status to completed with completed_at and confirmed_by; confirming a row that is already completed changes nothing, so a retry is a no-op. Undo sets status back to attempted and fills undone_at, undone_by and undo_reason; nothing is deleted. attempt_count and first_attempt_at are reserved for an answer checker and are not written yet. Deleting the account deletes its rows.",
   level_events:
     "The audit log of Megagame level changes; current levels are the profiles level columns. source is picker (joining a class on /account) or volunteer (the level-up action). A partial unique index allows one live event per player, class and level. checks_passed false with override_reason records a volunteer's \"Yes, I'm sure\". Undo voids the row and recomputes the profile column from what remains.",
 };

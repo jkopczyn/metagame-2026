@@ -1,10 +1,11 @@
-// Pure megagame rules: code and answer matching, soft checks, and the
-// over-time chart's bucket math. No database or Next imports, so client
+// Pure megagame rules: code matching, soft checks, and the over-time
+// chart's bucket math. No database or Next imports, so client
 // components can use it. Class list and level maximum come from
 // megagame-levels.ts.
 
 import {
   MAX_LEVEL,
+  MEGAGAME_CLASSES,
   isMegagameClass,
   type MegagameClass,
   type MegagameLevels,
@@ -58,32 +59,6 @@ export function parseScannedCode(text: string): ScannedCode | null {
   if (!/^[\dA-Za-z\s-]+$/.test(raw)) return null;
   const code = normalizeTicketCode(raw);
   return isCompleteMegagameCode(code) ? { kind: "quest", code } : null;
-}
-
-/** Case, accents, punctuation and whitespace do not matter. */
-export function normalizeAnswer(input: string): string {
-  return input
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .replace(/[^\p{L}\p{N}]+/gu, "");
-}
-
-export type AnswerMatch = { matched: boolean; answer: string | null };
-
-/** `answer` is the accepted answer as stored, for showing the volunteer what matched. */
-export function matchAnswer(
-  entered: string,
-  accepted: readonly string[],
-): AnswerMatch {
-  const wanted = normalizeAnswer(entered);
-  if (wanted === "") return { matched: false, answer: null };
-  for (const candidate of accepted) {
-    if (normalizeAnswer(candidate) === wanted) {
-      return { matched: true, answer: candidate };
-    }
-  }
-  return { matched: false, answer: null };
 }
 
 export type LevelUpInput = {
@@ -271,6 +246,53 @@ export function bucketSeries(from: Date, to: Date, size: BucketSize): Date[] {
   const out: Date[] = [];
   for (let t = bucketStart(from, size).getTime(); t <= last; t += ms) {
     out.push(new Date(t));
+  }
+  return out;
+}
+
+export type DatedLevelEvent = {
+  userId: string;
+  class: string;
+  level: number;
+  awardedAt: Date;
+};
+
+/**
+ * For each end, players per level in each class (index = level), counting a
+ * player at their highest level from events awarded before that end.
+ */
+export function cumulativeLevelDistribution(
+  events: readonly DatedLevelEvent[],
+  ends: readonly Date[],
+): Record<MegagameClass, number[]>[] {
+  const valid = events
+    .filter(
+      (e) =>
+        isMegagameClass(e.class) &&
+        Number.isInteger(e.level) &&
+        e.level >= 1 &&
+        e.level <= MAX_LEVEL,
+    )
+    .sort((a, b) => a.awardedAt.getTime() - b.awardedAt.getTime());
+  const order = ends
+    .map((end, i) => ({ end: end.getTime(), i }))
+    .sort((a, b) => a.end - b.end);
+  const best = new Map<string, number>();
+  const out: Record<MegagameClass, number[]>[] = new Array(ends.length);
+  let next = 0;
+  for (const { end, i } of order) {
+    while (next < valid.length && valid[next].awardedAt.getTime() < end) {
+      const e = valid[next++];
+      const key = `${e.class}\u0000${e.userId}`;
+      best.set(key, Math.max(best.get(key) ?? 0, e.level));
+    }
+    const counts = Object.fromEntries(
+      MEGAGAME_CLASSES.map((c) => [c, new Array(MAX_LEVEL + 1).fill(0)]),
+    ) as Record<MegagameClass, number[]>;
+    for (const [key, level] of best) {
+      counts[key.split("\u0000")[0] as MegagameClass][level]++;
+    }
+    out[i] = counts;
   }
   return out;
 }

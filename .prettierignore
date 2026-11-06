@@ -11,3 +11,5 @@ emails/
 public/schema-erd/
 # standalone puzzle page, kept as written
 public/chainmail.html
+# sign maker: hand-compact source and its byte-exact build output
+assets/signs/*.html

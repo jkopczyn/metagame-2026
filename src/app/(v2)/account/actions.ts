@@ -246,6 +246,7 @@ const CLAIM_ERRORS = {
   taken: "Someone else has already claimed that ticket.",
   unpaid: "That ticket's payment hasn't settled yet. Try again later.",
   void: "That ticket's payment didn't go through, so it can't be claimed.",
+  checkedIn: "This ticket was already checked in at the desk; ask there.",
   limited: "Too many codes that didn't work. Try again in an hour.",
 };
 
@@ -280,10 +281,18 @@ export type UnclaimState = { error?: string; released?: string };
 /** Gives up the signed-in user's spot on a ticket; they keep it under a new code. */
 export async function unclaimMine(paymentId: string): Promise<UnclaimState> {
   const session = await requireSession();
-  const ticket = await unclaimTicket(session.user.id, paymentId);
-  if (!ticket) return { error: "That ticket isn't claimed by you." };
+  const result = await unclaimTicket(session.user.id, paymentId);
+  if (!result.ok && result.reason === "notYours") {
+    return { error: "That ticket isn't claimed by you." };
+  }
   revalidatePath("/account");
-  return { released: ticketLabel(ticket.tier) };
+  if (!result.ok) {
+    return {
+      error:
+        "You're checked in, so this ticket can't be passed on now. Ask the check-in desk if that's wrong.",
+    };
+  }
+  return { released: ticketLabel(result.ticket.tier) };
 }
 
 export type ClassState = { error?: string };

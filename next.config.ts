@@ -35,6 +35,7 @@ const nextConfig: NextConfig = {
     ],
     // The email catalog reads emails/ (sent) and emails/drafts/ at request
     // time. Keys are globs, so `[slug]` can't be spelled out.
+    "/backstage/signs/app": ["./assets/signs/metagame-signs.html"],
     "/backstage/emails": ["./emails/*", "./emails/drafts/*"],
     "/backstage/emails/**": ["./emails/*", "./emails/drafts/*"],
     // Ticket webhooks send the one-week-out email from the same files.

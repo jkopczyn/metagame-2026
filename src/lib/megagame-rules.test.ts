@@ -9,11 +9,10 @@ import {
   bucketStart,
   checkLevelUp,
   checkQuestWindow,
+  cumulativeLevelDistribution,
   playerQuestStatus,
   questWindowIsValid,
   isCompleteMegagameCode,
-  matchAnswer,
-  normalizeAnswer,
   isBucketSize,
   normalizeMegagameCode,
   normalizeBadgeNumber,
@@ -146,71 +145,6 @@ describe("isCompleteMegagameCode", () => {
   it("wants the full length", () => {
     expect(isCompleteMegagameCode("A2C4E")).toBe(false);
     expect(isCompleteMegagameCode("A2C4EF")).toBe(true);
-  });
-});
-
-describe("normalizeAnswer", () => {
-  it("keeps only letters and numbers, lowercased and unaccented", () => {
-    expect(normalizeAnswer("  The Red Door ")).toBe("thereddoor");
-    expect(normalizeAnswer("crème brûlée")).toBe("cremebrulee");
-    expect(normalizeAnswer("it's a trap!")).toBe("itsatrap");
-    expect(normalizeAnswer("")).toBe("");
-  });
-});
-
-describe("matchAnswer", () => {
-  it("ignores case and surrounding whitespace", () => {
-    expect(matchAnswer("  The Red Door ", ["the red door"])).toEqual({
-      matched: true,
-      answer: "the red door",
-    });
-  });
-
-  it("ignores accents in either direction", () => {
-    expect(matchAnswer("creme brulee", ["crème brûlée"]).matched).toBe(true);
-    expect(matchAnswer("crème brûlée", ["creme brulee"]).matched).toBe(true);
-  });
-
-  it("ignores punctuation", () => {
-    expect(matchAnswer("it's a trap!", ["Its a trap"]).matched).toBe(true);
-  });
-
-  it("ignores internal whitespace", () => {
-    expect(matchAnswer("red    door", ["red door"]).matched).toBe(true);
-  });
-
-  it("treats hyphenation and spacing as interchangeable", () => {
-    expect(matchAnswer("co-op", ["co op"]).matched).toBe(true);
-    expect(matchAnswer("co-op", ["coop"]).matched).toBe(true);
-  });
-
-  it("returns the accepted answer as stored", () => {
-    expect(matchAnswer("second One", ["First", "Second one"])).toEqual({
-      matched: true,
-      answer: "Second one",
-    });
-  });
-
-  it("reports no match", () => {
-    expect(matchAnswer("blue door", ["the red door"])).toEqual({
-      matched: false,
-      answer: null,
-    });
-  });
-
-  it("never matches an empty entry", () => {
-    expect(matchAnswer("", ["", "red"])).toEqual({
-      matched: false,
-      answer: null,
-    });
-    expect(matchAnswer("!!!", ["", "red"]).matched).toBe(false);
-  });
-
-  it("never matches against an empty accepted list", () => {
-    expect(matchAnswer("anything", [])).toEqual({
-      matched: false,
-      answer: null,
-    });
   });
 });
 
@@ -659,5 +593,65 @@ describe("playerQuestStatus", () => {
         "No claimed ticket.",
       ],
     });
+  });
+});
+
+describe("cumulativeLevelDistribution", () => {
+  const at = (iso: string) => new Date(iso);
+  const ev = (userId: string, cls: string, level: number, iso: string) => ({
+    userId,
+    class: cls,
+    level,
+    awardedAt: at(iso),
+  });
+
+  it("counts each player once per class at their highest level before each end", () => {
+    const events = [
+      ev("a", "wizard", 1, "2026-11-07T10:00:00.000Z"),
+      ev("b", "wizard", 1, "2026-11-07T10:20:00.000Z"),
+      ev("a", "wizard", 2, "2026-11-07T10:40:00.000Z"),
+      ev("a", "pirate", 1, "2026-11-07T10:50:00.000Z"),
+    ];
+    const ends = [
+      at("2026-11-07T10:30:00.000Z"),
+      at("2026-11-07T11:00:00.000Z"),
+    ];
+    const [first, second] = cumulativeLevelDistribution(events, ends);
+    expect(first.wizard).toEqual([0, 2, 0, 0, 0, 0]);
+    expect(first.pirate).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(second.wizard).toEqual([0, 1, 1, 0, 0, 0]);
+    expect(second.pirate).toEqual([0, 1, 0, 0, 0, 0]);
+    expect(second.alien).toHaveLength(MAX_LEVEL + 1);
+  });
+
+  it("excludes an event awarded exactly at the end, since the end opens the next bucket", () => {
+    const [d] = cumulativeLevelDistribution(
+      [ev("a", "alien", 1, "2026-11-07T11:00:00.000Z")],
+      [at("2026-11-07T11:00:00.000Z")],
+    );
+    expect(d.alien).toEqual([0, 0, 0, 0, 0, 0]);
+  });
+
+  it("ignores unknown classes and out-of-range levels", () => {
+    const [d] = cumulativeLevelDistribution(
+      [
+        ev("a", "bard", 1, "2026-11-07T10:00:00.000Z"),
+        ev("b", "wizard", 9, "2026-11-07T10:00:00.000Z"),
+        ev("c", "wizard", 0, "2026-11-07T10:00:00.000Z"),
+      ],
+      [at("2026-11-07T11:00:00.000Z")],
+    );
+    expect(d.wizard).toEqual([0, 0, 0, 0, 0, 0]);
+  });
+
+  it("does not depend on the events being sorted", () => {
+    const events = [
+      ev("a", "wizard", 3, "2026-11-07T12:00:00.000Z"),
+      ev("a", "wizard", 1, "2026-11-07T10:00:00.000Z"),
+    ];
+    const [d] = cumulativeLevelDistribution(events, [
+      at("2026-11-07T11:00:00.000Z"),
+    ]);
+    expect(d.wizard).toEqual([0, 1, 0, 0, 0, 0]);
   });
 });

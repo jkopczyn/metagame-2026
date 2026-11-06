@@ -74,30 +74,6 @@ export async function sessionMetadata(slug: string): Promise<Metadata> {
 
 const MUTED = "text-sm text-[#1b1530]/60";
 
-async function GraderNotes({ sessionId }: { sessionId: string }) {
-  let summary = null;
-  try {
-    summary = await gradingSummary(sessionId);
-  } catch (err) {
-    console.error("grades read failed", sessionId, err);
-  }
-  if (!summary) {
-    return <p className={MUTED}>Couldn&rsquo;t load the grades</p>;
-  }
-  const { notes } = summary;
-  if (notes.length === 0) return null;
-  return (
-    <AdminNote
-      title="Grader notes for scheduler"
-      text={
-        notes.length === 1
-          ? notes[0].text
-          : notes.map((n) => `${n.grader}: ${n.text}`).join("\n\n")
-      }
-    />
-  );
-}
-
 function AdminNote({ title, text }: { title: string; text: string }) {
   return (
     <div>
@@ -111,22 +87,26 @@ function AdminNote({ title, text }: { title: string; text: string }) {
   );
 }
 
-async function AdminDetails({ sessionId }: { sessionId: string }) {
-  const { sessions } = await loadRawSchedule();
-  const raw = sessions.find((s) => s.id === sessionId);
-  const recordId = raw?.airtableRfpRecordId ?? null;
-  const inPipeline = (await gradingSummary(sessionId))?.inPipeline ?? false;
-  const needs = raw?.needs?.trim() || null;
-  const shepherd = raw?.shepherd ?? null;
+/** The grading side, for the schedule's managers: links and grader notes. */
+async function Grading({
+  sessionId,
+  recordId,
+}: {
+  sessionId: string;
+  recordId: string | null;
+}) {
+  let summary = null;
+  try {
+    summary = await gradingSummary(sessionId);
+  } catch (err) {
+    console.error("grades read failed", sessionId, err);
+  }
   const link = "font-semibold text-navy underline";
-
+  const notes = summary?.notes ?? [];
   return (
-    <section className="mt-10 flex flex-col gap-4 border-t border-dashed border-line pt-6">
-      <h2 className="font-[family-name:var(--font-bebas)] text-2xl tracking-[0.04em] text-[#1b1530]/55">
-        Admin only
-      </h2>
+    <>
       <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
-        {(recordId || inPipeline) && (
+        {(recordId || summary?.inPipeline) && (
           <Link href={gradeLink(sessionId)} target="_blank" className={link}>
             Grading page
           </Link>
@@ -144,24 +124,64 @@ async function AdminDetails({ sessionId }: { sessionId: string }) {
           <span className={MUTED}>No RFP linked</span>
         )}
       </div>
+      {!summary && <p className={MUTED}>Couldn&rsquo;t load the grades</p>}
+      {notes.length > 0 && (
+        <AdminNote
+          title="Grader notes for scheduler"
+          text={
+            notes.length === 1
+              ? notes[0].text
+              : notes.map((n) => `${n.grader}: ${n.text}`).join("\n\n")
+          }
+        />
+      )}
+    </>
+  );
+}
+
+async function TeamDetails({
+  sessionId,
+  manager,
+}: {
+  sessionId: string;
+  /** Holds schedule.manage: also sees the grading side. */
+  manager: boolean;
+}) {
+  const { sessions } = await loadRawSchedule();
+  const raw = sessions.find((s) => s.id === sessionId);
+  const needs = raw?.needs?.trim() || null;
+  const shepherd = raw?.shepherd ?? null;
+  if (!manager && !needs && !shepherd) return null;
+
+  return (
+    <section className="mt-10 flex flex-col gap-4 border-t border-dashed border-line pt-6">
+      <h2 className="font-[family-name:var(--font-bebas)] text-2xl tracking-[0.04em] text-[#1b1530]/55">
+        Team only
+      </h2>
       {shepherd && (
         <p className="text-[15px] text-[#1b1530]/85">
           <span className="text-[#1b1530]/55">Shepherd:</span> {shepherd.name}
         </p>
       )}
-      <Suspense fallback={<p className={MUTED}>Loading grader notes…</p>}>
-        <GraderNotes sessionId={sessionId} />
-      </Suspense>
       {needs && <AdminNote title="Needs" text={needs} />}
+      {manager && (
+        <Suspense fallback={<p className={MUTED}>Loading grades…</p>}>
+          <Grading
+            sessionId={sessionId}
+            recordId={raw?.airtableRfpRecordId ?? null}
+          />
+        </Suspense>
+      )}
     </section>
   );
 }
 
 /** The session modal's body, on the session's own page or over another. */
 export default async function SessionDetails({ slug }: { slug: string }) {
-  const [{ session, room }, account, admin] = await Promise.all([
+  const [{ session, room }, account, notes, admin] = await Promise.all([
     findSession(slug),
     currentSession(),
+    toolAccess("schedule.session_notes"),
     toolAccess("schedule.manage"),
   ]);
   const viewerId = account?.user.id ?? null;
@@ -337,7 +357,7 @@ export default async function SessionDetails({ slug }: { slug: string }) {
         </p>
       )}
 
-      {admin && <AdminDetails sessionId={session.id} />}
+      {notes && <TeamDetails sessionId={session.id} manager={!!admin} />}
     </>
   );
 }
