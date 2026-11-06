@@ -95,7 +95,7 @@ describe("buildHatTricksView", () => {
     expect(view.nowLabel).toBe(formatClockTime(at("10:30")));
   });
 
-  it("shows the on-shift hat with the art standing in for the photo", () => {
+  it("shows the on-shift hat with its art and photo", () => {
     const view = build(at("10:30"));
     expect(view.state.kind).toBe("on");
     if (view.state.kind !== "on") return;
@@ -104,7 +104,7 @@ describe("buildHatTricksView", () => {
     expect(card.id).toBe("wizard");
     expect(card.name).toBe("Wizard hat");
     expect(card.art).toBe("/images/hat-tricks/wizard.svg");
-    expect(card.photo).toBe(card.art);
+    expect(card.photo).toBe("/images/hat-tricks/wizard.jpg");
     expect(view.state.endsAt).toBe(at("11:00").toISOString());
     expect(view.state.endsAtLabel).toBe("Wed 11:00 AM");
     expect(view.state.nextLine).toBe(
