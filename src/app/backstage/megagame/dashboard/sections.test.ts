@@ -1,12 +1,16 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import LevelGrid from "./LevelGrid";
 import ConcentrationSection from "./ConcentrationSection";
 import { DELETED_PLAYER, type Concentration } from "@/lib/megagame-progress";
 import { NO_LEVELS } from "@/lib/megagame-levels";
 import ClassesSection from "./ClassesSection";
 import type { ClassTable } from "@/lib/megagame-progress";
+import TransitionsSection from "./TransitionsSection";
+import type { Transitions } from "@/lib/megagame-progress";
+import CohortsSection from "./CohortsSection";
+import type { CohortTable } from "@/lib/megagame-progress";
 
 describe("LevelGrid", () => {
   it("shows players per level with percentages of ticket holders", () => {
@@ -266,5 +270,113 @@ describe("ClassesSection", () => {
     expect(html).not.toMatch(/aria-label="Players at each level by class/);
     expect(html).not.toContain("Total");
     expect(html).not.toContain("(end)");
+  });
+});
+
+const HOUR = 3_600_000;
+const transitionData: Transitions = {
+  rows: [
+    {
+      class: "wizard",
+      from: 1,
+      to: 2,
+      made: 3,
+      skipped: 1,
+      q25: 3 * HOUR,
+      median: 4 * HOUR,
+      q75: 5 * HOUR,
+    },
+    {
+      class: "wizard",
+      from: 2,
+      to: 3,
+      made: 0,
+      skipped: 0,
+      q25: null,
+      median: null,
+      q75: null,
+    },
+  ],
+  current: [
+    {
+      class: "wizard",
+      level: 2,
+      players: 3,
+      withEvent: 2,
+      medianSince: 5.5 * HOUR,
+    },
+  ],
+};
+
+describe("TransitionsSection", () => {
+  it("shows counts, skips and durations, with a dash where nobody made it", () => {
+    const html = renderToStaticMarkup(
+      createElement(TransitionsSection, { data: transitionData }),
+    );
+    expect(html).toContain("1 → 2");
+    expect(html).toContain("3h 00m");
+    expect(html).toContain("4h 00m");
+    expect(html).toContain("5h 30m");
+    expect(html).toContain("–");
+  });
+
+  it("names the first con day in the note from CONFERENCE_DAYS", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/schedule", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("@/lib/schedule")>()),
+      CONFERENCE_DAYS: [
+        { key: "2027-01-01", name: "Friday", dateLabel: "Jan 1" },
+      ],
+    }));
+    try {
+      const { default: Section } = await import("./TransitionsSection");
+      const html = renderToStaticMarkup(
+        createElement(Section, { data: transitionData }),
+      );
+      expect(html).toContain("midnight Pacific, Friday Jan 1");
+    } finally {
+      vi.doUnmock("@/lib/schedule");
+      vi.resetModules();
+    }
+  });
+});
+
+const cohortData: CohortTable = {
+  days: ["2026-11-06", "2026-11-07", "2026-11-08"],
+  rows: [
+    {
+      day: "2026-11-06",
+      size: 2,
+      completionsMean: 1,
+      completionsMedian: 1,
+      levelUpsMean: 0.5,
+      reachedLevel2Share: 1,
+      retention: [null, 0.5, 0],
+    },
+  ],
+  holders: 4,
+  notYetActive: 2,
+  notYetActiveShare: 0.5,
+};
+
+describe("CohortsSection", () => {
+  it("shows each cohort with retention on later days only", () => {
+    const html = renderToStaticMarkup(
+      createElement(CohortsSection, { data: cohortData }),
+    );
+    expect(html).toContain("Friday Nov 6");
+    expect(html).toContain("Active Saturday Nov 7");
+    expect(html).toContain("50%");
+    expect(html).toContain("0.5");
+    expect(html).toContain("2 of 4 claimed-ticket holders");
+  });
+
+  it("says activity before the first con day is its own row and not counted as not yet active", () => {
+    const html = renderToStaticMarkup(
+      createElement(CohortsSection, { data: cohortData }),
+    );
+    expect(html).toContain(
+      "Activity before the first con day appears as its own cohort row and is not counted as not yet active.",
+    );
   });
 });

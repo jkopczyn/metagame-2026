@@ -4,8 +4,10 @@ import SignIn from "../../SignIn";
 import Section from "../Section";
 import AutoRefresh from "./AutoRefresh";
 import ClassesSection from "./ClassesSection";
+import CohortsSection from "./CohortsSection";
 import ConcentrationSection from "./ConcentrationSection";
 import LevelGrid from "./LevelGrid";
+import TransitionsSection from "./TransitionsSection";
 import { NOTE } from "./styles";
 import {
   RANGE_LABELS,
@@ -108,6 +110,14 @@ export default async function DashboardPage(
           tooMany={view.tooMany}
           rangeLabel={RANGE_LABELS[view.preset]}
         />
+      </Section>
+
+      <Section title="Level transitions">
+        <TransitionsSection data={progress.transitions} />
+      </Section>
+
+      <Section title="Cohorts">
+        <CohortsSection data={progress.cohorts} />
       </Section>
 
       <Section title="Export">
