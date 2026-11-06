@@ -42,6 +42,8 @@ export const quests = pgTable(
     evidence: text(),
     evidenceImage: text(),
     hint: text(),
+    // Who wrote the quest, printed at the foot of the card.
+    author: text(),
     active: boolean().notNull().default(true),
     ...timestamps,
   },

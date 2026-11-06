@@ -18,6 +18,7 @@ const owl = {
   solution: "AVIANNA",
   solution_images: ["images/a.jpg", "images/b.jpg"],
   hint: "Nocturnal.",
+  submitted_by: "Tobias",
   source: "2025 form",
   finalized: false,
 };
@@ -43,6 +44,7 @@ describe("parseManifest", () => {
       stamps: { wizard: 2, pirate: 0, alien: 0, any: 1 },
       evidence: "AVIANNA",
       hint: "Nocturnal.",
+      author: "Tobias",
       active: false,
     });
     expect(e.bodyImages).toEqual(["bundle/images/owl.png"]);

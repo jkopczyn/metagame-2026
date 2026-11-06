@@ -171,6 +171,7 @@ export function parseManifest(
       evidence: q.solution ?? q.evidence,
       evidenceImage: null,
       hint: q.hint,
+      author: q.author ?? q.submitted_by,
       // quest_panic's drafts (finalized false) come in withdrawn, so a person
       // reviews them before the board or the printer sees them.
       active: q.active ?? (q.finalized == null ? true : q.finalized === true),

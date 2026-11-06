@@ -267,6 +267,13 @@
       "when": 1793985097766,
       "tag": "0037_quest_cards",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1793991645729,
+      "tag": "0038_quest_author",
+      "breakpoints": true
     }
   ]
 }

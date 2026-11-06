@@ -15,6 +15,7 @@ export const TITLE_MAX = 120;
 export const BODY_MAX = 6000;
 export const EVIDENCE_MAX = 10000;
 export const HINT_MAX = 500;
+export const AUTHOR_MAX = 200;
 
 export type StampClass = MegagameClass | "any";
 export const STAMP_CLASSES: readonly StampClass[] = [
@@ -38,6 +39,8 @@ export type QuestInput = {
   evidence: string | null;
   evidenceImage: string | null;
   hint: string | null;
+  /** Printed at the foot of the card. */
+  author: string | null;
   active: boolean;
 };
 
@@ -70,6 +73,7 @@ export const questInputOf = (q: QuestFields): QuestInput => ({
   evidence: q.evidence,
   evidenceImage: q.evidenceImage,
   hint: q.hint,
+  author: q.author,
   active: q.active,
 });
 
@@ -191,6 +195,10 @@ export function parseQuestInput(raw: Record<string, unknown>): ParsedQuest {
   if (hint.length > HINT_MAX)
     errors.push(`hint: at most ${HINT_MAX} characters`);
 
+  const author = text(raw.author);
+  if (author.length > AUTHOR_MAX)
+    errors.push(`author: at most ${AUTHOR_MAX} characters`);
+
   const active =
     raw.active == null || raw.active === ""
       ? true
@@ -211,6 +219,7 @@ export function parseQuestInput(raw: Record<string, unknown>): ParsedQuest {
       evidence: evidence || null,
       evidenceImage,
       hint: hint || null,
+      author: author || null,
       active,
     },
   };

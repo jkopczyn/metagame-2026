@@ -179,6 +179,16 @@
   font-weight: 500;
   opacity: 0.75;
 }
+/* Centred between the rewards and the code, on the footer's baseline. */
+.author {
+  flex: 1 1 auto;
+  align-self: flex-end;
+  padding: 0 0.2in 0.1in;
+  text-align: center;
+  font-size: 13pt;
+  font-style: italic;
+  opacity: 0.75;
+}
 .code {
   display: flex;
   align-items: center;
