@@ -54,6 +54,7 @@ import {
   completionsInClass,
   completionsByIds,
   confirmCompletions,
+  exportEventTable,
   findLevelEvent,
   findPlayerByBadgeNumber,
   findQuestByCode,
@@ -850,5 +851,85 @@ describe("claimedTicketHolderIds", () => {
     expect(where.sql).toContain('"tickets"."owner_user_id" is not null');
     expect(where.params).toContain("paid");
     expect(c.calls.some((call) => call[0] === "groupBy")).toBe(true);
+  });
+});
+
+describe("exportEventTable", () => {
+  it("exports every quest_progress column and row, undone ones included", async () => {
+    const at = new Date("2026-11-07T10:00:00.000Z");
+    const row = {
+      id: "p1",
+      userId: "u1",
+      questId: "q1",
+      status: "attempted",
+      attemptCount: 1,
+      firstAttemptAt: null,
+      completedAt: at,
+      confirmedBy: "v1",
+      undoneAt: at,
+      undoneBy: "v2",
+      undoReason: "wrong player",
+      updatedAt: at,
+    };
+    queue([row]);
+    const out = await exportEventTable("quest_progress");
+    expect(out.columns).toEqual([
+      "id",
+      "user_id",
+      "quest_id",
+      "status",
+      "attempt_count",
+      "first_attempt_at",
+      "completed_at",
+      "confirmed_by",
+      "undone_at",
+      "undone_by",
+      "undo_reason",
+      "updated_at",
+    ]);
+    expect(out.rows).toEqual([Object.values(row)]);
+    const c = chainOf(db.select, 0);
+    expect(c.calls.some((call) => call[0] === "where")).toBe(false);
+    expect(
+      c.calls
+        .filter((call) => call[0] === "orderBy")[0]
+        .slice(1)
+        .map((o) => render(o)),
+    ).toEqual([
+      '"quest_progress"."updated_at" asc',
+      '"quest_progress"."id" asc',
+    ]);
+  });
+
+  it("exports every level_events column, voided rows included, by award time", async () => {
+    queue([]);
+    const out = await exportEventTable("level_events");
+    expect(out.columns).toEqual([
+      "id",
+      "user_id",
+      "class",
+      "level",
+      "source",
+      "awarded_by",
+      "awarded_at",
+      "checks_passed",
+      "override_reason",
+      "card_photo_url",
+      "note",
+      "voided_at",
+      "voided_by",
+      "void_reason",
+    ]);
+    const c = chainOf(db.select, 0);
+    expect(c.calls.some((call) => call[0] === "where")).toBe(false);
+    expect(
+      c.calls.some((call) => call[0] === "innerJoin" || call[0] === "leftJoin"),
+    ).toBe(false);
+    expect(
+      c.calls
+        .filter((call) => call[0] === "orderBy")[0]
+        .slice(1)
+        .map((o) => render(o)),
+    ).toEqual(['"level_events"."awarded_at" asc', '"level_events"."id" asc']);
   });
 });

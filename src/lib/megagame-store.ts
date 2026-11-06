@@ -4,6 +4,7 @@ import {
   asc,
   desc,
   eq,
+  getTableColumns,
   gt,
   gte,
   ilike,
@@ -35,6 +36,7 @@ import type { QuestInput } from "./megagame-quests";
 import {
   BUCKET_ORIGIN,
   bucketIntervalSql,
+  type EventTable,
   isCompleteMegagameCode,
   normalizeMegagameCode,
 } from "./megagame-rules";
@@ -1114,4 +1116,36 @@ export async function claimedTicketHolderIds(): Promise<string[]> {
     )
     .groupBy(tickets.ownerUserId);
   return rows.flatMap((r) => (r.id ? [r.id] : []));
+}
+
+const snakeCase = (k: string) =>
+  k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+
+/** Every column and row of an event table, undone and voided rows included, oldest first. */
+export async function exportEventTable(
+  table: EventTable,
+): Promise<{ columns: string[]; rows: unknown[][] }> {
+  const { questProgress, levelEvents } = schema;
+  const db = getDb();
+  const shape = (fields: Record<string, unknown>, rows: object[]) => {
+    const keys = Object.keys(fields);
+    return {
+      columns: keys.map(snakeCase),
+      rows: rows.map((r) => keys.map((k) => (r as Record<string, unknown>)[k])),
+    };
+  };
+  if (table === "quest_progress") {
+    const fields = getTableColumns(questProgress);
+    const rows = await db
+      .select(fields)
+      .from(questProgress)
+      .orderBy(asc(questProgress.updatedAt), asc(questProgress.id));
+    return shape(fields, rows);
+  }
+  const fields = getTableColumns(levelEvents);
+  const rows = await db
+    .select(fields)
+    .from(levelEvents)
+    .orderBy(asc(levelEvents.awardedAt), asc(levelEvents.id));
+  return shape(fields, rows);
 }
