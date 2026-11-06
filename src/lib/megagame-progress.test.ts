@@ -29,7 +29,7 @@ const done = (
   userId: string | null,
   cls: string | null,
   iso: string,
-): ProgressCompletion => ({ userId, class: cls, confirmedAt: at(iso) });
+): ProgressCompletion => ({ userId, class: cls, completedAt: at(iso) });
 const ev = (
   userId: string | null,
   cls: string,

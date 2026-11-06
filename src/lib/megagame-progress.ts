@@ -22,7 +22,7 @@ export type ProgressCompletion = {
   userId: string | null;
   /** The quest's class; null for an any-class quest. */
   class: string | null;
-  confirmedAt: Date;
+  completedAt: Date;
 };
 
 export type ProgressLevelEvent = {
@@ -303,7 +303,7 @@ export function concentration(
     const cls = questClass(c.class);
     if (cls) bump(byClass[cls], key);
     else bump(anyClass, key);
-    widen(first, last, key, c.confirmedAt);
+    widen(first, last, key, c.completedAt);
   }
   for (const e of levelEvents) {
     if (!isLevelUp(e) || !isMegagameClass(e.class)) continue;
@@ -335,7 +335,7 @@ export function concentration(
   const series = ends.map((end): ConcentrationPoint => {
     const counts = new Map<string, number>();
     for (const c of completions)
-      if (c.confirmedAt < end) bump(counts, playerKey(c.userId));
+      if (c.completedAt < end) bump(counts, playerKey(c.userId));
     const values = [...counts.values()];
     return {
       end,
@@ -382,7 +382,7 @@ function classCells(
   const active = perClass(() => new Set<string>());
   let anyClass = 0;
   for (const c of completions) {
-    if (!inWindow(c.confirmedAt)) continue;
+    if (!inWindow(c.completedAt)) continue;
     const cls = questClass(c.class);
     if (!cls) {
       anyClass++;
@@ -577,7 +577,7 @@ export function cohorts(
   for (const c of completions) {
     if (c.userId === null) continue;
     bump(completed, c.userId);
-    touch(c.userId, c.confirmedAt);
+    touch(c.userId, c.completedAt);
   }
   for (const e of levelEvents) {
     if (e.userId === null || !isLevelUp(e) || !isMegagameClass(e.class))
