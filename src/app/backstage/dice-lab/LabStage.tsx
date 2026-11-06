@@ -58,7 +58,7 @@ const CAM_VIEWS: Record<CameraView, THREE.Vector3> = {
   default: CAM_POS, // slightly above, like the hero
   front: new THREE.Vector3(0, 0, CAM_DIST), // dead-on
 };
-const MAX_EXPORT = 8192;
+const MAX_EXPORT = 16384;
 const MAX_TILE = 2048;
 
 type Props = {
