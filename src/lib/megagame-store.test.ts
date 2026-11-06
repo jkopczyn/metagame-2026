@@ -49,6 +49,7 @@ vi.mock("@/db", async () => {
 
 import { schema } from "@/db";
 import {
+  claimedTicketHolderIds,
   completionSeries,
   completionsInClass,
   completionsByIds,
@@ -58,8 +59,11 @@ import {
   findQuestByCode,
   hasVolunteerLevelEvent,
   levelEventSeries,
+  liveCompletionLog,
   liveCompletions,
+  liveLevelEventLog,
   playersByIds,
+  progressPlayers,
   recentCompletions,
   recentLevelUps,
   recentVoids,
@@ -773,5 +777,78 @@ describe("recentVoids", () => {
     expect(where.sql).toContain('"level_events"."voided_at" is not null');
     expect(where.params).toEqual(["volunteer"]);
     expect(arg(c, "limit")).toBe(2);
+  });
+});
+
+describe("liveCompletionLog", () => {
+  it("reads completed progress rows with their quest's class", async () => {
+    const at = new Date("2026-11-06T18:00:00.000Z");
+    queue([
+      { userId: "u1", class: "wizard", completedAt: at },
+      { userId: "u2", class: null, completedAt: null },
+    ]);
+    expect(await liveCompletionLog()).toEqual([
+      { userId: "u1", class: "wizard", completedAt: at },
+    ]);
+    const c = chainOf(db.select, 0);
+    expect(c.calls.find((call) => call[0] === "innerJoin")?.[1]).toBe(
+      schema.quests,
+    );
+    const where = dialect.sqlToQuery(arg(c, "where") as SQL);
+    expect(where.sql).toBe('"quest_progress"."status" = $1');
+    expect(where.params).toEqual(["completed"]);
+  });
+});
+
+describe("liveLevelEventLog", () => {
+  it("reads every live level event, deleted accounts included", async () => {
+    queue([]);
+    await liveLevelEventLog();
+    const where = render(arg(chainOf(db.select, 0), "where"));
+    expect(where).toBe('"level_events"."voided_at" is null');
+    const fields = Object.keys(
+      (db.select.mock.calls[0] as unknown as [Record<string, unknown>])[0],
+    );
+    expect(fields).toEqual(["userId", "class", "level", "source", "awardedAt"]);
+  });
+});
+
+describe("progressPlayers", () => {
+  it("reads players in any class plus the given ids, once each", async () => {
+    queue([
+      { id: "u1", name: "Ada", wizard: 2, pirate: 0, alien: 1 },
+      { id: "u2", name: "Bo", wizard: null, pirate: null, alien: null },
+    ]);
+    expect(await progressPlayers(["u1", "u1", "u2"])).toEqual([
+      { id: "u1", name: "Ada", levels: { wizard: 2, pirate: 0, alien: 1 } },
+      { id: "u2", name: "Bo", levels: { wizard: 0, pirate: 0, alien: 0 } },
+    ]);
+    const c = chainOf(db.select, 0);
+    expect(c.calls.find((call) => call[0] === "leftJoin")?.[1]).toBe(
+      schema.profiles,
+    );
+    const where = dialect.sqlToQuery(arg(c, "where") as SQL);
+    expect(where.sql).toContain('"profiles"."wizard_level" > $');
+    expect(where.sql).toContain('"user"."id" in ($');
+    expect(where.params).toEqual([0, 0, 0, "u1", "u2"]);
+  });
+
+  it("skips the id list when there are no ids", async () => {
+    queue([]);
+    await progressPlayers([]);
+    const where = render(arg(chainOf(db.select, 0), "where"));
+    expect(where).not.toContain('"user"."id" in');
+  });
+});
+
+describe("claimedTicketHolderIds", () => {
+  it("lists distinct owners of paid tickets", async () => {
+    queue([{ id: "u1" }, { id: null }, { id: "u2" }]);
+    expect(await claimedTicketHolderIds()).toEqual(["u1", "u2"]);
+    const c = chainOf(db.select, 0);
+    const where = dialect.sqlToQuery(arg(c, "where") as SQL);
+    expect(where.sql).toContain('"tickets"."owner_user_id" is not null');
+    expect(where.params).toContain("paid");
+    expect(c.calls.some((call) => call[0] === "groupBy")).toBe(true);
   });
 });
