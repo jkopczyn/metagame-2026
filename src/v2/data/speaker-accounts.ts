@@ -71,4 +71,10 @@ export const SPEAKER_ACCOUNTS = {
     name: "Ricki Heicklen",
     userId: "bnoEVZ36sfvVbDaHmITKIv6clLZoaSX6",
   },
+  marcusRichardson: {
+    name: "Marcus Richardson",
+    userId: "TODO-marcus-richardson",
+  },
+  caseyJones: { name: "Casey Jones", userId: "TODO-casey-jones" },
+  guy: { name: "Guy", userId: "TODO-guy" },
 };
