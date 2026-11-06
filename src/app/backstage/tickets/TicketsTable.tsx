@@ -40,6 +40,8 @@ export type AdminTicket = {
     amountCents: number | null;
     couponCode: string | null;
     referralCode: string | null;
+    /** Four-digit badge number, once assigned. */
+    badgeCode: string | null;
     /** The referrer's ticket code, when bought with a referral. */
     referredBy: string | null;
     /** Paid tickets bought with this one's code. */
@@ -231,6 +233,9 @@ export default function TicketsTable({
                   </div>
                   <div className="mt-1 truncate text-xs text-ink/60">
                     <span className="font-mono">{t.code}</span>
+                    {t.badgeCode && (
+                      <span className="font-mono"> · #{t.badgeCode}</span>
+                    )}
                     {swagReason(t) && (
                       <span className="text-meeple"> · {swagReason(t)}</span>
                     )}
@@ -465,6 +470,13 @@ function TicketDetail({
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
         <Field label="Code">
           <span className="font-mono">{t.code}</span>
+        </Field>
+        <Field label="Badge">
+          {t.badgeCode ? (
+            <span className="font-mono">#{t.badgeCode}</span>
+          ) : (
+            <span className="text-cream/40">—</span>
+          )}
         </Field>
         <Field label="Purchased">{shortDate.format(t.createdAt)}</Field>
         <Field label="Amount">

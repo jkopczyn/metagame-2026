@@ -232,6 +232,13 @@
       "when": 1793837886763,
       "tag": "0032_graceful_amphibian",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793933753055,
+      "tag": "0033_ticket_badge_code",
+      "breakpoints": true
     }
   ]
 }

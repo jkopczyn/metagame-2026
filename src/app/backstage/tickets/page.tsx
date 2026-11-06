@@ -16,6 +16,7 @@ import {
 } from "@/lib/admin-tickets";
 import { ticketAccounts } from "@/lib/admin-store";
 import { can } from "@/lib/access";
+import { formatBadgeCode } from "@/lib/badge-code";
 import { formatReferralCode } from "@/lib/referral";
 import { referralFacts } from "@/lib/referral-store";
 import { formatTicketCode } from "@/lib/ticket-code-format";
@@ -94,6 +95,7 @@ export default async function AdminTicketsPage(
         amountCents: t.amountCents,
         couponCode: t.couponCode,
         referralCode: t.referralCode && formatReferralCode(t.referralCode),
+        badgeCode: t.badgeCode === null ? null : formatBadgeCode(t.badgeCode),
         referredBy: referrer ? formatTicketCode(referrer) : null,
         referrals: referrals.get(t.paymentId) ?? 0,
       },
