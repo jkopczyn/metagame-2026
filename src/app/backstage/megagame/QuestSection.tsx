@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { undoCompletions } from "./actions";
-import AnswerChecker from "./AnswerChecker";
 import { boardHref, type BoardParams } from "./board-params";
 import ConfirmForm from "./ConfirmForm";
 import {
@@ -15,6 +14,7 @@ import PlayerRows from "./PlayerRows";
 import QuestCodeEntry from "./QuestCodeEntry";
 import Section from "./Section";
 import UndoForm from "./UndoForm";
+import QuestEvidence from "./QuestEvidence";
 import { CLASS_LABELS, isMegagameClass } from "@/lib/megagame-levels";
 import type { Quest } from "@/lib/megagame-store";
 import { formatTicketCode } from "@/lib/ticket-code-format";
@@ -175,18 +175,7 @@ async function CheckAndConfirm({
     <>
       <div className="flex flex-col gap-2">
         <h3 className="font-semibold text-navy">Check</h3>
-        {quest.kind === "evidence" ? (
-          <div className="rounded-xl border border-line bg-white p-4">
-            <p className="text-sm font-medium text-ink/80">
-              Look for evidence that
-            </p>
-            <p className="mt-1 text-lg text-ink">
-              {quest.evidence || "No description given."}
-            </p>
-          </div>
-        ) : (
-          <AnswerChecker key={quest.code} answers={quest.answers} />
-        )}
+        <QuestEvidence quest={quest} />
       </div>
       <PlayerListView rows={rows} params={params} notice={notice}>
         <ConfirmForm
