@@ -72,8 +72,9 @@ export default async function DashboardPage(
           Progress
         </h1>
         <p className={NOTE}>
-          Updated {TIME.format(now)}. The page refreshes every minute. Voided
-          records are left out. Deleted accounts count as one player.
+          Updated {TIME.format(now)}. The page refreshes every minute. Undone
+          completions and voided level-ups are left out. Deleted accounts count
+          as one player.
         </p>
         <Pickers view={view} />
         <p className={NOTE}>
@@ -101,8 +102,8 @@ export default async function DashboardPage(
           ))}
         </ul>
         <p className={NOTE}>
-          Every row of each table, voided ones included. People and quests
-          appear as ids.
+          Every row of each table, undone and voided ones included. People and
+          quests appear as ids.
         </p>
       </Section>
     </div>
