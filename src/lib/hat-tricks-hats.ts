@@ -16,7 +16,7 @@ export type Hat = {
   id: HatId;
   name: string;
   art: string;
-  // A photo of the physical hat; the art stands in until one exists.
+  // A photo of the physical hat; the art stands in if a hat has none.
   photo?: string;
 };
 
@@ -33,6 +33,7 @@ export const HATS: readonly Hat[] = HAT_IDS.map((id) => ({
   id,
   name: NAMES[id],
   art: `/images/hat-tricks/${id}.svg`,
+  photo: `/images/hat-tricks/${id}.jpg`,
 }));
 
 export function isHatId(value: unknown): value is HatId {

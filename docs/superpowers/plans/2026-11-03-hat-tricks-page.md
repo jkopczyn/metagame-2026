@@ -58,7 +58,7 @@ Names: Wizard hat, Alien saucer, Sparkly fuzzy hat, Satin slouch hat, Tricorn, S
 Tests first:
 
 - `HATS` ids equal `HAT_IDS` in order, and names match the list above.
-- every `art` is `/images/hat-tricks/<id>.svg`; no hat has `photo`.
+- every `art` is `/images/hat-tricks/<id>.svg` and every `photo` is `/images/hat-tricks/<id>.jpg` (900x900 crops of the user's photos, added 2026-11-06).
 - `isHatId` accepts each id and rejects `"beanie"`, `""`, `42`, `undefined`.
 - `hatById("crown").name === "Spiked crown"`.
 
@@ -392,7 +392,7 @@ export function previewOverrides(
 Tests first (fixture on 2020-01-01: shift 1 10:00-11:00 `["wizard"]`, shift 2 11:00-12:00 `["crown", "fuzzy"]`, shift 3 13:00-14:00 `["tricorn"]`, shift 4 14:00-15:00 `["saucer"]`):
 
 - `formatShiftTime("2020-01-04T15:45:00-08:00")` is `"Sat 3:45 PM"`; `formatClockTime` adds seconds; output contains no U+202F.
-- at 10:30: state `on`, one card for wizard with `photo === art`, `endsAt` 11:00, `nextLine` "The shift after that ends at Wed 12:00 PM"; `perHat` has only wizard.
+- at 10:30: state `on`, one card for wizard with `photo` `/images/hat-tricks/wizard.jpg`, `endsAt` 11:00, `nextLine` "The shift after that ends at Wed 12:00 PM"; `perHat` has only wizard.
 - at 11:30: `nextLine` is "The shift after that ends at Wed 1:00 PM".
 - at 13:30: `nextLine` is `null`.
 - secrecy, on state: at 10:30 with steals only of wizard, `JSON.stringify(view)` does not contain `"crown"`, `"fuzzy"`, `"Spiked crown"`, or `"Sparkly fuzzy hat"`.

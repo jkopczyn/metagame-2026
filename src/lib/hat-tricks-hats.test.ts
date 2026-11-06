@@ -14,10 +14,10 @@ describe("hat definitions", () => {
     ]);
   });
 
-  it("points each hat at its line art and has no photos yet", () => {
+  it("points each hat at its line art and photo", () => {
     for (const hat of HATS) {
       expect(hat.art).toBe(`/images/hat-tricks/${hat.id}.svg`);
-      expect(hat.photo).toBeUndefined();
+      expect(hat.photo).toBe(`/images/hat-tricks/${hat.id}.jpg`);
     }
   });
 
