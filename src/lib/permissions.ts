@@ -256,7 +256,7 @@ export const PERMISSIONS = {
     level: "edit",
     label: "Manage megagame",
     description:
-      "Add, edit and print quests at /backstage/quests, and undo other volunteers' confirmations and level-ups.",
+      "Add, edit and print quests at /backstage/quests, and undo other volunteers' confirmations and level-ups. Read the progress dashboard at /backstage/megagame/dashboard.",
     implies: ["megagame.verify"],
   },
   "misc.dice_lab": {
