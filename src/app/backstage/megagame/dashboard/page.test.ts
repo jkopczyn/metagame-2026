@@ -61,12 +61,12 @@ describe("dashboard page", () => {
       {
         userId: "u1",
         class: "wizard",
-        confirmedAt: new Date("2026-11-06T18:00:00.000Z"),
+        completedAt: new Date("2026-11-06T18:00:00.000Z"),
       },
       {
         userId: null,
         class: null,
-        confirmedAt: new Date("2026-11-06T19:00:00.000Z"),
+        completedAt: new Date("2026-11-06T19:00:00.000Z"),
       },
     ]);
     store.liveLevelEventLog.mockResolvedValue([
