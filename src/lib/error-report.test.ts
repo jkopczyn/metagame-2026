@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/env", () => ({
-  env: { DISCORD_ERROR_WEBHOOK_URL: "https://discord.test/hook" },
+  env: {
+    DISCORD_ERROR_WEBHOOK_URL: "https://discord.test/hook",
+    DISCORD_STAFF_WEBHOOK_URL: "https://discord.test/staff",
+  },
 }));
 const adminEmail = vi.fn();
 vi.mock("@/lib/email", () => ({
@@ -10,6 +13,7 @@ vi.mock("@/lib/email", () => ({
 
 import {
   BRIAN_DISCORD_ID,
+  ON_SITE_ROLE_ID,
   formatErrorReport,
   reportError,
 } from "./error-report";
@@ -96,6 +100,22 @@ describe("reportError", () => {
     expect(adminEmail).not.toHaveBeenCalled();
   });
 
+  it("sends staff issues to the staff channel, pinging the on-site role", async () => {
+    const fetch = vi.fn(async () => new Response("", { status: 204 }));
+    vi.stubGlobal("fetch", fetch);
+    await reportError({ source: "Desk", summary: "help", channel: "staff" });
+    const [url, init] = fetch.mock.calls[0] as unknown as [
+      string,
+      { body: string },
+    ];
+    expect(url).toBe("https://discord.test/staff");
+    const body = JSON.parse(init.body);
+    expect(body.content).toContain("Staff issue");
+    expect(body.content).toContain(`<@&${ON_SITE_ROLE_ID}>`);
+    expect(body.content).not.toContain(BRIAN_DISCORD_ID);
+    expect(body.allowed_mentions).toEqual({ roles: [ON_SITE_ROLE_ID] });
+  });
+
   it("never throws when Discord is down", async () => {
     vi.stubGlobal(
       "fetch",
@@ -104,7 +124,7 @@ describe("reportError", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(
       reportError({ source: "s", summary: "t", mention: false }),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(false);
     expect(error).toHaveBeenCalled();
     error.mockRestore();
   });

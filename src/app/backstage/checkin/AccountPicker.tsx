@@ -2,40 +2,41 @@
 
 import { useEffect, useId, useState, useTransition } from "react";
 import { fieldClass, smallButtonClass } from "../ui";
-import { findAccounts, mintAccount } from "./actions";
+import { findAccounts } from "./actions";
 import { latestRequest } from "../megagame/latest";
 import { CHECKIN_MIN_CHARS, type CheckinAccount } from "@/lib/checkin";
 
-function AccountLine({ account }: { account: CheckinAccount }) {
+function AccountLine({ name, email }: { name: string; email: string }) {
   return (
     <span className="min-w-0 flex-1 text-left">
-      <span className="block truncate font-medium text-navy">
-        {account.name}
-      </span>
+      <span className="block truncate font-medium text-navy">{name}</span>
       <span className="block truncate font-mono text-xs text-ink/60">
-        {account.email}
+        {email}
       </span>
     </span>
   );
 }
 
-/** Picks the account a ticket is for: the one on the purchase, or one searched for. */
+/**
+ * Picks the account a ticket is for: the one on the purchase, or one searched
+ * for. The desk never makes accounts; people sign in themselves first.
+ */
 export default function AccountPicker({
   suggested,
-  prefill,
+  buyer,
   onPick,
 }: {
   suggested: CheckinAccount | null;
-  /** From the purchase, for a new account. */
-  prefill: { name: string | null; email: string | null };
+  /** The purchase's name and email when the buyer has no account yet. */
+  buyer: { name: string | null; email: string | null } | null;
   onPick: (account: CheckinAccount) => void;
 }) {
-  const purchaser = prefill.email !== null;
-  const [searching, setSearching] = useState(suggested === null && !purchaser);
-  // Who the new-account form is for: the purchaser, or someone else (blank).
-  const [minting, setMinting] = useState<"purchaser" | "other" | null>(null);
+  const [searching, setSearching] = useState(
+    suggested === null && buyer === null,
+  );
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<CheckinAccount[]>([]);
+  const [searchedFor, setSearchedFor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [search] = useState(latestRequest);
@@ -51,6 +52,7 @@ export default function AccountPicker({
         if (!isCurrent()) return;
         setError(res.error ?? null);
         setHits(res.accounts ?? []);
+        setSearchedFor(res.error ? null : q);
       });
     }, 300);
     return () => {
@@ -59,54 +61,42 @@ export default function AccountPicker({
     };
   }, [query, search]);
 
-  const pick = (account: CheckinAccount) => (
+  const pick = (account: CheckinAccount, label: string, primary = false) => (
     <button
       type="button"
       onClick={() => onPick(account)}
-      className="flex w-full items-center gap-3 rounded-lg border border-line bg-white px-3 py-3 hover:border-navy"
+      className={`flex w-full items-center gap-3 rounded-lg bg-white px-3 py-3 ${
+        primary
+          ? "border-2 border-navy hover:bg-navy/5"
+          : "border border-line hover:border-navy"
+      }`}
     >
-      <AccountLine account={account} />
-      <span className="shrink-0 text-sm font-semibold text-navy">Pick</span>
+      <AccountLine name={account.name} email={account.email} />
+      <span className="shrink-0 text-sm font-semibold text-navy">{label}</span>
     </button>
   );
-
-  if (minting) {
-    return (
-      <MintForm
-        prefill={
-          minting === "purchaser" ? prefill : { name: null, email: null }
-        }
-        onPick={onPick}
-        onBack={() => setMinting(null)}
-      />
-    );
-  }
 
   return (
     <div className="flex flex-col gap-3">
       {suggested
-        ? pick(suggested)
-        : purchaser && (
-            <button
-              type="button"
-              onClick={() => setMinting("purchaser")}
-              className="flex w-full items-center gap-3 rounded-lg border-2 border-navy bg-white px-3 py-3 hover:bg-navy/5"
-            >
-              <span className="min-w-0 flex-1 text-left">
-                <span className="block truncate font-medium text-navy">
-                  {prefill.name ?? prefill.email}
-                </span>
-                <span className="block truncate font-mono text-xs text-ink/60">
-                  {prefill.name ? prefill.email : "no name on the purchase"}
-                </span>
-              </span>
-              <span className="shrink-0 text-right text-sm font-semibold text-navy">
-                It&rsquo;s them
-                <span className="block text-xs font-normal text-ink/60">
-                  makes their account
-                </span>
-              </span>
-            </button>
+        ? pick(suggested, "Use existing account", true)
+        : buyer && (
+            <div className="flex flex-col gap-2 rounded-lg border border-line bg-white px-3 py-3">
+              <div className="flex items-center gap-3">
+                <AccountLine
+                  name={buyer.name ?? buyer.email ?? ""}
+                  email={
+                    buyer.name ? (buyer.email ?? "") : "no name on the purchase"
+                  }
+                />
+                <span className="shrink-0 text-xs text-ink/60">no account</span>
+              </div>
+              <p className="text-sm text-ink/70">
+                If being claimed by this purchaser: they sign in at
+                metagame.games/login first (one code to that email), then search
+                for them below.
+              </p>
+            </div>
           )}
       {!searching ? (
         <button
@@ -114,7 +104,9 @@ export default function AccountPicker({
           onClick={() => setSearching(true)}
           className={`${smallButtonClass} self-start py-2`}
         >
-          Someone else is claiming this ticket…
+          {suggested
+            ? "Someone else is claiming this ticket…"
+            : "Search accounts…"}
         </button>
       ) : (
         <div className="flex flex-col gap-2">
@@ -136,7 +128,8 @@ export default function AccountPicker({
           />
           {pending && <p className="text-sm text-ink/60">Searching…</p>}
           {!pending &&
-            query.trim().length >= CHECKIN_MIN_CHARS &&
+            searchedFor !== null &&
+            searchedFor === query.trim() &&
             hits.length === 0 && (
               <p className="text-sm text-ink/60">
                 No account matches. They need to sign in at metagame.games/login
@@ -144,7 +137,7 @@ export default function AccountPicker({
               </p>
             )}
           {hits.map((a) => (
-            <div key={a.id}>{pick(a)}</div>
+            <div key={a.id}>{pick(a, "Pick")}</div>
           ))}
         </div>
       )}
@@ -153,88 +146,6 @@ export default function AccountPicker({
           {error}
         </p>
       )}
-      {searching && (
-        <button
-          type="button"
-          onClick={() => setMinting("other")}
-          className={`${smallButtonClass} self-start py-2`}
-        >
-          They have no account yet…
-        </button>
-      )}
-    </div>
-  );
-}
-
-function MintForm({
-  prefill,
-  onPick,
-  onBack,
-}: {
-  prefill: { name: string | null; email: string | null };
-  onPick: (account: CheckinAccount) => void;
-  onBack: () => void;
-}) {
-  const [name, setName] = useState(prefill.name ?? "");
-  const [email, setEmail] = useState(prefill.email ?? "");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-  const nameId = useId();
-  const emailId = useId();
-  return (
-    <div className="flex flex-col gap-2 rounded-lg border border-line bg-white p-3">
-      <label htmlFor={nameId} className="text-sm font-medium text-ink/80">
-        Name, as it should read on the badge
-      </label>
-      <input
-        id={nameId}
-        autoFocus
-        autoComplete="off"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        className={fieldClass}
-      />
-      <label htmlFor={emailId} className="text-sm font-medium text-ink/80">
-        Email they&rsquo;ll sign in with
-      </label>
-      <input
-        id={emailId}
-        type="email"
-        inputMode="email"
-        autoComplete="off"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className={fieldClass}
-      />
-      <p className="text-xs text-ink/60">
-        Read the email back to them. They get a sign-in link there.
-      </p>
-      {error && (
-        <p role="alert" className="text-sm text-meeple">
-          {error}
-        </p>
-      )}
-      <button
-        type="button"
-        disabled={pending || !name.trim() || !email.trim()}
-        onClick={() =>
-          start(async () => {
-            const res = await mintAccount({ name, email });
-            if (res.account) onPick(res.account);
-            else setError(res.error ?? "Couldn't create the account.");
-          })
-        }
-        className={`${smallButtonClass} self-start py-2 font-semibold text-navy disabled:opacity-40`}
-      >
-        {pending ? "Creating…" : "Create account & pick"}
-      </button>
-      <button
-        type="button"
-        onClick={onBack}
-        className="self-start text-sm text-ink/60 underline-offset-2 hover:underline"
-      >
-        Back to search
-      </button>
     </div>
   );
 }

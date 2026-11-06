@@ -10,9 +10,8 @@ import {
   type CheckinAccount,
 } from "@/lib/checkin";
 import { badgeWearer, deskTicket } from "@/lib/checkin-store";
-import { sendAccountInviteEmail } from "@/lib/email";
-import { reportError } from "@/lib/error-report";
-import { ensureAccount, searchAccounts } from "@/lib/schedule-store";
+import { reportError, type ReportChannel } from "@/lib/error-report";
+import { searchAccounts } from "@/lib/schedule-store";
 import {
   assignBadgeCode,
   checkInTicket,
@@ -29,7 +28,7 @@ const str = (formData: FormData, key: string, max = 500) =>
 
 const manage = () => requireAccess("checkin.manage");
 
-export type DeskState = { error?: string; done?: string };
+export type DeskState = { error?: string; done?: string; badge?: number };
 
 const CLAIM_ERRORS = {
   unknown: "That ticket no longer exists. Search again.",
@@ -97,7 +96,8 @@ export async function arriveAction(
 
   const result = await checkInTicket(access.userId, paymentId);
   revalidatePath(TOOL);
-  if (result.ok) return { done: "Checked in" };
+  if (result.ok)
+    return { done: "Checked in", badge: result.ticket.badgeCode ?? undefined };
   if (result.reason === "already") return { error: CLAIM_ERRORS.checkedIn };
   if (result.reason === "unpaid") return { error: CLAIM_ERRORS.unpaid };
   if (result.reason === "unclaimed")
@@ -132,34 +132,6 @@ export async function findAccounts(
   };
 }
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/**
- * An account for someone at the desk with none. Unverified and passwordless,
- * like a host invite: their first code sign-in claims it, and the invite
- * email tells them how.
- */
-export async function mintAccount(input: {
-  name: string;
-  email: string;
-}): Promise<{ account?: CheckinAccount; error?: string }> {
-  if (!(await manage())) return { error: EXPIRED };
-  const name = String(input.name).trim().slice(0, 200);
-  const email = String(input.email).trim().toLowerCase().slice(0, 254);
-  if (!name)
-    return { error: "Type their name as it should read on the badge." };
-  if (!EMAIL.test(email)) return { error: "That email doesn't look right." };
-  const {
-    userId,
-    name: storedName,
-    email: storedEmail,
-  } = await ensureAccount(name, email);
-  sendAccountInviteEmail({ to: storedEmail, name: storedName }).catch((err) =>
-    console.error("[checkin] invite email failed", storedEmail, err),
-  );
-  return { account: { id: userId, name: storedName, email: storedEmail } };
-}
-
 export async function reportProblem(
   _prev: DeskState,
   formData: FormData,
@@ -168,14 +140,29 @@ export async function reportProblem(
   if (!access) return { error: EXPIRED };
   const text = str(formData, "text", 1200);
   if (!text) return { error: "Say what's wrong first." };
-  await reportError({
+  const kind = str(formData, "kind", 20);
+  if (kind !== "technical" && kind !== "human") {
+    return { error: "Pick whether this is a technical or a human issue." };
+  }
+  const channel: ReportChannel = kind === "technical" ? "errors" : "staff";
+  const sent = await reportError({
     source: "Check-in desk",
     summary: text,
+    channel,
     details: {
       Volunteer: access.name,
       Search: str(formData, "q", CHECKIN_QUERY_MAX),
-      Ticket: str(formData, "paymentId"),
     },
   });
-  return { done: "Sent to Brian and Sparr." };
+  if (!sent) {
+    return {
+      error: `Couldn't send. Grab ${channel === "errors" ? "Brian" : "on-site staff"} directly.`,
+    };
+  }
+  return {
+    done:
+      channel === "errors"
+        ? "Sent to #website-errors. Brian is pinged."
+        : "Sent to #staff-issues. On-site staff are pinged.",
+  };
 }

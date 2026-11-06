@@ -67,6 +67,12 @@ const ENV_SPEC: EnvSpec[] = [
       "Discord webhook for the website-errors channel: failed form submissions, purchases and emails post there (see src/lib/error-report.ts). Without it those reports fall back to the admin email.",
   },
   {
+    name: "DISCORD_STAFF_WEBHOOK_URL",
+    required: false,
+    description:
+      "Discord webhook for the staff-issues channel: people problems reported from the check-in desk post there and ping on-site staff. Without it those reports fall back to the admin email.",
+  },
+  {
     name: "OPENNODE_KEY",
     required: false,
     description:
@@ -189,6 +195,7 @@ export const env = {
   BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   DISCORD_ERROR_WEBHOOK_URL: process.env.DISCORD_ERROR_WEBHOOK_URL,
+  DISCORD_STAFF_WEBHOOK_URL: process.env.DISCORD_STAFF_WEBHOOK_URL,
   XERO_CLIENT_ID: process.env.XERO_CLIENT_ID,
   XERO_CLIENT_SECRET: process.env.XERO_CLIENT_SECRET,
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,

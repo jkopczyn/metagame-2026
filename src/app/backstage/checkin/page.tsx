@@ -100,6 +100,7 @@ export default async function CheckinPage(
       : t.purchaserEmail && name !== t.purchaserEmail
         ? t.purchaserEmail
         : tier;
+    const offered = suggested(t);
     return {
       paymentId: t.paymentId,
       name,
@@ -112,7 +113,13 @@ export default async function CheckinPage(
       checkedIn: t.checkedInAt
         ? { at: formatPacificTime(t.checkedInAt), by: by?.name ?? "someone" }
         : null,
-      suggested: suggested(t),
+      suggested: offered,
+      buyerNeedsAccount:
+        offered === null &&
+        !spare &&
+        t.ownerUserId === null &&
+        t.purchaserEmail !== null &&
+        !byEmail.has(t.purchaserEmail),
     };
   });
   const groups = groupByPack(tickets);
