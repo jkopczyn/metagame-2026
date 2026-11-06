@@ -47,6 +47,9 @@ importers:
       emoji-picker-react:
         specifier: 4.22.3
         version: 4.22.3(react@19.3.1)
+      jsqr:
+        specifier: ^1.4.0
+        version: 1.4.0
       lucide-react:
         specifier: ^1.25.0
         version: 1.25.0(react@19.3.1)
@@ -138,9 +141,6 @@ importers:
       eslint-config-next:
         specifier: 16.4.2
         version: 16.4.2(@typescript-eslint/parser@8.60.1(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
-      jsqr:
-        specifier: ^1.4.0
-        version: 1.4.0
       lint-staged:
         specifier: ^17.5.1
         version: 17.5.1

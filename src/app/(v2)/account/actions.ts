@@ -14,8 +14,17 @@ import {
   hasPassword,
 } from "@/lib/auth";
 import { deleteImage, uploadImage } from "@/lib/blob";
-import { isMegagameClass, starterLevels } from "@/lib/megagame-levels";
-import { loadMegagameLevels, setMegagameLevels } from "@/lib/megagame-store";
+import {
+  MEGAGAME_CLASSES,
+  isMegagameClass,
+  starterLevels,
+} from "@/lib/megagame-levels";
+import {
+  hasVolunteerLevelEvent,
+  loadMegagameLevels,
+  recordPickerJoin,
+  setMegagameLevels,
+} from "@/lib/megagame-store";
 import { invalidateSchedule } from "@/lib/schedule-store";
 import { isSpeakerAccount } from "@/v2/data/speakers";
 import {
@@ -288,10 +297,23 @@ export async function chooseMegagameClass(
   formData: FormData,
 ): Promise<ClassState> {
   const session = await requireSession();
+  if (await hasVolunteerLevelEvent(session.user.id)) {
+    return {
+      error:
+        "Your class is locked now that a volunteer has recorded a level for you.",
+    };
+  }
   const chosen = formData.get("class");
   if (!isMegagameClass(chosen)) return { error: "Pick a class." };
   const current = await loadMegagameLevels(session.user.id);
   if (current[chosen] > 0) return {};
+  // The picker only ever sets level 1, so a higher level is progress it must
+  // not reset, whatever the event log says.
+  if (MEGAGAME_CLASSES.some((c) => current[c] > 1)) {
+    return { error: "Your class is locked now that you have levelled up." };
+  }
+  // The audit row goes first so a failed column write never leaves a level with no event.
+  await recordPickerJoin(session.user.id, chosen);
   await setMegagameLevels(session.user.id, starterLevels(chosen));
   revalidatePath("/account");
   revalidatePath(`/u/${session.user.id}`);

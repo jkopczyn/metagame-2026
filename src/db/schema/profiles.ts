@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  integer,
   pgTable,
   smallint,
   text,
@@ -30,6 +31,8 @@ export const profiles = pgTable(
     wizardLevel: smallint().notNull().default(0),
     pirateLevel: smallint().notNull().default(0),
     alienLevel: smallint().notNull().default(0),
+    // The number printed on the Megagame badge, 0–9999. Assigned elsewhere.
+    badgeNumber: integer().unique(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true })
       .notNull()
@@ -41,5 +44,9 @@ export const profiles = pgTable(
     check("profiles_wizard_level_range", sql`${t.wizardLevel} between 0 and 5`),
     check("profiles_pirate_level_range", sql`${t.pirateLevel} between 0 and 5`),
     check("profiles_alien_level_range", sql`${t.alienLevel} between 0 and 5`),
+    check(
+      "profiles_badge_number_range",
+      sql`${t.badgeNumber} between 0 and 9999`,
+    ),
   ],
 );
