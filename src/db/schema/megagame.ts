@@ -21,25 +21,45 @@ export const quests = pgTable(
     id: uuid().primaryKey().defaultRandom(),
     code: text().notNull().unique(),
     title: text().notNull(),
-    // Null means any class. Text, not an enum, so renaming a class needs no migration.
-    class: text(),
-    kind: text().notNull(),
-    answers: text()
+    // What the printed card says; plain text with line breaks.
+    bodyText: text().notNull().default(""),
+    // Up to three Vercel Blob URLs, printed under the text in this order.
+    bodyImages: text()
       .array()
       .notNull()
       .default(sql`'{}'`),
-    evidence: text(),
-    hint: text(),
+    // Null means any class. Text, not an enum, so renaming a class needs no migration.
+    class: text(),
     minLevel: integer(),
     maxLevel: integer(),
+    minPlayers: integer().notNull().default(1),
+    // Stamps awarded on completion; "any" stamps go to a class of the player's choosing.
+    stampsWizard: integer().notNull().default(0),
+    stampsPirate: integer().notNull().default(0),
+    stampsAlien: integer().notNull().default(0),
+    stampsAny: integer().notNull().default(0),
+    // What the volunteer looks for: a solution, an answer, a photo to compare.
+    evidence: text(),
+    evidenceImage: text(),
+    hint: text(),
     active: boolean().notNull().default(true),
     ...timestamps,
   },
   (t) => [
-    check("quests_kind_known", sql`${t.kind} in ('answer', 'evidence')`),
     check(
       "quests_level_window_needs_class",
       sql`${t.class} is not null or (${t.minLevel} is null and ${t.maxLevel} is null)`,
+    ),
+    // MAX_BODY_IMAGES in megagame-quests.ts; a template value would be a bind parameter.
+    check("quests_body_images_max", sql`cardinality(${t.bodyImages}) <= 3`),
+    check("quests_min_players_range", sql`${t.minPlayers} between 1 and 100`),
+    check(
+      "quests_stamps_not_negative",
+      sql`${t.stampsWizard} >= 0 and ${t.stampsPirate} >= 0 and ${t.stampsAlien} >= 0 and ${t.stampsAny} >= 0`,
+    ),
+    check(
+      "quests_evidence_image_https",
+      sql`${t.evidenceImage} is null or ${t.evidenceImage} like 'https://%'`,
     ),
   ],
 );

@@ -1052,6 +1052,12 @@ await sql.query(
 await sql.query(`delete from session_grades where id::text like $1`, [
   SEED_UUID,
 ]);
+// Seed quests go with their progress; a quest with real progress is never a seed.
+await sql.query(
+  `delete from quest_progress where quest_id in (select id from quests where id::text like $1)`,
+  [SEED_UUID],
+);
+await sql.query(`delete from quests where id::text like $1`, [SEED_UUID]);
 await sql.query(
   `delete from sessions where id::text like $1 and not (id::text = any($2::text[]))`,
   [SEED_UUID, pgArray(sessions.map((s) => s.id))],
@@ -1242,6 +1248,72 @@ counts.session_grade_space_options = await upsert(
   spaceOptions,
 );
 counts.apikey = await upsert("apikey", ["id"], apiKeys);
+
+// Three quest cards for /backstage/quests and the Quest Board, one per background.
+const quests = [
+  {
+    id: uuid(9001),
+    code: ticketCode("seed-quest-1"),
+    title: "Hoot & Seek",
+    body_text:
+      "Somewhere on the grounds an owl keeps watch over a word.\n\nFind the owl, read what it guards and bring the word to the Quest Board.",
+    body_images: pgArray([]),
+    class: "wizard",
+    min_level: 1,
+    max_level: null,
+    min_players: 2,
+    stamps_wizard: 2,
+    stamps_pirate: 0,
+    stamps_alien: 0,
+    stamps_any: 0,
+    evidence: "The word is AVIANNA.",
+    evidence_image: null,
+    hint: "Owls like high places.",
+    active: true,
+  },
+  {
+    id: uuid(9002),
+    code: ticketCode("seed-quest-2"),
+    title: "Dead Reckoning",
+    body_text:
+      "Pace out the courtyard from the fountain to the gate and back, counting steps. The treasure lies at the number of steps divided by the number of pirates in your crew.",
+    body_images: pgArray([]),
+    class: "pirate",
+    min_level: 2,
+    max_level: 4,
+    min_players: 3,
+    stamps_wizard: 0,
+    stamps_pirate: 3,
+    stamps_alien: 0,
+    stamps_any: 1,
+    evidence:
+      "Any whole number between 20 and 40; ask how many pirates they counted.",
+    evidence_image: null,
+    hint: null,
+    active: true,
+  },
+  {
+    id: uuid(9003),
+    code: ticketCode("seed-quest-3"),
+    title: "First Contact",
+    body_text:
+      "Teach a stranger a game in under five minutes. Then have them teach it to someone else while you watch, and say nothing.",
+    body_images: pgArray([]),
+    class: null,
+    min_level: null,
+    max_level: null,
+    min_players: 1,
+    stamps_wizard: 0,
+    stamps_pirate: 0,
+    stamps_alien: 0,
+    stamps_any: 1,
+    evidence: "The stranger's name and the game. Take their word for it.",
+    evidence_image: null,
+    hint: null,
+    active: false,
+  },
+];
+counts.quests = await upsert("quests", ["id"], quests);
 
 for (const [table, n] of Object.entries(counts)) {
   console.log(`[db:seed] ${table}: ${n}`);

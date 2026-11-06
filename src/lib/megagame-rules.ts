@@ -1,5 +1,5 @@
-// Pure megagame rules: code and answer matching, soft checks, and the
-// over-time chart's bucket math. No database or Next imports, so client
+// Pure megagame rules: code matching, soft checks, and the over-time
+// chart's bucket math. No database or Next imports, so client
 // components can use it. Class list and level maximum come from
 // megagame-levels.ts.
 
@@ -58,32 +58,6 @@ export function parseScannedCode(text: string): ScannedCode | null {
   if (!/^[\dA-Za-z\s-]+$/.test(raw)) return null;
   const code = normalizeTicketCode(raw);
   return isCompleteMegagameCode(code) ? { kind: "quest", code } : null;
-}
-
-/** Case, accents, punctuation and whitespace do not matter. */
-export function normalizeAnswer(input: string): string {
-  return input
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .replace(/[^\p{L}\p{N}]+/gu, "");
-}
-
-export type AnswerMatch = { matched: boolean; answer: string | null };
-
-/** `answer` is the accepted answer as stored, for showing the volunteer what matched. */
-export function matchAnswer(
-  entered: string,
-  accepted: readonly string[],
-): AnswerMatch {
-  const wanted = normalizeAnswer(entered);
-  if (wanted === "") return { matched: false, answer: null };
-  for (const candidate of accepted) {
-    if (normalizeAnswer(candidate) === wanted) {
-      return { matched: true, answer: candidate };
-    }
-  }
-  return { matched: false, answer: null };
 }
 
 export type LevelUpInput = {
