@@ -14,6 +14,7 @@ import {
   questWindowIsValid,
   isCompleteMegagameCode,
   isBucketSize,
+  isEventTable,
   normalizeMegagameCode,
   normalizeBadgeNumber,
   parseScannedCode,
@@ -653,5 +654,15 @@ describe("cumulativeLevelDistribution", () => {
       at("2026-11-07T11:00:00.000Z"),
     ]);
     expect(d.wizard).toEqual([0, 1, 0, 0, 0, 0]);
+  });
+});
+
+describe("isEventTable", () => {
+  it("accepts only the two event tables", () => {
+    expect(isEventTable("quest_progress")).toBe(true);
+    expect(isEventTable("level_events")).toBe(true);
+    expect(isEventTable("quest_completions")).toBe(false);
+    expect(isEventTable("user")).toBe(false);
+    expect(isEventTable("quests")).toBe(false);
   });
 });

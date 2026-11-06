@@ -296,3 +296,10 @@ export function cumulativeLevelDistribution(
   }
   return out;
 }
+
+/** The event tables the progress dashboard exports. */
+export const EVENT_TABLES = ["quest_progress", "level_events"] as const;
+export type EventTable = (typeof EVENT_TABLES)[number];
+
+export const isEventTable = (value: unknown): value is EventTable =>
+  EVENT_TABLES.includes(value as EventTable);
