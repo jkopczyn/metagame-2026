@@ -59,6 +59,7 @@ const CAM_VIEWS: Record<CameraView, THREE.Vector3> = {
   front: new THREE.Vector3(0, 0, CAM_DIST), // dead-on
 };
 const MAX_EXPORT = 8192;
+const MAX_TILE = 2048;
 
 type Props = {
   dice: DieSpec[];
@@ -464,10 +465,10 @@ function shadowTexture(blur: number): THREE.Texture {
   return t;
 }
 
-// Renders the scene once at the requested width (same framing as on screen),
-// copies the pixels out before the browser composites, then optionally crops to
-// the dice's alpha bounding box. The on-screen canvas is resized only for the
-// duration of that one synchronous draw.
+// Renders the scene at the requested width (same framing as on screen), copies
+// the pixels out before the browser composites, then optionally crops to the
+// dice's alpha bounding box. The on-screen canvas is resized only for the
+// duration of those synchronous draws.
 function Exporter({
   rig,
   dice,
@@ -505,23 +506,31 @@ function Exporter({
       const full = document.createElement("canvas");
       full.width = w;
       full.height = h;
-      // render at 2× where the GPU allows and scale down: smoother edges than
-      // the canvas's own multisampling alone
-      const ss = Math.max(
-        1,
-        Math.min(
-          2,
-          Math.floor(gl.capabilities.maxTextureSize / Math.max(w, h)),
-        ),
-      );
+      // 2× supersample, scaled down: smoother edges than the canvas's own
+      // multisampling alone. Rendered as tiles via camera view offsets because
+      // browsers silently clamp the drawing buffer (Chrome ~7000px a side,
+      // Safari 16M pixels) and three.js never finds out. Tile edges land on
+      // whole output pixels so the downscale never straddles two tiles.
+      const ss = 2;
+      const tile = Math.floor(MAX_TILE / ss) * ss;
+      const ctx = full.getContext("2d")!;
+      ctx.imageSmoothingQuality = "high";
+      const W = w * ss;
+      const H = h * ss;
       try {
         gl.setPixelRatio(1);
-        gl.setSize(w * ss, h * ss, false);
-        gl.render(scene, camera);
-        const ctx = full.getContext("2d")!;
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(gl.domElement, 0, 0, w, h);
+        for (let y = 0; y < H; y += tile) {
+          for (let x = 0; x < W; x += tile) {
+            const tw = Math.min(tile, W - x);
+            const th = Math.min(tile, H - y);
+            camera.setViewOffset(W, H, x, y, tw, th);
+            gl.setSize(tw, th, false);
+            gl.render(scene, camera);
+            ctx.drawImage(gl.domElement, x / ss, y / ss, tw / ss, th / ss);
+          }
+        }
       } finally {
+        camera.clearViewOffset();
         gl.setPixelRatio(dpr);
         gl.setSize(size.width, size.height, false);
         hidden.forEach((o) => (o.visible = true));
@@ -529,7 +538,6 @@ function Exporter({
 
       let out = full;
       if (crop) {
-        const ctx = full.getContext("2d")!;
         const data = ctx.getImageData(0, 0, w, h).data;
         let x0 = w,
           y0 = h,
