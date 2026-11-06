@@ -612,6 +612,19 @@ export const API_AREAS: Area[] = [
     ],
   },
   {
+    title: "Badges",
+    endpoints: [
+      {
+        method: "GET",
+        path: "/api/admin/badges/{code}",
+        permission: "tickets.view",
+        summary:
+          "The attendee whose claimed ticket carries badge number {code} (one to four digits, leading zeros optional). 404 if no claimed ticket has it.",
+        response: '{ badgeCode: "0042", userId, name }',
+      },
+    ],
+  },
+  {
     title: "Docs",
     endpoints: [
       {
