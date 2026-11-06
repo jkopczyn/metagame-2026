@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import SignIn from "../SignIn";
@@ -54,6 +55,16 @@ export default async function QuestBoard(
 
   return (
     <>
+      {viewer.manager && (
+        <p className="text-right text-sm">
+          <Link
+            href="/backstage/megagame/dashboard"
+            className="text-ink/60 underline underline-offset-2 hover:text-meeple"
+          >
+            Dashboard
+          </Link>
+        </p>
+      )}
       {/* Side by side on wide screens; the phone keeps the top-to-bottom order. */}
       <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
         <div className="min-w-0">
