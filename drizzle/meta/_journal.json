@@ -239,6 +239,13 @@
       "when": 1793933753055,
       "tag": "0033_ticket_badge_code",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1793938453891,
+      "tag": "0034_megagame_tables",
+      "breakpoints": true
     }
   ]
 }
