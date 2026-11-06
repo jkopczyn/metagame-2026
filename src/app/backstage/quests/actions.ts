@@ -61,6 +61,7 @@ export async function saveQuest(
     evidence: str(formData, "evidence"),
     evidenceImage: str(formData, "evidenceImage"),
     hint: str(formData, "hint"),
+    author: str(formData, "author"),
     active: formData.has("active") ? "on" : "false",
   });
   if (!parsed.ok) return { errors: parsed.errors };

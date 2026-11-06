@@ -175,6 +175,7 @@ const questRow = (input: QuestInput) => ({
   evidence: input.evidence,
   evidenceImage: input.evidenceImage,
   hint: input.hint,
+  author: input.author,
   active: input.active,
 });
 

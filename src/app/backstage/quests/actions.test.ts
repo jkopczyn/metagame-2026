@@ -60,6 +60,7 @@ const row = {
   evidence: null,
   evidenceImage: null,
   hint: null,
+  author: null,
   active: true,
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -108,6 +109,7 @@ describe("saveQuest", () => {
           evidence: "AVIANNA",
           evidenceImage: BLOB,
           hint: "",
+          author: " Tobias ",
           active: "on",
         }),
       ),
@@ -124,6 +126,7 @@ describe("saveQuest", () => {
       evidence: "AVIANNA",
       evidenceImage: BLOB,
       hint: null,
+      author: "Tobias",
       active: true,
     });
   });

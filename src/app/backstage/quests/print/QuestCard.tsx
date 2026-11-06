@@ -124,6 +124,9 @@ export default function QuestCard({ quest }: { quest: Quest }) {
               <div className={styles.rewardLabel}>stamps</div>
             )}
           </div>
+          {quest.author && (
+            <div className={styles.author}>Quest by {quest.author}</div>
+          )}
           <div className={styles.code}>
             <span className={styles.codeText}>
               {formatTicketCode(quest.code)}

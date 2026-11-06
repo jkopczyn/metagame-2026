@@ -24,6 +24,7 @@ describe("parseQuestInput", () => {
         evidence: null,
         evidenceImage: null,
         hint: null,
+        author: null,
         active: true,
       },
     });
@@ -132,6 +133,7 @@ describe("row helpers", () => {
     evidence: null,
     evidenceImage: null,
     hint: null,
+    author: null,
     active: true,
   };
 

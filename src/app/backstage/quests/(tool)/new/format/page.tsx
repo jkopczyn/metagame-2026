@@ -14,6 +14,7 @@ const EXAMPLE = `{
       "solution": "The answer is AVIANNA.",
       "solution_images": ["images/owl-solution.jpg"],
       "hint": "Owls are nocturnal.",
+      "submitted_by": "Tobias",
       "finalized": false
     }
   ]
@@ -51,10 +52,14 @@ const ROWS: [string, string][] = [
   ],
   ["hint", "A nudge the volunteer may give players. Optional."],
   [
+    "submitted_by (or author)",
+    "Printed at the foot of the card as the quest's author. Optional.",
+  ],
+  [
     "finalized",
     "quest_panic's review flag. false imports the quest withdrawn (inactive) so someone looks it over before the board or Print all sees it; missing means active.",
   ],
-  ["source, submitted_by, notes", "Ignored, like any other unknown field."],
+  ["source, notes", "Ignored, like any other unknown field."],
 ];
 
 export default async function BundleFormat() {

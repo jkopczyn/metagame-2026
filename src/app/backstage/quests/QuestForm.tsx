@@ -11,6 +11,7 @@ import {
   type MegagameClass,
 } from "@/lib/megagame-levels";
 import {
+  AUTHOR_MAX,
   MAX_BODY_IMAGES,
   MAX_MIN_PLAYERS,
   MAX_STAMPS,
@@ -33,6 +34,7 @@ const EMPTY: QuestInput = {
   evidence: null,
   evidenceImage: null,
   hint: null,
+  author: null,
   active: true,
 };
 
@@ -199,6 +201,17 @@ export default function QuestForm({
           defaultValue={initial.hint ?? ""}
           className={fieldClass}
           placeholder="Optional nudge the volunteer may give a stuck group."
+        />
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className={LABEL}>Author</span>
+        <input
+          name="author"
+          maxLength={AUTHOR_MAX}
+          defaultValue={initial.author ?? ""}
+          className={fieldClass}
+          placeholder="Printed at the foot of the card. Optional."
         />
       </label>
 
