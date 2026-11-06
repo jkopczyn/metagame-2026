@@ -2,14 +2,17 @@ import aella from "../../../public/images/speakers/aella.jpg";
 import aemilia from "../../../public/images/speakers/aemilia_dixon.jpg";
 import amy from "../../../public/images/speakers/amy_schneider.jpg";
 import andrew from "../../../public/images/speakers/andrew_nathenson.jpg";
+import casey from "../../../public/images/speakers/casey_jones.jpg";
 import caro from "../../../public/images/speakers/caro_murphy.jpg";
 import chris from "../../../public/images/speakers/chris_grace.jpg";
 import chrisKay from "../../../public/images/speakers/chris_kay.jpg";
 import david from "../../../public/images/speakers/david_turner.jpg";
 import elli from "../../../public/images/speakers/elli_furedy.jpg";
+import guy from "../../../public/images/speakers/guy.jpg";
 import iris from "../../../public/images/speakers/iris_lemony.jpg";
 import jamie from "../../../public/images/speakers/jamie_wahls.jpg";
 import lexi from "../../../public/images/speakers/lexi_kohanski.jpg";
+import marcus from "../../../public/images/speakers/marcus_richardson.jpg";
 import marlee from "../../../public/images/speakers/marlee_honton.jpg";
 import peihGee from "../../../public/images/speakers/peih_gee_law.jpg";
 import randy from "../../../public/images/speakers/randy_lubin.jpg";
@@ -26,6 +29,7 @@ import leveragedPlayLogo from "../../../public/images/speakers/logos/leveraged-p
 import repodLogo from "../../../public/images/speakers/logos/repod.png";
 import semantleLogo from "../../../public/images/speakers/logos/semantle.png";
 import shineOnLogo from "../../../public/images/speakers/logos/shine-on.png";
+import slaydiumLogo from "../../../public/images/speakers/logos/slaydium.png";
 import spencerLogo from "../../../public/images/speakers/logos/spencer.png";
 import tommyLogo from "../../../public/images/speakers/logos/tommy-honton.png";
 import metagameLogo from "../../../public/images/logo_single.png";
@@ -166,6 +170,24 @@ export const SPEAKERS: Speaker[] = [
     titleUrl: "https://candlecraftgames.com/",
     photo: chrisKay,
     logo: candlecraftLogo,
+  },
+  {
+    ...SPEAKER_ACCOUNTS.marcusRichardson,
+    title: "Aurelius Whitlock’s Murder Museum",
+    titleUrl: "https://open.spotify.com/show/30R5REvknCBprrCrlAYDTW",
+    photo: marcus,
+  },
+  {
+    ...SPEAKER_ACCOUNTS.caseyJones,
+    title: "Slaydium Games",
+    titleUrl: "https://www.slaydiumgames.com/",
+    photo: casey,
+    logo: slaydiumLogo,
+  },
+  {
+    ...SPEAKER_ACCOUNTS.guy,
+    title: "",
+    photo: guy,
   },
   {
     ...SPEAKER_ACCOUNTS.rickiHeicklen,
