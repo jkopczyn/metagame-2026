@@ -11,6 +11,7 @@ import {
   MailIcon,
   MicIcon,
   QrCodeIcon,
+  ScrollTextIcon,
   SignpostIcon,
   SwordsIcon,
   TicketIcon,
@@ -104,6 +105,13 @@ const TOOLS: {
     name: "Quest Board",
     blurb: "Confirm quest completions and record level-ups.",
     perm: "megagame.verify",
+  },
+  {
+    href: "/backstage/quests",
+    icon: ScrollTextIcon,
+    name: "Edit Quests",
+    blurb: "Write, import and print the Megagame quest cards.",
+    perm: "megagame.manage",
   },
   {
     href: "/backstage/budget",
