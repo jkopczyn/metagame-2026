@@ -60,15 +60,15 @@
 
 .frame {
   position: absolute;
-  inset: 0.75in 0.8in 0.7in;
+  inset: 0.6in 0.8in 0.6in;
   display: flex;
   flex-direction: column;
-  gap: 0.18in;
+  gap: 0.1in;
 }
 
 .title {
   margin: 0;
-  height: 1.45in;
+  height: 0.95in;
   flex: none;
   display: flex;
   align-items: center;
@@ -76,7 +76,7 @@
   text-align: center;
   font-family: var(--font-bebas), var(--font-space-grotesk), sans-serif;
   font-weight: 400;
-  font-size: 64pt; /* CardFit shrinks this to fit */
+  font-size: 44pt; /* CardFit shrinks this to fit */
   letter-spacing: 0.02em;
   text-wrap: balance;
   line-height: 0.98;
@@ -90,7 +90,7 @@
   justify-content: center;
   gap: 0.14in;
   font-weight: 700;
-  font-size: 20pt;
+  font-size: 16pt;
 }
 .req {
   display: flex;
@@ -99,36 +99,36 @@
 }
 .req svg,
 .req img {
-  width: 0.6in;
-  height: 0.6in;
+  width: 0.45in;
+  height: 0.45in;
   object-fit: contain;
 }
 .join {
-  font-size: 26pt;
+  font-size: 20pt;
   font-weight: 700;
   opacity: 0.7;
 }
 
-/* Text takes the height it needs; pictures grow into whatever is left (never
-   below their minimum). When both don't fit, the text box shrinks and CardFit
-   reduces the font size. */
+/* Text takes the height it needs; pictures grow into whatever is left, and
+   never below 3.6in, so a puzzle grid stays big enough to solve on the page.
+   When both don't fit, the text box shrinks and CardFit reduces the font. */
 .body {
   flex: 0 1 auto;
-  min-height: 1in;
+  min-height: 0.5in;
   overflow: hidden;
 }
 .bodyText {
   white-space: pre-line;
-  font-size: 20pt; /* CardFit shrinks this to fit */
-  line-height: 1.32;
+  font-size: 18pt; /* CardFit shrinks this to fit */
+  line-height: 1.28;
   font-weight: 400;
   text-align: justify;
   hyphens: auto;
 }
 
 .images {
-  flex: 1 0 2.3in;
-  min-height: 2.3in;
+  flex: 1 0 3.6in;
+  min-height: 3.6in;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -154,14 +154,14 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  min-height: 0.9in;
+  min-height: 0.8in;
 }
 .rewards {
   display: flex;
   align-items: center;
   gap: 0.16in;
   font-weight: 700;
-  font-size: 20pt;
+  font-size: 16pt;
 }
 .reward {
   display: flex;
@@ -170,12 +170,12 @@
 }
 .reward svg,
 .reward img {
-  width: 0.5in;
-  height: 0.5in;
+  width: 0.42in;
+  height: 0.42in;
   object-fit: contain;
 }
 .rewardLabel {
-  font-size: 14pt;
+  font-size: 12pt;
   font-weight: 500;
   opacity: 0.75;
 }
@@ -185,7 +185,7 @@
   align-self: flex-end;
   padding: 0 0.2in 0.1in;
   text-align: center;
-  font-size: 13pt;
+  font-size: 11pt;
   font-style: italic;
   opacity: 0.75;
 }
@@ -196,7 +196,7 @@
 }
 .codeText {
   font-family: var(--font-space-mono), monospace;
-  font-size: 20pt;
+  font-size: 16pt;
   font-weight: 700;
   letter-spacing: 0.06em;
   padding: 0.04in 0.12in;
@@ -204,8 +204,8 @@
   border-radius: 0.1in;
 }
 .qr {
-  width: 0.9in;
-  height: 0.9in;
+  width: 0.8in;
+  height: 0.8in;
 }
 
 /* On screen: cards stacked with a gap, and a flag on any whose text could not

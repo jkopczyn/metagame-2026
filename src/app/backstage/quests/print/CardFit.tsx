@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const TITLE_PT = { max: 64, min: 22, step: 2 };
+const TITLE_PT = { max: 44, min: 18, step: 2 };
 const BODY_PT = { min: 9, step: 0.5 };
 
 const fits = (box: HTMLElement) =>
@@ -33,7 +33,7 @@ export function fitCards(root: ParentNode): string[] {
     const text = card.querySelector<HTMLElement>("[data-body-text]");
     if (!body || !text) return;
     // Cards with pictures start smaller so the pictures get more of the page.
-    const maxPt = card.querySelector("[data-images]") ? 16 : 20;
+    const maxPt = card.querySelector("[data-images]") ? 13 : 18;
     if (!shrink(body, text, maxPt, BODY_PT.min, BODY_PT.step)) {
       card.dataset.overflow = "1";
       overflow.push(card.dataset.card ?? "?");
