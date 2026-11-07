@@ -148,10 +148,15 @@ export type ShiftState =
   | { kind: "on"; hats: HatId[]; endsAt: Date; nextEndsAt: Date | null }
   | { kind: "off"; nextStartsAt: Date }
   | { kind: "done" }
-  | { kind: "unposted" };
+  | { kind: "standing"; hats: HatId[] };
+
+/** With no schedule posted, the pirate tricorn is stealable the whole time. */
+export const STANDING_HATS: readonly HatId[] = ["tricorn"];
 
 export function shiftState(schedule: Schedule, now: Date): ShiftState {
-  if (schedule.length === 0) return { kind: "unposted" };
+  if (schedule.length === 0) {
+    return { kind: "standing", hats: [...STANDING_HATS] };
+  }
 
   const at = now.getTime();
   const index = schedule.findIndex(

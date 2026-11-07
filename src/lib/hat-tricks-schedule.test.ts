@@ -201,8 +201,11 @@ describe("shiftState", () => {
     shift("10:00", "11:00", ["wizard"]),
     shift("11:00", "12:00", ["crown"]),
   );
-  it("is unposted for an empty schedule", () => {
-    expect(shiftState([], at("10:30"))).toEqual({ kind: "unposted" });
+  it("is a standing tricorn shift for an empty schedule", () => {
+    expect(shiftState([], at("10:30"))).toEqual({
+      kind: "standing",
+      hats: ["tricorn"],
+    });
   });
 
   it("is on with the next shift's end", () => {
