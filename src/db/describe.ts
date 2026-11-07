@@ -123,7 +123,7 @@ const TABLE_NOTES: Record<string, string> = {
   level_events:
     "The audit log of Megagame level changes; current levels are the profiles level columns. source is picker (joining a class on /account) or volunteer (the level-up action). A partial unique index allows one live event per player, class and level. checks_passed false with override_reason records a volunteer's \"Yes, I'm sure\". Undo voids the row and recomputes the profile column from what remains.",
   hat_steals:
-    "One row per hat theft in the Hat Tricks minigame (/megagame/hat-tricks). user_id is the thief; recorded_by is the volunteer who logged it (null for backfills). Scores are computed from these rows and the shift schedule, which lives only in the HAT_TRICKS_SCHEDULE env var.",
+    "One row per hat theft in the Hat Tricks minigame (/hat-tricks). user_id is the thief; recorded_by is the volunteer who logged it (null for backfills). Scores are computed from these rows and the shift schedule, which lives only in the HAT_TRICKS_SCHEDULE env var.",
 };
 
 function columnName(column: PgColumn): string {
