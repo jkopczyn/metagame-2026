@@ -42,8 +42,8 @@ describe("questLinkTarget", () => {
     expect(await questLinkTarget("A2C4EF")).toBe("/login?next=%2Fq%2FA2C4EF");
   });
 
-  it("sends a signed-in viewer without the permission to their account", async () => {
+  it("shows a signed-in viewer without the permission the explanation page", async () => {
     auth.currentSession.mockResolvedValue(session);
-    expect(await questLinkTarget("A2C4EF")).toBe("/account");
+    expect(await questLinkTarget("A2C4EF")).toBeNull();
   });
 });
