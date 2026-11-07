@@ -269,7 +269,7 @@ Tests first, in `src/db/describe.test.ts` (it already reads every table through 
 - add the group name `"Megagame"` at the end of the expected group list, and `"hat_steals"` at the end of the flattened table list;
 - add a test that `hat_steals` has columns `id, hat_id, user_id, stolen_at, recorded_by, created_at` with the nullability above, that `user_id` and `recorded_by` reference `user.id`, and that it has the index on `hat_id, stolen_at`. Follow the existing helpers (`table(...)`, `column(...)`) in that file.
 
-Implementation: the table file and index export; in `src/db/describe.ts` add `Megagame: ["hat_steals"]` as the last entry of `TABLE_GROUPS`, and a `TABLE_NOTES` entry: `hat_steals: "One row per hat theft in the Hat Tricks minigame (/megagame/hat-tricks). user_id is the thief; recorded_by is the volunteer who logged it (null for backfills). Scores are computed from these rows and the shift schedule, which lives only in the HAT_TRICKS_SCHEDULE env var."`
+Implementation: the table file and index export; in `src/db/describe.ts` add `Megagame: ["hat_steals"]` as the last entry of `TABLE_GROUPS`, and a `TABLE_NOTES` entry: `hat_steals: "One row per hat theft in the Hat Tricks minigame (/hat-tricks). user_id is the thief; recorded_by is the volunteer who logged it (null for backfills). Scores are computed from these rows and the shift schedule, which lives only in the HAT_TRICKS_SCHEDULE env var."`
 
 Then run `pnpm db:generate --name hat_steals` (it does not need a database; if it complains about `DATABASE_URL`, prefix `DATABASE_URL=postgres://x@localhost/x`). Read the generated SQL: it must create the table, both foreign keys, the index, and a check listing exactly the six ids, and nothing else. Never hand-edit it. The number is 0028 today. If main gains a newer migration before merge, delete the generated files and rerun the command after rebasing; never renumber by hand.
 
@@ -308,7 +308,7 @@ Commit: `feat: add hat tricks line art`.
 
 Files: change `src/env.ts` and `.env.example`; create `src/lib/hat-tricks-env-example.test.ts`.
 
-- In `ENV_SPEC`, add `{ name: "HAT_TRICKS_SCHEDULE", required: false, description: "JSON array of Hat Tricks shifts ({start, end, hats}) for /megagame/hat-tricks. Set only in Vercel; the real schedule must never be committed. Unset means the page says the schedule isn't posted yet." }`.
+- In `ENV_SPEC`, add `{ name: "HAT_TRICKS_SCHEDULE", required: false, description: "JSON array of Hat Tricks shifts ({start, end, hats}) for /hat-tricks. Set only in Vercel; the real schedule must never be committed. Unset means the page says the schedule isn't posted yet." }`.
 - In the `env` object, add `HAT_TRICKS_SCHEDULE: process.env.HAT_TRICKS_SCHEDULE,`.
 - In `.env.example`, add a commented block in the file's style: a comment line saying what it is and that the real value is set only in Vercel, then `# HAT_TRICKS_SCHEDULE=<DECOY_JSON>` on one line, with the value printed from the A2 fixture (for example `pnpm exec tsx -e 'import("./src/lib/hat-tricks-decoy.fixture.ts").then(m => console.log(m.DECOY_JSON))'`, or any equivalent).
 
@@ -421,7 +421,7 @@ Select `hatSteals.hatId, userId, stolenAt` joined to `user` for `user.name`, ord
 
 ## F3. Components and page
 
-Files: create `src/v2/hat-tricks/HatClock.tsx`, `src/v2/hat-tricks/HatCard.tsx`, `src/v2/hat-tricks/Leaderboard.tsx`, `src/v2/hat-tricks/Rules.tsx`, `src/app/(v2)/megagame/hat-tricks/page.tsx`; change `src/v2/components/ContentPage.tsx`. No rendering tests (spec). Commit: `feat: hat tricks page at /megagame/hat-tricks`.
+Files: create `src/v2/hat-tricks/HatClock.tsx`, `src/v2/hat-tricks/HatCard.tsx`, `src/v2/hat-tricks/Leaderboard.tsx`, `src/v2/hat-tricks/Rules.tsx`, `src/app/(v2)/hat-tricks/page.tsx`; change `src/v2/components/ContentPage.tsx`. No rendering tests (spec). Commit: `feat: hat tricks page at /hat-tricks`.
 
 - `ContentPage.tsx`: add an optional prop `above?: React.ReactNode`, rendered inside the `<header>` before the eyebrow and the `<h1>`. No other change; existing callers are unaffected.
 - `page.tsx`:

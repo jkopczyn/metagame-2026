@@ -109,7 +109,7 @@ Scoring functions are pure (`scoreHats(schedule, steals, now)` or similar) and u
 
 ## Page
 
-Route: `src/app/(v2)/megagame/hat-tricks/page.tsx`. Public; no sign-in. Server component with `dynamic = "force-dynamic"` (it reads the clock and the database on each request). Uses the v2 site shell and styles like the other `(v2)` pages. Metadata title "Hat Tricks — Metagame 2026".
+Route: `src/app/(v2)/hat-tricks/page.tsx`. Public; no sign-in. Server component with `dynamic = "force-dynamic"` (it reads the clock and the database on each request). Uses the v2 site shell and styles like the other `(v2)` pages. Metadata title "Hat Tricks — Metagame 2026".
 
 Sections, top to bottom:
 
