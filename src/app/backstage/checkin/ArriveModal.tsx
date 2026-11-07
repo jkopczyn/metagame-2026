@@ -3,7 +3,7 @@
 import { useActionState, useId, useRef, useState } from "react";
 import { buttonClass, fieldClass, smallButtonClass } from "../ui";
 import AccountPicker from "./AccountPicker";
-import { arriveAction } from "./actions";
+import { arriveAction, findAccounts } from "./actions";
 import type { DeskTicket } from "./desk";
 import { formatBadgeCode } from "@/lib/badge-code";
 import type { CheckinAccount } from "@/lib/checkin";
@@ -73,6 +73,7 @@ export default function ArriveModal({
           {claiming &&
             (forUser === null ? (
               <AccountPicker
+                search={findAccounts}
                 suggested={ticket.suggested}
                 buyer={
                   ticket.buyerNeedsAccount

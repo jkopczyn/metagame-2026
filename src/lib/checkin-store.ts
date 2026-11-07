@@ -14,13 +14,14 @@ import { alias } from "drizzle-orm/pg-core";
 import { getDb, schema } from "@/db";
 import {
   CHECKIN_MIN_CHARS,
+  CHECKIN_QUERY_MAX,
   packKey,
   parseCheckinQuery,
   type CheckinAccount,
 } from "@/lib/checkin";
 import { formatBadgeCode } from "@/lib/badge-code";
 import { escapeLike, likeContains } from "@/lib/like";
-import { accountName } from "@/lib/schedule-store";
+import { accountName, searchAccounts } from "@/lib/schedule-store";
 import { emailKey } from "@/lib/ticket-holder";
 import { visible, type TicketRow } from "@/lib/ticket-store";
 
@@ -194,4 +195,18 @@ async function badgeWearer(code: number): Promise<string | null> {
 export async function badgeTakenMessage(code: number): Promise<string> {
   const wearer = await badgeWearer(code);
   return `Badge ${formatBadgeCode(code)} is already on ${wearer ?? "another ticket"}.`;
+}
+
+/** Non-banned accounts matching a name or email, for a tool's account picker. */
+export async function findCheckinAccounts(
+  query: string,
+): Promise<CheckinAccount[]> {
+  const q = String(query).trim().slice(0, CHECKIN_QUERY_MAX);
+  if (q.length < CHECKIN_MIN_CHARS) return [];
+  const found = await searchAccounts(q, { banned: false });
+  return found.map(({ userId, name, email }) => ({
+    id: userId,
+    name,
+    email,
+  }));
 }

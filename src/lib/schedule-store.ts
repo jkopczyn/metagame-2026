@@ -52,7 +52,7 @@ export const accountName = sql<string>`coalesce(nullif(trim(${user.name}), ''), 
 
 // The same rule without the email, for names other attendees see. Code
 // sign-in can leave the account name blank.
-const publicName = sql<string>`coalesce(nullif(trim(${user.name}), ''), 'Someone')`;
+export const publicName = sql<string>`coalesce(nullif(trim(${user.name}), ''), 'Someone')`;
 
 const accountColumns = {
   userId: user.id,

@@ -1,5 +1,7 @@
 # Hat Tricks page: design
 
+> Since this was written, the schedule moved from the `HAT_TRICKS_SCHEDULE` environment variable to the `hat_schedule` table, and steals and the schedule are edited at `/backstage/hat-tricks`.
+
 Date: 2026-11-03. Status: approved by the user in discussion; ready for an implementation plan.
 
 ## What the game is

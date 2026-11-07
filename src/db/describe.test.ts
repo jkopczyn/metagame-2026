@@ -21,6 +21,7 @@ describe("describeSchema", () => {
       "bookmarks",
       "budget_ignored_lines",
       "budget_import_runs",
+      "hat_schedule",
       "hat_steals",
       "level_events",
       "locations",
@@ -68,6 +69,7 @@ describe("describeSchema", () => {
       "account",
       "apikey",
       "bookmarks",
+      "hat_schedule",
       "hat_steals",
       "hat_steals",
       "level_events",
@@ -224,6 +226,7 @@ describe("describeSchema", () => {
       "quest_progress",
       "level_events",
       "hat_steals",
+      "hat_schedule",
       "sign_drafts",
     ]);
   });

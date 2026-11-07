@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { env } from "@/env";
-import { loadSteals } from "@/lib/hat-tricks-store";
+import { loadSchedule, loadSteals } from "@/lib/hat-tricks-store";
 import { buildHatTricksView, previewOverrides } from "@/lib/hat-tricks-view";
 import ContentPage from "@/v2/components/ContentPage";
 import { HEADING } from "@/v2/components/styles";
@@ -28,7 +27,7 @@ export default async function HatTricksPage({
   const now = overrides?.now ?? new Date();
   const rawSchedule = overrides
     ? overrides.rawSchedule
-    : env.HAT_TRICKS_SCHEDULE;
+    : (await loadSchedule()).raw;
   const { steals, names } = overrides?.data ?? (await loadSteals());
 
   const view = buildHatTricksView({
@@ -36,7 +35,7 @@ export default async function HatTricksPage({
     steals,
     names,
     now,
-    onScheduleError: (e) => console.error("HAT_TRICKS_SCHEDULE:", e),
+    onScheduleError: (e) => console.error("hat_schedule:", e),
   });
   const { state } = view;
 

@@ -2,7 +2,6 @@
 
 import { useEffect, useId, useState, useTransition } from "react";
 import { fieldClass, smallButtonClass } from "../ui";
-import { findAccounts } from "./actions";
 import { latestRequest } from "../megagame/latest";
 import { CHECKIN_MIN_CHARS, type CheckinAccount } from "@/lib/checkin";
 
@@ -24,11 +23,16 @@ function AccountLine({ name, email }: { name: string; email: string }) {
 export default function AccountPicker({
   suggested,
   buyer,
+  search: findAccounts,
   onPick,
 }: {
   suggested: CheckinAccount | null;
   /** The purchase's name and email when the buyer has no account yet. */
   buyer: { name: string | null; email: string | null } | null;
+  /** A server action gated on the calling tool's own permission. */
+  search: (
+    query: string,
+  ) => Promise<{ accounts?: CheckinAccount[]; error?: string }>;
   onPick: (account: CheckinAccount) => void;
 }) {
   const [searching, setSearching] = useState(
@@ -39,14 +43,14 @@ export default function AccountPicker({
   const [searchedFor, setSearchedFor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const [search] = useState(latestRequest);
+  const [latest] = useState(latestRequest);
   const searchId = useId();
 
   useEffect(() => {
     const q = query.trim();
     if (q.length < CHECKIN_MIN_CHARS) return;
     const timer = setTimeout(() => {
-      const isCurrent = search.begin();
+      const isCurrent = latest.begin();
       start(async () => {
         const res = await findAccounts(q);
         if (!isCurrent()) return;
@@ -57,9 +61,9 @@ export default function AccountPicker({
     }, 300);
     return () => {
       clearTimeout(timer);
-      search.cancel();
+      latest.cancel();
     };
-  }, [query, search]);
+  }, [query, latest, findAccounts]);
 
   const pick = (account: CheckinAccount, label: string, primary = false) => (
     <button

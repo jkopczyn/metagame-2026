@@ -4,7 +4,11 @@
 
 import { formatClockTime, formatShiftTime } from "./hat-tricks-format";
 import { HATS, hatById, isHatId, type HatId } from "./hat-tricks-hats";
-import { parseSchedule, shiftState } from "./hat-tricks-schedule";
+import {
+  parseSchedule,
+  shiftState,
+  type Schedule,
+} from "./hat-tricks-schedule";
 import {
   lastSteals,
   rankTallies,
@@ -50,7 +54,7 @@ export function buildHatTricksView(input: {
 }): HatTricksView {
   const { steals, names, now } = input;
 
-  let schedule = parseSchedule(undefined);
+  let schedule: Schedule = [];
   try {
     schedule = parseSchedule(input.rawSchedule);
   } catch (error) {

@@ -3,6 +3,7 @@ import {
   BookOpenIcon,
   CalendarIcon,
   ClipboardCheckIcon,
+  CrownIcon,
   DatabaseIcon,
   DicesIcon,
   DollarSignIcon,
@@ -120,6 +121,13 @@ const TOOLS: {
     name: "Edit Quests",
     blurb: "Write, import and print the Megagame quest cards.",
     perm: "megagame.manage",
+  },
+  {
+    href: "/backstage/hat-tricks",
+    icon: CrownIcon,
+    name: "Hat Tricks",
+    blurb: "Record hat steals and set the shift schedule.",
+    perm: "megagame.verify",
   },
   {
     href: "/backstage/budget",

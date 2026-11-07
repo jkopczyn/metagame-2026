@@ -249,7 +249,7 @@ export const PERMISSIONS = {
     level: "edit",
     label: "Verify quests",
     description:
-      "Record quest completions and level-ups at /backstage/megagame.",
+      "Record quest completions and level-ups at /backstage/megagame, and run Hat Tricks at /backstage/hat-tricks, including its secret shift schedule.",
   },
   "megagame.manage": {
     audience: "team",

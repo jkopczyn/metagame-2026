@@ -112,6 +112,12 @@ const nextConfig: NextConfig = {
       destination: "/?ref=:ref#tickets",
       permanent: false,
     },
+    // Hat Tricks' address before the booklet's /hat-tricks became the page.
+    {
+      source: "/megagame/hat-tricks",
+      destination: "/hat-tricks",
+      permanent: false,
+    },
     // Shareable short links to the Partiful RSVPs.
     {
       source: CON_PARTIFUL_PATH,

@@ -1,6 +1,7 @@
 // Parsing and querying of the Hat Tricks shift schedule. The schedule itself
-// is never in the repository; it arrives as JSON in HAT_TRICKS_SCHEDULE.
+// is never in the repository; it is stored as JSON in the hat_schedule table.
 
+import { fromPacificWall, toPacificWall } from "@/lib/schedule";
 import { isHatId, type HatId } from "./hat-tricks-hats";
 
 export type Shift = { start: Date; end: Date; hats: HatId[] };
@@ -176,6 +177,63 @@ export function shiftState(schedule: Schedule, now: Date): ShiftState {
   const upcoming = nextShift(schedule, now);
   if (upcoming) return { kind: "off", nextStartsAt: upcoming.start };
   return { kind: "done" };
+}
+
+/** The hats that could be stolen at this instant. */
+export function stealableHats(schedule: Schedule, at: Date): readonly HatId[] {
+  if (schedule.length === 0) return STANDING_HATS;
+  return currentShift(schedule, at)?.hats ?? [];
+}
+
+/**
+ * What the schedule editor holds: each shift's Pacific start, and one end for
+ * the last shift. Every other shift ends when the next starts, so the editor
+ * can't produce a gap.
+ */
+export type ScheduleDraft = {
+  rows: { start: string; hats: HatId[] }[];
+  end: string;
+};
+
+export function draftFromSchedule(schedule: Schedule): ScheduleDraft {
+  return {
+    rows: schedule.map((s) => ({
+      start: toPacificWall(s.start.toISOString()),
+      hats: s.hats,
+    })),
+    end: schedule.length
+      ? toPacificWall(schedule[schedule.length - 1].end.toISOString())
+      : "",
+  };
+}
+
+/** The JSON to store for a draft; parseSchedule's errors apply. Rows may be in any order. */
+export function draftToJson(draft: ScheduleDraft): string {
+  if (draft.rows.length === 0) return "[]";
+  const instant = (wall: string, label: string): string => {
+    const at = fromPacificWall(wall);
+    if (!at) throw new ScheduleParseError(`${label} needs a date and time`);
+    return at.toISOString();
+  };
+  const rows = draft.rows
+    .map((row, index) => ({
+      start: instant(row.start, `shift ${index + 1}`),
+      hats: row.hats,
+    }))
+    .sort((a, b) => a.start.localeCompare(b.start));
+  if (new Set(rows.map((row) => row.start)).size < rows.length) {
+    throw new ScheduleParseError("two shifts start at the same time");
+  }
+  const end = instant(draft.end, "the last shift's end");
+  const json = JSON.stringify(
+    rows.map((row, index) => ({
+      start: row.start,
+      end: rows[index + 1]?.start ?? end,
+      hats: row.hats,
+    })),
+  );
+  parseSchedule(json);
+  return json;
 }
 
 export type Bounds = { from: "open" | "closed"; to: "open" | "closed" };

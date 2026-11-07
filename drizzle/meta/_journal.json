@@ -281,6 +281,13 @@
       "when": 1794008452316,
       "tag": "0039_hat_steals",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794032992726,
+      "tag": "0040_hat_schedule",
+      "breakpoints": true
     }
   ]
 }

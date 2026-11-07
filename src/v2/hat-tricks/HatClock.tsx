@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { formatClockTime } from "@/lib/hat-tricks-format";
 import { DISPLAY } from "@/v2/components/styles";
 
+const REFRESH_MS = 60_000;
+
 /**
  * The event clock. It gets only the instants it displays, never the schedule.
  * The first render shows the server's label so hydration matches, and the tick
@@ -49,6 +51,14 @@ export default function HatClock({
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [nowIso, refreshAt, router]);
+
+  // Nothing pushes to an open page, and a new schedule or steal should reach it.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [router]);
 
   return (
     <div>

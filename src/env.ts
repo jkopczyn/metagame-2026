@@ -149,12 +149,6 @@ const ENV_SPEC: EnvSpec[] = [
     description:
       "Signs Better Auth session cookies. Any long random string; rotating it signs everyone out. Without it, /login and /account throw a clear error.",
   },
-  {
-    name: "HAT_TRICKS_SCHEDULE",
-    required: false,
-    description:
-      "JSON array of Hat Tricks shifts ({start, end, hats}) for /hat-tricks. Set only in Vercel; the real schedule must never be committed. Unset means the pirate tricorn is the only hat, stealable the whole time.",
-  },
 ];
 
 let alreadyValidated = false;
@@ -209,5 +203,4 @@ export const env = {
   BUDGET_SHEET_ID: process.env.BUDGET_SHEET_ID,
   BUDGET_MODEL: process.env.BUDGET_MODEL,
   CRON_SECRET: process.env.CRON_SECRET,
-  HAT_TRICKS_SCHEDULE: process.env.HAT_TRICKS_SCHEDULE,
 } as const;

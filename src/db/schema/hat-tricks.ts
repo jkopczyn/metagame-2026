@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   check,
   index,
+  integer,
   pgTable,
   text,
   timestamp,
@@ -30,4 +31,18 @@ export const hatSteals = pgTable(
       sql`${t.hatId} in (${sql.raw(HAT_IDS.map((id) => `'${id}'`).join(", "))})`,
     ),
   ],
+);
+
+// One row, holding the whole schedule as JSON in the format parseSchedule reads.
+export const hatSchedule = pgTable(
+  "hat_schedule",
+  {
+    id: integer().primaryKey().default(1),
+    shifts: text().notNull(),
+    // Bumped by every save, so a stale tab can't overwrite a newer schedule.
+    version: integer().notNull().default(1),
+    updatedBy: text().references(() => user.id, { onDelete: "set null" }),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("hat_schedule_single_row", sql`${t.id} = 1`)],
 );

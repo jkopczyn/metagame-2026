@@ -3,14 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { EXPIRED, requireAccess } from "@/lib/admin-auth";
 import {
-  CHECKIN_MIN_CHARS,
   CHECKIN_QUERY_MAX,
   parseBadgeInput,
   type CheckinAccount,
 } from "@/lib/checkin";
-import { badgeTakenMessage, deskTicket } from "@/lib/checkin-store";
+import {
+  badgeTakenMessage,
+  deskTicket,
+  findCheckinAccounts,
+} from "@/lib/checkin-store";
 import { reportError, type ReportChannel } from "@/lib/error-report";
-import { searchAccounts } from "@/lib/schedule-store";
 import {
   assignBadgeCode,
   checkInTicket,
@@ -114,16 +116,7 @@ export async function findAccounts(
   query: string,
 ): Promise<{ accounts?: CheckinAccount[]; error?: string }> {
   if (!(await manage())) return { error: EXPIRED };
-  const q = String(query).trim().slice(0, CHECKIN_QUERY_MAX);
-  if (q.length < CHECKIN_MIN_CHARS) return { accounts: [] };
-  const found = await searchAccounts(q, { banned: false });
-  return {
-    accounts: found.map(({ userId, name, email }) => ({
-      id: userId,
-      name,
-      email,
-    })),
-  };
+  return { accounts: await findCheckinAccounts(query) };
 }
 
 export async function reportProblem(

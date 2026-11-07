@@ -1,6 +1,6 @@
-// A fake Hat Tricks weekend for tests and .env.example. It is shaped like a
-// weekend on purpose and must never be edited to resemble the event's
-// schedule, which exists only in the HAT_TRICKS_SCHEDULE env var.
+// A fake Hat Tricks weekend for tests. It is shaped like a weekend on purpose
+// and must never be edited to resemble the event's schedule, which exists only
+// in the database.
 
 import { HAT_IDS, type HatId } from "./hat-tricks-hats";
 
