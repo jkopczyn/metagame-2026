@@ -112,13 +112,6 @@ const nextConfig: NextConfig = {
       destination: "/?ref=:ref#tickets",
       permanent: false,
     },
-    // The game page is at /hat-tricks, the address printed in the booklet.
-    // Temporary so the old address keeps working without sticking in caches.
-    {
-      source: "/megagame/hat-tricks",
-      destination: "/hat-tricks",
-      permanent: false,
-    },
     // Shareable short links to the Partiful RSVPs.
     {
       source: CON_PARTIFUL_PATH,
