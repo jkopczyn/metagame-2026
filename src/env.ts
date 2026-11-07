@@ -153,7 +153,7 @@ const ENV_SPEC: EnvSpec[] = [
     name: "HAT_TRICKS_SCHEDULE",
     required: false,
     description:
-      "JSON array of Hat Tricks shifts ({start, end, hats}) for /megagame/hat-tricks. Set only in Vercel; the real schedule must never be committed. Unset means the page says the schedule isn't posted yet.",
+      "JSON array of Hat Tricks shifts ({start, end, hats}) for /hat-tricks. Set only in Vercel; the real schedule must never be committed. Unset means the page says the schedule isn't posted yet.",
   },
 ];
 
