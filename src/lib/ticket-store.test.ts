@@ -23,6 +23,7 @@ vi.mock("@/lib/email", () => ({ sendAdminErrorEmail: vi.fn(async () => {}) }));
 
 const {
   assignBadgeCode,
+  badgeCodesFor,
   checkInTicket,
   claimOwnTicket,
   claimTicket,
@@ -331,6 +332,20 @@ describe("unclaimTicket", () => {
       ok: false,
       reason: "notYours",
     });
+  });
+});
+
+describe("badgeCodesFor", () => {
+  it("maps each account to the badge on its claimed paid ticket", async () => {
+    await seed("pi_1", { owner: "ada" });
+    await seed("pi_2", { owner: "bob" });
+    await seed("pi_3", { owner: "desk", status: "pending" });
+    await assignBadgeCode("pi_1", 42);
+    await assignBadgeCode("pi_3", 9);
+    expect(await badgeCodesFor(["ada", "bob", "desk", "nobody"])).toEqual(
+      new Map([["ada", 42]]),
+    );
+    expect(await badgeCodesFor([])).toEqual(new Map());
   });
 });
 

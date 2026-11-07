@@ -584,7 +584,7 @@ export const API_AREAS: Area[] = [
   },
   {
     title: "Tickets",
-    blurb: "Fixing up a ticket's referral after the fact.",
+    blurb: "Fixing up a ticket's badge code or referral after the fact.",
     endpoints: [
       {
         method: "PUT",
@@ -608,6 +608,29 @@ export const API_AREAS: Area[] = [
         permission: "tickets.edit",
         summary: "Clears ticket {id}'s referrer.",
         response: "{ referredBy: null }",
+      },
+      {
+        method: "PUT",
+        path: "/api/admin/tickets/{id}/badge",
+        permission: "tickets.edit",
+        summary:
+          "Puts badge number {badgeCode} on ticket {id}, replacing any it had. 409 when another ticket wears that number; 404 if the ticket is missing.",
+        body: [
+          {
+            name: "badgeCode",
+            type: "string",
+            required: true,
+            note: "One to four digits; leading zeros optional.",
+          },
+        ],
+        response: '{ badgeCode: "0042" }',
+      },
+      {
+        method: "DELETE",
+        path: "/api/admin/tickets/{id}/badge",
+        permission: "tickets.edit",
+        summary: "Takes the badge number off ticket {id}.",
+        response: "{ badgeCode: null }",
       },
     ],
   },

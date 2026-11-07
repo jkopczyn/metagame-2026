@@ -42,6 +42,8 @@ export type UserRow = {
   self: boolean;
   /** Tickets they've claimed. */
   tickets: number;
+  /** Four-digit badge number on their claimed ticket, once the desk assigned one. */
+  badge: string | null;
 };
 
 type SortKey = "name" | "email" | "tickets" | "joined" | "roles";
@@ -76,7 +78,15 @@ const compare = (a: UserRow, b: UserRow, key: SortKey): number => {
   }
 };
 
-function TicketCell({ id, count }: { id: string; count: number }) {
+function TicketCell({
+  id,
+  count,
+  badge,
+}: {
+  id: string;
+  count: number;
+  badge: string | null;
+}) {
   const { has, label } = ticketBadge(count);
   return (
     <Link
@@ -86,6 +96,7 @@ function TicketCell({ id, count }: { id: string; count: number }) {
     >
       <TicketIcon className="size-4" aria-label="Tickets" />
       {label && <span className="text-xs font-semibold">{label}</span>}
+      {badge && <span className="font-mono text-xs">#{badge}</span>}
     </Link>
   );
 }
@@ -160,6 +171,7 @@ export default function UsersTable({
         u.banned ? "banned" : "",
         u.emailVerified ? "" : "unverified",
         u.tickets > 0 ? "ticket" : "no ticket",
+        u.badge ? `#${u.badge}` : "",
       ]
         .join(" ")
         .toLowerCase();
@@ -326,7 +338,7 @@ export default function UsersTable({
                     )}
                   </td>
                   <td className="px-4 py-2">
-                    <TicketCell id={u.id} count={u.tickets} />
+                    <TicketCell id={u.id} count={u.tickets} badge={u.badge} />
                   </td>
                   <td
                     className="px-4 py-2 whitespace-nowrap"
@@ -738,6 +750,13 @@ function UserDetail({
             >
               {u.tickets} claimed
             </Link>
+          ) : (
+            <span className="text-cream/40">None</span>
+          )}
+        </Field>
+        <Field label="Badge">
+          {u.badge ? (
+            <span className="font-mono">#{u.badge}</span>
           ) : (
             <span className="text-cream/40">None</span>
           )}

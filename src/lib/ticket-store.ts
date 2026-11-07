@@ -214,6 +214,25 @@ export async function claimedCounts(
   return new Map(rows.map((r) => [r.userId!, r.n]));
 }
 
+/** The badge number on each account's claimed paid ticket; absent means none yet. */
+export async function badgeCodesFor(
+  userIds: string[],
+): Promise<Map<string, number>> {
+  if (userIds.length === 0) return new Map();
+  const rows = await getDb()
+    .select({ userId: tickets.ownerUserId, badge: tickets.badgeCode })
+    .from(tickets)
+    .where(
+      and(
+        visible,
+        inArray(tickets.ownerUserId, userIds),
+        eq(tickets.status, "paid"),
+        isNotNull(tickets.badgeCode),
+      ),
+    );
+  return new Map(rows.map((r) => [r.userId!, r.badge!]));
+}
+
 /** Whether the user has claimed a paid ticket as their own. */
 export async function hasClaimedTicket(userId: string): Promise<boolean> {
   const [row] = await getDb()

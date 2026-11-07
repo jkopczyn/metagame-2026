@@ -126,6 +126,11 @@ export default function TicketsTable({
       );
     });
 
+  const applyBadge = (id: string, badgeCode: string | null) =>
+    setRows((rows) =>
+      rows.map((r) => (r.t.id === id ? { ...r, t: { ...r.t, badgeCode } } : r)),
+    );
+
   const matching = useMemo(
     () =>
       sortTicketRows(
@@ -326,6 +331,7 @@ export default function TicketsTable({
               ticket={open}
               canEdit={canEdit}
               onReferrer={applyReferrer}
+              onBadge={applyBadge}
             />
           )}
         </DialogContent>
@@ -451,10 +457,12 @@ function TicketDetail({
   ticket: { t, people },
   canEdit,
   onReferrer,
+  onBadge,
 }: {
   ticket: AdminTicket;
   canEdit: boolean;
   onReferrer: (id: string, referredBy: string | null) => void;
+  onBadge: (id: string, badgeCode: string | null) => void;
 }) {
   return (
     <>
@@ -529,13 +537,125 @@ function TicketDetail({
         </Field>
       </dl>
       {canEdit && (
-        <ReferrerEditor
-          id={t.id}
-          referredBy={t.referredBy}
-          onChange={(code) => onReferrer(t.id, code)}
-        />
+        <>
+          <BadgeEditor
+            id={t.id}
+            badgeCode={t.badgeCode}
+            onChange={(code) => onBadge(t.id, code)}
+          />
+          <ReferrerEditor
+            id={t.id}
+            referredBy={t.referredBy}
+            onChange={(code) => onReferrer(t.id, code)}
+          />
+        </>
       )}
     </>
+  );
+}
+
+/**
+ * PUT or DELETE one field of ticket `id` through its /api/admin/tickets route,
+ * resolving to the new value or throwing the server's message.
+ */
+async function editTicket<T>(
+  id: string,
+  field: string,
+  method: "PUT" | "DELETE",
+  body: Record<string, string> | undefined,
+): Promise<T> {
+  const res = await fetch(
+    `/api/admin/tickets/${encodeURIComponent(id)}/${field}`,
+    {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: body && JSON.stringify(body),
+    },
+  );
+  const data = (await res.json().catch(() => null)) as
+    | (Record<string, unknown> & { error?: string })
+    | null;
+  if (!res.ok || data === null)
+    throw new Error(data?.error ?? `Failed (${res.status}).`);
+  return data as T;
+}
+
+/** Fixes the sticker number on a ticket after the desk, or takes it off. */
+function BadgeEditor({
+  id,
+  badgeCode,
+  onChange,
+}: {
+  id: string;
+  badgeCode: string | null;
+  onChange: (badgeCode: string | null) => void;
+}) {
+  const router = useRouter();
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const send = async (method: "PUT" | "DELETE") => {
+    setBusy(true);
+    setError(null);
+    try {
+      const data = await editTicket<{ badgeCode: string | null }>(
+        id,
+        "badge",
+        method,
+        method === "PUT" ? { badgeCode: code } : undefined,
+      );
+      onChange(data.badgeCode);
+      setCode("");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (code) void send("PUT");
+      }}
+      className="space-y-2 text-sm"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={code}
+          onChange={(e) =>
+            setCode(e.target.value.replace(/\D/g, "").slice(0, 4))
+          }
+          inputMode="numeric"
+          pattern="[0-9]*"
+          placeholder="Badge code"
+          autoComplete="off"
+          disabled={busy}
+          className={`${fieldClass} max-w-[8rem] font-mono text-sm text-ink`}
+        />
+        <button
+          type="submit"
+          disabled={busy || !code}
+          className={smallButtonClass}
+        >
+          {badgeCode ? "Change badge" : "Set badge"}
+        </button>
+        {badgeCode && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void send("DELETE")}
+            className={smallButtonClass}
+          >
+            Remove badge
+          </button>
+        )}
+      </div>
+      {error && <p className="text-salmon">{error}</p>}
+    </form>
   );
 }
 
@@ -558,25 +678,12 @@ function ReferrerEditor({
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/admin/tickets/${encodeURIComponent(id)}/referral`,
-        {
-          method,
-          headers: { "Content-Type": "application/json" },
-          body:
-            method === "PUT"
-              ? JSON.stringify({ referrerCode: code })
-              : undefined,
-        },
+      const data = await editTicket<{ referredBy: string | null }>(
+        id,
+        "referral",
+        method,
+        method === "PUT" ? { referrerCode: code } : undefined,
       );
-      const data = (await res.json()) as {
-        error?: string;
-        referredBy?: string | null;
-      };
-      if (!res.ok) {
-        setError(data.error ?? `Failed (${res.status}).`);
-        return;
-      }
       onChange(data.referredBy ?? null);
       setCode("");
       router.refresh();

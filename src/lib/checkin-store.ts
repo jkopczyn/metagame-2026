@@ -18,6 +18,7 @@ import {
   parseCheckinQuery,
   type CheckinAccount,
 } from "@/lib/checkin";
+import { formatBadgeCode } from "@/lib/badge-code";
 import { escapeLike, likeContains } from "@/lib/like";
 import { accountName } from "@/lib/schedule-store";
 import { emailKey } from "@/lib/ticket-holder";
@@ -176,8 +177,8 @@ export async function deskTicket(paymentId: string): Promise<TicketRow | null> {
   return row ?? null;
 }
 
-/** Who wears a badge number already, for the "taken" message. */
-export async function badgeWearer(code: number): Promise<string | null> {
+/** Who wears a badge number already, for badgeTakenMessage. */
+async function badgeWearer(code: number): Promise<string | null> {
   const owner = alias(user, "owner");
   const [row] = await getDb()
     .select({
@@ -188,4 +189,9 @@ export async function badgeWearer(code: number): Promise<string | null> {
     .where(and(visible, eq(tickets.badgeCode, code)))
     .limit(1);
   return row?.name ?? null;
+}
+
+export async function badgeTakenMessage(code: number): Promise<string> {
+  const wearer = await badgeWearer(code);
+  return `Badge ${formatBadgeCode(code)} is already on ${wearer ?? "another ticket"}.`;
 }

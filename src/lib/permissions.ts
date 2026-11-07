@@ -65,7 +65,8 @@ export const PERMISSIONS = {
     group: "Tickets",
     level: "edit",
     label: "Edit tickets",
-    description: "Set or clear which ticket referred a ticket, after the fact.",
+    description:
+      "Fix a ticket's badge code or which ticket referred it, after the fact.",
     implies: ["tickets.view"],
   },
   "checkin.manage": {

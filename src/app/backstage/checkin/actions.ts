@@ -2,14 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { EXPIRED, requireAccess } from "@/lib/admin-auth";
-import { formatBadgeCode } from "@/lib/badge-code";
 import {
   CHECKIN_MIN_CHARS,
   CHECKIN_QUERY_MAX,
   parseBadgeInput,
   type CheckinAccount,
 } from "@/lib/checkin";
-import { badgeWearer, deskTicket } from "@/lib/checkin-store";
+import { badgeTakenMessage, deskTicket } from "@/lib/checkin-store";
 import { reportError, type ReportChannel } from "@/lib/error-report";
 import { searchAccounts } from "@/lib/schedule-store";
 import {
@@ -40,11 +39,6 @@ const CLAIM_ERRORS = {
   checkedIn: "That ticket is already checked in.",
   limited: "Too many attempts. Try again in an hour.",
 };
-
-async function takenMessage(code: number): Promise<string> {
-  const wearer = await badgeWearer(code);
-  return `Badge ${formatBadgeCode(code)} is already on ${wearer ?? "another ticket"}.`;
-}
 
 /**
  * The arrival flow in one submit: claim the ticket for the chosen account if
@@ -87,7 +81,7 @@ export async function arriveAction(
     if (!assigned.ok) {
       revalidatePath(TOOL);
       if (assigned.reason === "taken")
-        return { error: await takenMessage(badge) };
+        return { error: await badgeTakenMessage(badge) };
       if (assigned.reason === "invalid")
         return { error: "Badge numbers are up to four digits." };
       return { error: CLAIM_ERRORS.unknown };
