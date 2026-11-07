@@ -4,6 +4,7 @@ import { getDb, schema } from "@/db";
 import { can } from "@/lib/access";
 import { currentSession } from "@/lib/auth";
 import {
+  privateProfile,
   profileAccess,
   publicProfileFields,
   type ProfileAccess,
@@ -12,14 +13,15 @@ import {
 
 export type ProfileView = {
   profile: PublicProfile;
-  /** Which of the three tiers let this viewer in; drives the page's notice. */
+  /** Which tier let this viewer in; drives the page's notice. */
   access: Exclude<ProfileAccess, "none">;
 };
 
 /**
  * The profile page for `id`, or null when this viewer gets a 404. Signed-in
  * only: `isPublic` opens it to other attendees, profiles.view to the team and
- * volunteers, and the owner always sees their own.
+ * volunteers, and the owner always sees their own. Anyone else signed in gets
+ * the name alone.
  */
 export const loadProfileView = cache(
   async (id: string): Promise<ProfileView | null> => {
@@ -41,6 +43,7 @@ export const loadProfileView = cache(
       canViewAll: !!viewAll,
     });
     if (access === "none") return null;
+    if (access === "private") return { profile: privateProfile(row), access };
     return { profile: publicProfileFields(row), access };
   },
 );

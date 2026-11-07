@@ -87,10 +87,12 @@ export type ProfileViewer = {
 
 /**
  * Which page this viewer gets. "none" is a 404 rather than a 403, so the
- * route never confirms that an account exists.
+ * route never confirms to the logged out that an account exists.
  */
 export type ProfileAccess =
   | "none"
+  /** A real account that hasn't shown its profile: name only, not a 404. */
+  | "private"
   /** The profile as anyone signed in sees it. */
   | "shown"
   /** The owner's look at their own page before they've shown it to anyone. */
@@ -101,8 +103,10 @@ export type ProfileAccess =
 /**
  * `isPublic` means "other attendees may see this", which is what the account
  * checkbox has always said — so it gates other attendees, not the team, and
- * never reaches the logged out. A banned account has no page at all; the team
- * reads those on /backstage/users instead.
+ * never reaches the logged out. Other attendees get a name-only "private"
+ * page: the name already appears wherever they clicked through from. A banned
+ * account has no page at all; the team reads those on /backstage/users
+ * instead.
  */
 export function profileAccess(
   row: ProfileRow,
@@ -112,7 +116,19 @@ export function profileAccess(
   if (row.profile?.isPublic) return "shown";
   if (viewer.self) return "own-preview";
   if (viewer.canViewAll) return "team-private";
-  return "none";
+  return "private";
+}
+
+/** What the "private" tier shows: the name, which is already public. */
+export function privateProfile(row: ProfileRow): PublicProfile {
+  return {
+    userId: row.user.id,
+    name: publicName(row.user.name),
+    pronouns: null,
+    bio: null,
+    website: null,
+    imageUrl: null,
+  };
 }
 
 /**

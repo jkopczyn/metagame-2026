@@ -73,8 +73,8 @@ export type UnconferenceNote = {
 
 /**
  * A note as the board's client is sent it: the author's name for the tile,
- * and whether it is the viewer's own, decided on the server. No account id,
- * the way PublicSession ships its hosts without one.
+ * and whether it is the viewer's own, decided on the server. No account id:
+ * tiles don't link to profiles.
  */
 export type BoardNote = Omit<UnconferenceNote, "author" | "poster"> & {
   author: { name: string };

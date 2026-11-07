@@ -723,7 +723,7 @@ export async function loadSessionRsvps(
   const [showNames, rows] = await Promise.all([
     canSeeRsvpNames(sessionId),
     getDb()
-      .select({ status: rsvps.status, name: publicName })
+      .select({ status: rsvps.status, userId: rsvps.userId, name: publicName })
       .from(rsvps)
       .innerJoin(user, eq(user.id, rsvps.userId))
       .where(eq(rsvps.sessionId, sessionId))

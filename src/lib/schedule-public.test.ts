@@ -54,17 +54,20 @@ const room = (over: Partial<ScheduleLocation>): ScheduleLocation => ({
 });
 
 describe("summarizeRsvps", () => {
+  const ada = { userId: "u-ada", name: "Ada" };
+  const grace = { userId: "u-grace", name: "Grace" };
+  const alan = { userId: "u-alan", name: "Alan" };
   const rows = [
-    { status: "going" as const, name: "Ada" },
-    { status: "waitlist" as const, name: "Grace" },
-    { status: "going" as const, name: "Alan" },
+    { status: "going" as const, ...ada },
+    { status: "waitlist" as const, ...grace },
+    { status: "going" as const, ...alan },
   ];
 
   it("gives names, in order, when allowed", () => {
     expect(summarizeRsvps(rows, true)).toEqual({
       going: 2,
       waitlist: 1,
-      names: { going: ["Ada", "Alan"], waitlist: ["Grace"] },
+      names: { going: [ada, alan], waitlist: [grace] },
     });
   });
 
@@ -97,7 +100,7 @@ describe("publicSchedule", () => {
     expect(json).not.toContain("rec1");
     expect(json).not.toContain("Grace");
     expect(json).not.toContain("u9");
-    expect(sessions[0].hosts).toEqual([{ name: "Ada" }]);
+    expect(sessions[0].hosts).toEqual([{ userId: "u1", name: "Ada" }]);
   });
 
   it("carries the commitment, sponsor and RSVPs-open flags", () => {
@@ -147,7 +150,7 @@ describe("publicSchedule", () => {
         }),
       ],
     });
-    expect(sessions[0].hosts).toEqual([{ name: "Someone" }]);
+    expect(sessions[0].hosts).toEqual([{ userId: "u2", name: "Someone" }]);
   });
 
   it("shows only public rooms, even one holding a published session", () => {

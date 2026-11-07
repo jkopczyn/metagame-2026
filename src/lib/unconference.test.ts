@@ -175,9 +175,9 @@ describe("boardNote", () => {
     updatedAt: "2026-06-01T10:00:00.000Z",
   };
 
-  // The client is sent names, never account ids: PublicSession ships hosts
-  // the same way. If this fails because `author.userId` came back, the board
-  // payload has started handing out a name-to-id map for every author.
+  // The client is sent names, never account ids. If this fails because
+  // `author.userId` came back, the board payload has started handing out a
+  // name-to-id map for every author.
   it("keeps the author's name and drops their account id", () => {
     const sent = boardNote(stored, "ana");
     expect(sent.author).toEqual({ name: "Ana" });

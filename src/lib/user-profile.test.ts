@@ -104,14 +104,14 @@ describe("profileAccess", () => {
     expect(profileAccess(shown, viewer())).toBe("shown");
   });
 
-  it("404s a hidden profile for an ordinary signed-in account", () => {
-    expect(profileAccess(hidden, viewer())).toBe("none");
+  it("gives an ordinary signed-in account a private page for a hidden profile", () => {
+    expect(profileAccess(hidden, viewer())).toBe("private");
     expect(
       profileAccess(
         { user: { id: "u1", name: "Ada" }, profile: null },
         viewer(),
       ),
-    ).toBe("none");
+    ).toBe("private");
   });
 
   it("lets a profiles.view holder past isPublic, and says so", () => {

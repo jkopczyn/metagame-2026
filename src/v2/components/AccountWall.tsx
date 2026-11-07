@@ -6,8 +6,8 @@ import ContentPage from "./ContentPage";
  *
  * Callers must decide to show this *before* looking the resource up, so a
  * signed-out visitor gets the same page for every URL and it confirms nothing
- * about what exists. Where being seen matters — a profile that isn't public,
- * someone else's session — a signed-in viewer still gets notFound().
+ * about what exists. Where being seen matters — someone else's session — a
+ * signed-in viewer still gets notFound().
  */
 export default function AccountWall({
   title,
