@@ -9,7 +9,7 @@ describe("hat definitions", () => {
       "Alien saucer",
       "Sparkly fuzzy hat",
       "Satin slouch hat",
-      "Tricorn",
+      "Pirate tricorn",
       "Spiked crown",
     ]);
   });
