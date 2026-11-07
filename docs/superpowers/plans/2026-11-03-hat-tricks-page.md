@@ -118,7 +118,7 @@ export type ShiftState =
     }
   | { kind: "off"; nextStartsAt: Date }
   | { kind: "done" }
-  | { kind: "unposted" };
+  | { kind: "standing"; hats: HatId[] };
 
 export function shiftState(schedule: Schedule, now: Date): ShiftState;
 
@@ -146,13 +146,13 @@ Parsing rules. Each failure throws `ScheduleParseError`. Errors about one entry 
 - For consecutive entries, `prev.end !== next.start` (a gap, an overlap, or out of order). Shifts are contiguous.
 - Unknown keys on an entry are ignored, so a harmless extra key does not blank the page.
 
-Shift state: empty schedule gives `unposted`. Inside shift i gives `on` with `nextEndsAt = schedule[i + 1]?.end ?? null`; since shifts are contiguous the next start is the current end. Otherwise, if `nextShift` exists, `off` with its start. Otherwise `done`.
+Shift state: empty schedule gives `standing` with hats `["tricorn"]`. Inside shift i gives `on` with `nextEndsAt = schedule[i + 1]?.end ?? null`; since shifts are contiguous the next start is the current end. Otherwise, if `nextShift` exists, `off` with its start. Otherwise `done`.
 
 Tests first. Fixture helper `shift(startHHMM, endHHMM, hats)` building ISO strings on `2020-01-01` with offset `-08:00`.
 
 - `parseSchedule`: a valid two-shift value gives the right Dates and hat arrays; `undefined`, `""`, `"   "`, and `"[]"` give `[]`; an extra key is ignored. Error cases, each `toThrow(ScheduleParseError)`: malformed JSON; non-array; unknown hat id (message contains the id); three hats; empty hats; duplicate hat; overlapping shifts; a gap between shifts; out-of-order shifts; `end` equal to `start`; no offset (`"2020-01-01T10:00:00"`); `2020-02-30T10:00:00-08:00`; `2021-02-29T10:00:00-08:00`; hour `25`; offset `+25:00`. One test checks that an error in the second entry has a message starting `shift 2:`. One test checks that `2020-02-29T10:00:00-08:00` (a valid leap day) parses.
 - `currentShift`/`nextShift`: inside, before first, after last, at a shift's exact start (current is that shift), at an exact end that is the next shift's start (current is the next shift), at the last end (current is null).
-- `shiftState`: `unposted` for `[]`; `on` with `nextEndsAt` set when a shift follows; `on` in the last shift with `nextEndsAt: null`; `off` before the first shift; `done` at and after the last end.
+- `shiftState`: `standing` with `["tricorn"]` for `[]`; `on` with `nextEndsAt` set when a shift follows; `on` in the last shift with `nextEndsAt: null`; `off` before the first shift; `done` at and after the last end.
 - Decoy: `parseSchedule(DECOY_JSON)` gives 23 shifts; `shiftChangesBetween` from Fri 13:00 to Sun 13:00 gives 24 instants; `shiftState` at Sat 03:00 is `on` (overnight) ending Sat 08:00 with `nextEndsAt` Sat 10:00; at Fri 13:00 is `off` with `nextStartsAt` Fri 14:00; at Sun 12:50 is `on` with `nextEndsAt: null`; at Sun 13:00 is `done`.
 - `shiftChangesBetween`: back-to-back shifts produce one change at the shared instant; with default bounds, `from` is excluded and `to` included when either equals a change; with `{ from: "closed", to: "open" }` the reverse; with both closed, both included; `from > to` gives `[]`; empty schedule gives `[]`.
 
@@ -308,7 +308,7 @@ Commit: `feat: add hat tricks line art`.
 
 Files: change `src/env.ts` and `.env.example`; create `src/lib/hat-tricks-env-example.test.ts`.
 
-- In `ENV_SPEC`, add `{ name: "HAT_TRICKS_SCHEDULE", required: false, description: "JSON array of Hat Tricks shifts ({start, end, hats}) for /hat-tricks. Set only in Vercel; the real schedule must never be committed. Unset means the page says the schedule isn't posted yet." }`.
+- In `ENV_SPEC`, add `{ name: "HAT_TRICKS_SCHEDULE", required: false, description: "JSON array of Hat Tricks shifts ({start, end, hats}) for /hat-tricks. Set only in Vercel; the real schedule must never be committed. Unset means the pirate tricorn is the only hat, stealable the whole time." }`.
 - In the `env` object, add `HAT_TRICKS_SCHEDULE: process.env.HAT_TRICKS_SCHEDULE,`.
 - In `.env.example`, add a commented block in the file's style: a comment line saying what it is and that the real value is set only in Vercel, then `# HAT_TRICKS_SCHEDULE=<DECOY_JSON>` on one line, with the value printed from the A2 fixture (for example `pnpm exec tsx -e 'import("./src/lib/hat-tricks-decoy.fixture.ts").then(m => console.log(m.DECOY_JSON))'`, or any equivalent).
 
@@ -351,7 +351,7 @@ export type StateView =
     }
   | { kind: "off"; nextStartsAt: string; nextStartsAtLabel: string }
   | { kind: "done" }
-  | { kind: "unposted" };
+  | { kind: "standing"; hats: HatId[] };
 export type HatTricksView = {
   nowIso: string;
   nowLabel: string; // formatClockTime(now)
@@ -381,10 +381,10 @@ export function previewOverrides(
 
 `buildHatTricksView`:
 
-- Parse with `parseSchedule`; on any throw call `onScheduleError` and use `[]`, which gives state `unposted` and scores with no shift changes.
+- Parse with `parseSchedule`; on any throw call `onScheduleError` and use `[]`, which gives the `standing` tricorn state and scores with no shift changes.
 - Score with `scoreHats` (default grace), rank with `rankTallies`, build cards with `lastSteals`.
 - `nextLine` for the `on` state: `null` when `next` is null; `"The shift after that ends at {formatShiftTime(next.endsAt)}"` when `next.startsAt` equals `endsAt`; otherwise `"The next shift runs {formatShiftTime(next.startsAt)} to {formatShiftTime(next.endsAt)}"`. Only this string goes to the browser, never `next` as data.
-- `perHat`: the on-shift hats in shift order in the `on` state; all six in `HATS` order in the `done` state; empty in `off` and `unposted`.
+- `perHat`: the on-shift hats in shift order in the `on` state; all six in `HATS` order in the `done` state; the standing hats in `standing`; empty in `off`.
 - The output contains only what the spec allows the browser to see.
 
 `previewOverrides`: return `null` when `vercelEnv === "production"` or when `schedule` is absent (take the first value if it is an array). Otherwise return `{ rawSchedule: schedule }`, plus `now` when the `now` parameter parses to a valid Date (ignored otherwise), plus `data` when a `steals` parameter is present: parse it as a JSON array of `{ hatId, userId, stolenAt }`, dropping entries with an unknown hat id or invalid date, and parse `names` as a JSON object of userId to name. Malformed `steals` JSON gives an empty list; malformed or missing `names` gives an empty map. `now` without `schedule` is ignored, so the real schedule is never combined with a shifted clock.
@@ -398,7 +398,7 @@ Tests first (fixture on 2020-01-01: shift 1 10:00-11:00 `["wizard"]`, shift 2 11
 - secrecy, on state: at 10:30 with steals only of wizard, `JSON.stringify(view)` does not contain `"crown"`, `"fuzzy"`, `"Spiked crown"`, or `"Sparkly fuzzy hat"`.
 - secrecy, off state: at 09:30 with steals only of wizard, state `off` with next start 10:00, `perHat` is `[]`, and `JSON.stringify(view)` does not contain `"tricorn"` or `"Tricorn"`.
 - At 14:00: `done`, and `perHat` lists all six hats in order.
-- invalid raw schedule: `onScheduleError` called once, state `unposted`, `perHat` `[]`, and a seeded steal still yields 5 points in `overall`.
+- invalid raw schedule: `onScheduleError` called once, state `standing` with the tricorn, `perHat` `["tricorn"]`, and a seeded steal still yields 5 points in `overall`.
 - `lastStolen` shows the thief's name and `atLabel`, or `null` when the hat has no steals.
 - Decoy: at Fri 13:00 (before the first shift) with steals only of crown, state `off` with `nextStartsAtLabel` "Fri 2:00 PM", and `JSON.stringify(view)` contains neither `"wizard"` nor `"Wizard hat"` (the hat of the first shift). At Sun 09:10, `endsAtLabel` is "Sun 9:20 AM" and `nextLine` is "The shift after that ends at Sun 9:40 AM".
 - `previewOverrides`: `"production"` returns `null` even with every parameter set; `now` without `schedule` returns `null`; `schedule` alone returns only `rawSchedule`; a valid `now` is returned, an invalid one dropped; `steals` and `names` parse, unknown hat ids are dropped, malformed `steals` gives an empty list; `vercelEnv` `"preview"` and `undefined` both allow overrides.
@@ -439,7 +439,7 @@ Verification: `pnpm check` passes. Then push and follow the repo CLAUDE.md "Look
 - `on` with one hat (`now` Fri 15:00) and with two hats (`now` Sat 00:00, the overnight shift), each with a populated leaderboard (several fake users and steals);
 - `off` (`now` Fri 13:00, before the first shift);
 - `done` (`now` Sun 14:00, all six per-hat tables);
-- `unposted` (`schedule=[]`, or `schedule=notjson`);
+- `standing` (`schedule=[]`, or `schedule=notjson`);
 - the plain path with no parameters.
 
 Pass each path to `node scripts/preview-shot.mjs <preview-url> <path…>`. Surface the screenshots to the user rather than iterating, and delete them afterwards. Never put the fake values in a committed file.

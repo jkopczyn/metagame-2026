@@ -67,7 +67,7 @@ Server logic (pure functions, unit-tested with made-up schedules):
 
 - `currentShift(schedule, now)`: the shift containing `now`, or none.
 - `nextShift(schedule, now)`: the first shift starting at or after `now` (used when outside any shift).
-- The page's "shift state" for `now`: either `{ kind: "on", hats, endsAt, next }` (where `next` describes the shift after the current one as `{ startsAt, endsAt }`, or is absent if there is none), `{ kind: "off", nextStartsAt }` (between shifts, or before the first), `{ kind: "done" }` (after the last shift's end), or `{ kind: "unposted" }` (schedule unset, empty, or unparseable).
+- The page's "shift state" for `now`: either `{ kind: "on", hats, endsAt, next }` (where `next` describes the shift after the current one as `{ startsAt, endsAt }`, or is absent if there is none), `{ kind: "off", nextStartsAt }` (between shifts, or before the first), `{ kind: "done" }` (after the last shift's end), or `{ kind: "standing", hats: ["tricorn"] }` (schedule unset, empty, or unparseable: the pirate tricorn is the only hat and is stealable the whole time).
 - `shiftChangesBetween(schedule, from, to)`: the ordered list of shift-change instants in `(from, to]`. A shift change is any shift `start` or `end` (a shift's `end` that equals the next shift's `start` is one change, not two). This is what scoring iterates.
 
 The schedule is read per request; there is no caching beyond that, so a change in Vercel takes effect on the next request after redeploy or env reload.
@@ -114,7 +114,7 @@ Route: `src/app/(v2)/hat-tricks/page.tsx`. Public; no sign-in. Server component 
 Sections, top to bottom:
 
 1. **Header.** The six-hat stack SVG, the title "Hat Tricks", the one-line tagline "A hat trick is when you trick someone and take their hat."
-2. **On shift now.** One card per on-shift hat (one or two): the hat's SVG, its photo (or the SVG again), its name, and "Last stolen by {display name}" with the time, or "Not stolen yet" if the hat has no steal rows. When the state is `off`: "No hats can be stolen right now. Next shift starts at {time}." When `done`: "The game is over." When the schedule failed to parse, is unset, or is an empty list: "The schedule isn't posted yet." with no error details.
+2. **On shift now.** One card per on-shift hat (one or two): the hat's SVG, its photo (or the SVG again), its name, and "Last stolen by {display name}" with the time, or "Not stolen yet" if the hat has no steal rows. When the state is `off`: "No hats can be stolen right now. Next shift starts at {time}." When `done`: "The game is over." When the schedule failed to parse, is unset, or is an empty list, the state is `standing`: the pirate tricorn card is shown as if on shift, with no end time, followed by "No shift schedule is posted, so this hat can be stolen at any time." and no error details.
 3. **Clock.** Current event-local time (Pacific, `America/Los_Angeles`, using the `PACIFIC` constant from `src/lib/schedule.ts`), ticking each second in a small client component seeded with the server time so there is no hydration mismatch (render the server time, then start ticking on mount). Below it: "This shift ends at {endsAt}", then, when a following shift exists: "The shift after that ends at {next.endsAt}" if it starts when this one ends, or "The next shift runs {next.startsAt} to {next.endsAt}" if there is a gap first. Times are shown as weekday plus 12-hour time, for example "Sat 3:45 PM". The client component receives only the instants to display, never the schedule.
 4. **Leaderboards.** One table "Overall" (all six hats) and one table per on-shift hat, titled with the hat's name. In the `done` state, all six per-hat tables are shown instead, since the game awards a medal per hat and nothing remains to hide. Columns: rank, display name, steals, points. Empty tables show "No steals yet."
 5. **Rules.** Four expandable items (native `<details>` elements, closed by default, all independently openable). Summary line is the rule title; body is the detail paragraph. Text:
@@ -131,7 +131,7 @@ Display names come from `user.name`. Every user with at least one steal appears;
 
 ## Error handling
 
-- Schedule unset or unparseable: the page renders with the "not posted yet" state; the parse error is logged server-side. The leaderboards still render using whatever steals exist, with holding points of zero (no changes known) and theft points counted.
+- Schedule unset or unparseable: the page renders the standing tricorn state; the parse error is logged server-side. The leaderboards still render using whatever steals exist, with holding points of zero (no changes known) and theft points counted.
 - Database unavailable: let the existing error boundary handle it, as other pages do.
 
 ## Testing
