@@ -5,11 +5,14 @@ import { normalizeMegagameCode } from "./megagame-rules";
 
 // Where a quest label's printed /q/<code> QR link leads.
 
-/** The redirect for a quest label's link. Nobody without the permission sees the quest. */
+/**
+ * The redirect for a quest label's link, or null to show the page explaining
+ * the code is for volunteers. Nobody without the permission sees the quest.
+ */
 export async function questLinkTarget(
   rawCode: string,
   players?: string | string[],
-): Promise<string> {
+): Promise<string | null> {
   const code = normalizeMegagameCode(rawCode);
   const list = [players].flat()[0]?.trim();
   const keep = list ? `?${new URLSearchParams({ players: list })}` : "";
@@ -21,5 +24,5 @@ export async function questLinkTarget(
     if (list) query.set("players", list);
     return `/backstage/megagame?${query}`;
   }
-  return "/account";
+  return null;
 }
