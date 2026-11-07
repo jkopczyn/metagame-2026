@@ -181,28 +181,34 @@ describe("buildHatTricksView", () => {
     expect(view.perHat.map((entry) => entry.name)).toContain("Spiked crown");
   });
 
-  it("falls back to unposted when the schedule does not parse", () => {
+  it("falls back to the standing tricorn when the schedule does not parse", () => {
     const onScheduleError = vi.fn();
     const view = build(at("10:30"), {
       rawSchedule: "notjson",
       onScheduleError,
     });
     expect(onScheduleError).toHaveBeenCalledTimes(1);
-    expect(view.state).toEqual({ kind: "unposted" });
-    expect(view.perHat).toEqual([]);
+    expect(view.state.kind).toBe("standing");
+    if (view.state.kind !== "standing") throw new Error("expected standing");
+    expect(view.state.hats.map((hat) => hat.id)).toEqual(["tricorn"]);
+    expect(view.state.hats[0].name).toBe("Pirate tricorn");
+    expect(view.perHat.map((entry) => entry.id)).toEqual(["tricorn"]);
     expect(view.overall).toEqual([
       { rank: 1, userId: "u1", name: "Ada", steals: 1, points: 5 },
     ]);
   });
 
-  it("is unposted when the schedule is unset", () => {
+  it("shows only the standing tricorn when the schedule is unset", () => {
     const onScheduleError = vi.fn();
     const view = build(at("10:30"), {
       rawSchedule: undefined,
       onScheduleError,
     });
     expect(onScheduleError).not.toHaveBeenCalled();
-    expect(view.state).toEqual({ kind: "unposted" });
+    expect(view.state.kind).toBe("standing");
+    if (view.state.kind !== "standing") throw new Error("expected standing");
+    expect(view.state.hats.map((hat) => hat.id)).toEqual(["tricorn"]);
+    expect(JSON.stringify(view)).not.toContain("wizard");
   });
 
   it("names the last thief of a hat", () => {

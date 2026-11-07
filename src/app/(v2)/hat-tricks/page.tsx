@@ -62,7 +62,7 @@ export default async function HatTricksPage({
     >
       <section className="mb-14">
         <h2 className={SECTION_HEADING}>On shift now</h2>
-        {state.kind === "on" ? (
+        {state.kind === "on" || state.kind === "standing" ? (
           <div className="grid gap-5 sm:grid-cols-2">
             {state.hats.map((hat) => (
               <HatCard key={hat.id} hat={hat} />
@@ -72,9 +72,12 @@ export default async function HatTricksPage({
           <p className="text-base text-ink/70">
             {state.kind === "off"
               ? `No hats can be stolen right now. Next shift starts at ${state.nextStartsAtLabel}.`
-              : state.kind === "done"
-                ? "The game is over."
-                : "The schedule isn't posted yet."}
+              : "The game is over."}
+          </p>
+        )}
+        {state.kind === "standing" && (
+          <p className="mt-5 text-base text-ink/70">
+            No shift schedule is posted, so this hat can be stolen at any time.
           </p>
         )}
       </section>

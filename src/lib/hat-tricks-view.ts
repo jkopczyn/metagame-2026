@@ -31,7 +31,7 @@ export type StateView =
     }
   | { kind: "off"; nextStartsAt: string; nextStartsAtLabel: string }
   | { kind: "done" }
-  | { kind: "unposted" };
+  | { kind: "standing"; hats: HatCardView[] };
 
 export type HatTricksView = {
   nowIso: string;
@@ -79,7 +79,7 @@ export function buildHatTricksView(input: {
   };
 
   const visible: HatId[] =
-    state.kind === "on"
+    state.kind === "on" || state.kind === "standing"
       ? state.hats
       : state.kind === "done"
         ? HATS.map((hat) => hat.id)
@@ -111,6 +111,9 @@ function buildStateView(
       endsAtLabel,
       nextLine: nextLineFor(state.nextEndsAt),
     };
+  }
+  if (state.kind === "standing") {
+    return { kind: "standing", hats: state.hats.map(card) };
   }
   if (state.kind === "off") {
     return {
