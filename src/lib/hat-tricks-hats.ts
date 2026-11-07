@@ -25,7 +25,7 @@ const NAMES: Record<HatId, string> = {
   saucer: "Alien saucer",
   fuzzy: "Sparkly fuzzy hat",
   slouch: "Satin slouch hat",
-  tricorn: "Tricorn",
+  tricorn: "Pirate tricorn",
   crown: "Spiked crown",
 };
 
