@@ -29,9 +29,6 @@ import {
   SECTION,
   SECTION_ANCHOR,
 } from "@/v2/components/styles";
-import EggTierTicket, {
-  EarlierBirdNote,
-} from "@/v2/components/tickets/EggTierTicket";
 import { Button } from "@/v2/components/ui/button";
 import { CAROUSEL } from "@/v2/data/carousel";
 import {
@@ -557,17 +554,6 @@ export default async function Home() {
       </section>
 
       <ScrabbleDivider />
-
-      {/* tickets */}
-      <section id="tickets" className={`${SECTION} md:py-14`}>
-        <div className={CONTAINER}>
-          <SectionHeading eyebrow="Ready to play?" title="Tickets" />
-          <EarlierBirdNote className="mt-3.5 mb-7 max-w-[600px] text-[length:min(1rem,5vw_-_3.5px)]" />
-          <div className="flex max-w-[700px] flex-col items-start gap-6">
-            <EggTierTicket />
-          </div>
-        </div>
-      </section>
 
       {/* Bottom padding matches the next section's top, so the divider sits
           midway between the photo and the heading. */}

@@ -1,19 +1,13 @@
-import { Button } from "@/v2/components/ui/button";
 import SignupForm from "@/v2/components/signup/SignupForm";
-import {
-  EarlierBirdNote,
-  EGG_TIER_HREF,
-} from "@/v2/components/tickets/EggTierTicket";
 import Dice from "./dice/Dice";
 import HeroBackdrop from "./HeroBackdrop";
 
 // The above-the-fold banner: one viewport tall (more if the card needs it),
 // and the photo ends where the next section starts. The library photo
-// (washed) sits behind the rolling-dice METAGAME wordmark, then the headline,
-// tickets CTA and mailing-list signup on a cream card so they read
-// against the photo. Content hangs from the top
-// (pt-[6vh]) rather than centring, so HeroBackdrop can place its wash on the
-// dice with a fixed formula. `isolate` keeps the backdrop's -z-10 inside this
+// (washed) sits behind the rolling-dice METAGAME wordmark, then the headline
+// and mailing-list signup on a cream card so they read against the photo.
+// Content hangs from the top (pt-[6vh]) rather than centring, so HeroBackdrop
+// can place its wash on the dice with a fixed formula. `isolate` keeps the backdrop's -z-10 inside this
 // section's stacking context: behind the dice, above the cream.
 export default function SiteHero() {
   return (
@@ -27,19 +21,7 @@ export default function SiteHero() {
         <p className="mt-3 font-grotesk text-[clamp(28px,5vw,44px)] leading-[1.05] font-bold tracking-[-0.01em] text-navy">
           Metagame 2027 is coming!
         </p>
-        {/* Shrinks below ~390px so each line of the note fits the card. */}
-        <EarlierBirdNote className="mt-4 text-[length:min(0.875rem,4.25vw_-_2.5px)] md:mt-5 md:text-base" />
-        <Button
-          asChild
-          variant="raised"
-          size="lg"
-          className="mt-3 h-auto px-6 py-2.5 text-lg md:px-7 md:py-3 md:text-xl"
-        >
-          <a href={EGG_TIER_HREF} target="_blank" rel="noopener noreferrer">
-            Join us in 2027
-          </a>
-        </Button>
-        <div className="mt-4 w-full border-t border-navy/15 pt-3 md:mt-5 md:pt-4">
+        <div className="mt-4 w-full md:mt-5">
           <p className="mb-2 font-grotesk text-sm text-navy md:text-base">
             Stay updated
           </p>

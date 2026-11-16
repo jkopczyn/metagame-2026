@@ -228,25 +228,21 @@ export function dayPassForPaymentLinkUrl(
 
 export const DAY_PASS_TIER = "day-pass";
 
-// Metagame 2027 earlier-than-early-bird, sold through a dashboard Payment Link
-// while this site is still the 2026 one. Its buyers get a holding email, not
-// the 2026 confirmation and logistics. Pay what you want from $150; Stripe
-// won't take promo codes on a customer-chosen price.
+// Metagame 2027 earlier-than-early-bird, sold through dashboard Payment Links
+// until 2026-11-15 while this site was still the 2026 one. Its buyers got a
+// holding email, not the 2026 confirmation and logistics. The links stay here
+// so those purchases still match.
 export const EGG_TIER_2027 = {
   label: "Metagame 2027 - Egg Tier",
-  minUsd: 150,
   links: {
     test: "https://buy.stripe.com/test_14AfZgbAzdbxgVl9Vgfw40o",
     live: "https://buy.stripe.com/7sYbJ07kj7Rd5cD7N8fw40j",
   } satisfies Record<StripeMode, string>,
-  // Fixed-$150 links sold until 2026-11-10, kept so their purchases still match.
+  // Fixed-$150 links sold until 2026-11-10.
   retiredLinks: {
     test: "https://buy.stripe.com/test_28E8wO6gf6N96gH9Vgfw40n",
     live: "https://buy.stripe.com/fZubJ0gUTgnJfRh9Vgfw40i",
   } satisfies Record<StripeMode, string>,
-  get link() {
-    return this.links[stripeMode];
-  },
   get allLinks(): string[] {
     return [...Object.values(this.links), ...Object.values(this.retiredLinks)];
   },
