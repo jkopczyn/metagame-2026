@@ -55,6 +55,7 @@ describe("ticketFromPurchase", () => {
       status: "paid",
       test: false,
       tier: "Standard",
+      year: 2026,
       amountCents: 32500,
       couponCode: null,
       purchaserEmail: "ada@example.com",
@@ -68,6 +69,13 @@ describe("ticketFromPurchase", () => {
     expect(
       ticketFromPurchase({ ...stripe, couponCode: " earlyBird " }).couponCode,
     ).toBe("EARLYBIRD");
+  });
+
+  it("files a 2027 Egg Tier ticket under 2027", () => {
+    expect(
+      ticketFromPurchase({ ...stripe, ticketType: "Metagame 2027 - Egg Tier" })
+        .year,
+    ).toBe(2027);
   });
 
   it("prefers the preferred name and derives a missing code", () => {

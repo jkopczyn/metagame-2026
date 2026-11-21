@@ -18,9 +18,9 @@ import { ticketCode } from "@/lib/ticket-code";
 import { currentTicketCode, recordTicket } from "@/lib/ticket-store";
 import {
   dayPassForPaymentLinkUrl,
-  isEggTier2027,
   tierForCheckoutMetadata,
   tierLabelForStripeCheckout,
+  ticketYear,
 } from "@/lib/tickets";
 import { mailingListOptOutUrl } from "@/lib/purchase-buyer";
 import { pickUtm } from "@/lib/utm";
@@ -196,7 +196,6 @@ export async function POST(request: Request) {
     );
     const paymentLinkUrl = expanded<Stripe.PaymentLink>(full.payment_link)?.url;
     const productName = product && "name" in product ? product.name : undefined;
-    const egg2027 = isEggTier2027({ paymentLinkUrl, productName });
     // Sessions from /api/checkout/stripe carry the tier in metadata; purchases
     // through an old Payment Link are matched by its URL instead.
     const tier = tierForCheckoutMetadata(full.metadata);
@@ -207,6 +206,8 @@ export async function POST(request: Request) {
       paymentLinkUrl,
       productName,
     });
+    // Metagame 2026 is over: anything but its known tiers is a 2027 sale.
+    const egg2027 = ticketYear(ticketType) === 2027;
 
     // The customer-facing promo code (e.g. "EARLYBIRD") — the coupon is the
     // discount definition behind it; this is the string the buyer actually used.
@@ -309,7 +310,7 @@ export async function POST(request: Request) {
           to: email,
           purchaserName:
             preferredName ?? full.customer_details?.name ?? undefined,
-          tierLabel: ticketType ?? "Metagame 2026 ticket",
+          tierLabel: ticketType ?? `Metagame ${ticketYear(ticketType)} ticket`,
           egg2027,
           eventDay: tier
             ? tier.day

@@ -228,6 +228,9 @@ export function dayPassForPaymentLinkUrl(
 
 export const DAY_PASS_TIER = "day-pass";
 
+/** The upcoming event: new tickets file under it and check-in only sees its tickets. */
+export const EVENT_YEAR = 2027;
+
 // Metagame 2027 earlier-than-early-bird, sold through dashboard Payment Links
 // until 2026-11-15 while this site was still the 2026 one. Its buyers got a
 // holding email, not the 2026 confirmation and logistics. The links stay here
@@ -248,17 +251,23 @@ export const EGG_TIER_2027 = {
   },
 };
 
-export function isEggTier2027({
-  paymentLinkUrl,
-  productName,
-}: {
-  paymentLinkUrl: string | null | undefined;
-  productName: string | undefined;
-}): boolean {
-  return (
-    EGG_TIER_2027.allLinks.includes(paymentLinkUrl ?? "") ||
-    /2027/.test(productName ?? "")
-  );
+/**
+ * The Metagame a tier admits to. Metagame 2026 is over, so only its known
+ * tiers (by label or id) file under 2026; anything else sells for EVENT_YEAR.
+ */
+export function ticketYear(tier: string | null | undefined): number {
+  if (!tier) return EVENT_YEAR;
+  if (/2026/.test(tier)) return 2026;
+  const tiers2026 = new Set<string>([
+    ...ticketTiers.flatMap((t) => [t.id, t.label]),
+    supporterTier.id,
+    supporterTier.label,
+    ...dayPasses.flatMap((d) => [d.id, d.label]),
+    DAY_PASS_TIER,
+    "Guest of Honor",
+    "Family & Friends Pack — Standard",
+  ]);
+  return tiers2026.has(tier) ? 2026 : EVENT_YEAR;
 }
 
 /**

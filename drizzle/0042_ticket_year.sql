@@ -1,0 +1,1 @@
+ALTER TABLE "tickets" ADD COLUMN "year" integer DEFAULT 2027 NOT NULL;

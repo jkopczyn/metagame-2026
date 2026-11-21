@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   EGG_TIER_2027,
   dayPasses,
-  isEggTier2027,
   supporterTier,
+  ticketYear,
   ticketTiers,
   tierLabelForStripeCheckout,
 } from "./tickets";
@@ -85,20 +85,24 @@ describe("tierLabelForStripeCheckout", () => {
   });
 });
 
-describe("isEggTier2027", () => {
-  it("matches the 2027 Payment Link or a 2027 product", () => {
-    expect(
-      isEggTier2027({
-        paymentLinkUrl: EGG_TIER_2027.links.live,
-        productName: "Egg",
-      }),
-    ).toBe(true);
-    expect(
-      isEggTier2027({
-        paymentLinkUrl: undefined,
-        productName: "Metagame 2027 - Egg Tier",
-      }),
-    ).toBe(true);
+describe("ticketYear", () => {
+  it("files the known 2026 tiers under 2026", () => {
+    for (const tier of [
+      "Standard",
+      "standard",
+      "Supporter",
+      "Saturday Day Pass",
+      "Guest of Honor",
+      "Family & Friends Pack — Standard",
+      "Metagame 2026",
+    ])
+      expect(ticketYear(tier)).toBe(2026);
+  });
+
+  it("files everything else, including the Egg Tier, under 2027", () => {
+    expect(ticketYear(EGG_TIER_2027.label)).toBe(2027);
+    expect(ticketYear("Metagame 2027 - Early Bird")).toBe(2027);
+    expect(ticketYear(undefined)).toBe(2027);
     expect(
       tierLabelForStripeCheckout({
         metadata: null,
@@ -108,28 +112,13 @@ describe("isEggTier2027", () => {
     ).toBe("Metagame 2027 - Egg Tier");
   });
 
-  it("still matches the retired fixed-price links", () => {
-    expect(
-      isEggTier2027({
-        paymentLinkUrl: EGG_TIER_2027.retiredLinks.live,
-        productName: "Egg",
-      }),
-    ).toBe(true);
-    expect(
-      tierLabelForStripeCheckout({
-        metadata: null,
-        paymentLinkUrl: EGG_TIER_2027.retiredLinks.test,
-        productName: "Egg",
-      }),
-    ).toBe("Metagame 2027 - Egg Tier");
-  });
-
-  it("leaves 2026 checkouts alone", () => {
-    expect(
-      isEggTier2027({
-        paymentLinkUrl: ticketTiers[0].links.live,
-        productName: "Metagame 2026",
-      }),
-    ).toBe(false);
+  it("files the retired fixed-price Egg Tier links under 2027", () => {
+    const label = tierLabelForStripeCheckout({
+      metadata: null,
+      paymentLinkUrl: EGG_TIER_2027.retiredLinks.test,
+      productName: "Egg",
+    });
+    expect(label).toBe("Metagame 2027 - Egg Tier");
+    expect(ticketYear(label)).toBe(2027);
   });
 });

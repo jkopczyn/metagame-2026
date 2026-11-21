@@ -23,7 +23,7 @@ import { formatBadgeCode } from "@/lib/badge-code";
 import { escapeLike, likeContains } from "@/lib/like";
 import { accountName, searchAccounts } from "@/lib/schedule-store";
 import { emailKey } from "@/lib/ticket-holder";
-import { visible, type TicketRow } from "@/lib/ticket-store";
+import { thisYear, type TicketRow } from "@/lib/ticket-store";
 
 const { tickets, user } = schema;
 
@@ -31,7 +31,7 @@ export const CHECKIN_SEARCH_LIMIT = 25;
 export const CHECKIN_PAGE_SIZE = 50;
 
 /** Only paid tickets and ones still waiting on payment matter at the desk. */
-const atDesk = and(visible, inArray(tickets.status, ["paid", "pending"]));
+const atDesk = and(thisYear, inArray(tickets.status, ["paid", "pending"]));
 
 /**
  * Tickets matching what the volunteer typed, with the rest of any pack a hit
@@ -99,7 +99,7 @@ export async function listCheckinTickets(
   page: number,
 ): Promise<{ rows: TicketRow[]; total: number }> {
   const owner = alias(user, "owner");
-  const paid = and(visible, eq(tickets.status, "paid"));
+  const paid = and(thisYear, eq(tickets.status, "paid"));
   const db = getDb();
   const [[{ total }], hits] = await Promise.all([
     db.select({ total: count() }).from(tickets).where(paid),
@@ -164,7 +164,7 @@ export async function checkinCounts(): Promise<{
       checkedIn: count(tickets.checkedInAt),
     })
     .from(tickets)
-    .where(and(visible, eq(tickets.status, "paid")));
+    .where(and(thisYear, eq(tickets.status, "paid")));
   return { paid, checkedIn };
 }
 
@@ -173,7 +173,7 @@ export async function deskTicket(paymentId: string): Promise<TicketRow | null> {
   const [row] = await getDb()
     .select()
     .from(tickets)
-    .where(and(visible, eq(tickets.paymentId, paymentId)))
+    .where(and(thisYear, eq(tickets.paymentId, paymentId)))
     .limit(1);
   return row ?? null;
 }
@@ -187,7 +187,7 @@ async function badgeWearer(code: number): Promise<string | null> {
     })
     .from(tickets)
     .leftJoin(owner, eq(owner.id, tickets.ownerUserId))
-    .where(and(visible, eq(tickets.badgeCode, code)))
+    .where(and(thisYear, eq(tickets.badgeCode, code)))
     .limit(1);
   return row?.name ?? null;
 }

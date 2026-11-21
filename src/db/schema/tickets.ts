@@ -42,6 +42,8 @@ export const tickets = pgTable(
     status: ticketStatus().notNull(),
     test: boolean().notNull().default(false),
     tier: text(),
+    // Which Metagame the ticket admits to.
+    year: integer().notNull().default(2027),
     amountCents: integer(),
     couponCode: text(),
     purchaserEmail: text(),

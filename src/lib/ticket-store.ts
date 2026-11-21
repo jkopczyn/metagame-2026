@@ -27,7 +27,13 @@ import {
   withFreshTicketCode,
 } from "@/lib/ticket-code";
 import { emailKey } from "@/lib/ticket-holder";
-import { getDayPass, getTicket, supporterTier } from "@/lib/tickets";
+import {
+  EVENT_YEAR,
+  getDayPass,
+  getTicket,
+  supporterTier,
+  ticketYear,
+} from "@/lib/tickets";
 
 export { normalizeTicketCode } from "@/lib/ticket-code-format";
 export { emailKey, holdsTicket } from "@/lib/ticket-holder";
@@ -43,6 +49,9 @@ export const visible =
   process.env.NEXT_PUBLIC_VERCEL_ENV === "production"
     ? eq(tickets.test, false)
     : undefined;
+
+/** Visible and for this year's event: what the desk and check-in work from. */
+export const thisYear = and(visible, eq(tickets.year, EVENT_YEAR));
 
 /** holdsTicket as a WHERE clause. */
 const heldBy = (userId: string, email: string) =>
@@ -77,6 +86,7 @@ export function ticketFromPurchase(purchase: PurchaseRecord): Ticket {
     status: STATUS[purchase.status],
     test: purchase.test,
     tier: purchase.ticketType ?? null,
+    year: ticketYear(purchase.ticketType),
     amountCents:
       purchase.amount != null ? Math.round(purchase.amount * 100) : null,
     couponCode: purchase.couponCode?.trim().toUpperCase() || null,
@@ -114,6 +124,7 @@ export async function recordTicket(
     status,
     test,
     tier,
+    year,
     amountCents,
     couponCode,
     purchaserEmail,
@@ -126,6 +137,7 @@ export async function recordTicket(
       status,
       test,
       tier,
+      year,
       amountCents,
       couponCode,
       purchaserEmail,

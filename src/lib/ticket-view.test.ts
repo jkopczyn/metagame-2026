@@ -9,6 +9,7 @@ const row = (over: Partial<TicketRow> = {}): TicketRow => ({
   status: "paid",
   test: false,
   tier: "Standard",
+  year: 2026,
   amountCents: 32500,
   couponCode: null,
   purchaserEmail: "ada@example.com",
