@@ -33,7 +33,7 @@ export default function ScheduleLayout({
 }) {
   return (
     <>
-      <ContentPage eyebrow="Nov 6–8 at Lighthaven" title="Schedule" wide>
+      <ContentPage eyebrow="Nov 6–8 at Lighthaven" title="2026 Schedule" wide>
         <Suspense fallback={<ScheduleSkeleton />}>
           <Schedule />
         </Suspense>

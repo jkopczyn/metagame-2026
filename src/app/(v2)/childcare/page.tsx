@@ -3,10 +3,8 @@ import ContentPage from "@/v2/components/ContentPage";
 import LastYearSchedule from "@/v2/components/schedule/LastYearSchedule";
 import { HEADING } from "@/v2/components/styles";
 import Testimonials from "@/v2/components/Testimonials";
-import { Button } from "@/v2/components/ui/button";
 import { CHILDCARE_TESTIMONIALS } from "@/v2/data/childcare-testimonials";
 import ContactLink from "@/v2/components/contact/ContactLink";
-import { CHILD_REGISTRATION_FORM_URL } from "@/v2/lib/links";
 
 export const metadata: Metadata = {
   title: "Childcare — Metagame 2026",
@@ -24,16 +22,8 @@ export default function ChildcarePage() {
             Metagame is for the whole family. Children under 13 attend Metagame
             for free, and we hope to see many in attendance! We offer childcare
             for kids ages 5-12 (for free!), so that the parents can have fun
-            too. The schedule for childcare availability is listed on the
-            registration form below.
+            too.
           </p>
-          <p className="mt-3">
-            All children attending Metagame must be registered, whether or not
-            they&apos;re signing up for childcare.
-          </p>
-          <Button asChild variant="navy" className="mt-5">
-            <a href={CHILD_REGISTRATION_FORM_URL}>Register your children</a>
-          </Button>
           <p className="mt-5">
             Our 2026 schedule is still in progress, but you can take a look at{" "}
             <a

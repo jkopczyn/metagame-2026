@@ -7,11 +7,15 @@ import { buildErd } from "./scripts/build-erd.mjs";
 import { validateEnv } from "./src/env";
 import { EGG_TIER_2027, boothLinks, stripeMode } from "./src/lib/tickets";
 import {
+  CHILD_REGISTRATION_FORM_URL,
   CON_PARTIFUL_PATH,
   CON_PARTIFUL_URL,
+  FINANCIAL_AID_FORM_URL,
   HOUSING_PATH,
   HOUSING_URL,
   INTEREST_FORM_URL,
+  MEGAGAME_PROPOSAL_FORM_URL,
+  NIGHT_MARKET_FORM_URL,
   NIGHT_PARTIFUL_PATH,
   NIGHT_PARTIFUL_URL,
   RFP_FORM_URL,
@@ -107,15 +111,21 @@ const nextConfig: NextConfig = {
     // The sponsor page is gone until there's 2027 info; the form is the way in.
     { source: "/sponsor", destination: SPONSOR_FORM_URL, permanent: false },
     { source: "/team/join", destination: INTEREST_FORM_URL, permanent: true },
-    // Session proposals and volunteer applications are closed until 2027 plans
-    // firm up; the interest form takes those for now. Drop these to reopen.
-    ...[RFP_FORM_URL, VOLUNTEER_APPLY_PATH, VOLUNTEER_FORM_PATH].map(
-      (source) => ({
-        source,
-        destination: INTEREST_FORM_URL,
-        permanent: false,
-      }),
-    ),
+    // The 2026 forms are closed until 2027 plans firm up; the interest form
+    // takes those for now. Drop a path here to reopen its form.
+    ...[
+      RFP_FORM_URL,
+      MEGAGAME_PROPOSAL_FORM_URL,
+      VOLUNTEER_APPLY_PATH,
+      VOLUNTEER_FORM_PATH,
+      CHILD_REGISTRATION_FORM_URL,
+      FINANCIAL_AID_FORM_URL,
+      NIGHT_MARKET_FORM_URL,
+    ].map((source) => ({
+      source,
+      destination: INTEREST_FORM_URL,
+      permanent: false,
+    })),
     // /buy/<code> hands its code to the tickets section, which stores it for Standard checkout.
     { source: "/buy", destination: "/#tickets", permanent: false },
     {

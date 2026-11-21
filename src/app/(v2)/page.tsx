@@ -43,7 +43,6 @@ import {
   HOUSING_URL,
   PODCAST_EPISODE_URL,
   LIGHTHAVEN_URL,
-  MEGAGAME_PROPOSAL_FORM_URL,
   RFP_FORM_URL,
   SPONSOR_FORM_URL,
 } from "@/v2/lib/links";
@@ -368,7 +367,7 @@ export default async function Home() {
       {/* schedule */}
       <section id="schedule" className={`${SECTION} md:py-14`}>
         <div className={CONTAINER}>
-          <SectionHeading title="Schedule" />
+          <SectionHeading title="2026 Schedule" />
         </div>
         {schedule && (
           <div className="mt-10 px-4 sm:px-8">
@@ -403,20 +402,9 @@ export default async function Home() {
                 <p>
                   The Megagame is threaded through the rest of Metagame, with
                   many puzzles and games making up larger games and larger
-                  puzzles. Anyone can play it, and anyone can help create it. We
-                  want puzzles! We want games! We want cryptic hints added to
-                  your session! More details in the proposal form.
+                  puzzles.
                 </p>
               </div>
-              <Button asChild variant="default" className="mt-6 w-fit">
-                <a
-                  href={MEGAGAME_PROPOSAL_FORM_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Build part of the Megagame
-                </a>
-              </Button>
             </div>
             <figure className="w-full max-w-[560px]">
               <HatImage
@@ -566,7 +554,7 @@ export default async function Home() {
       {/* sponsors */}
       <section id="sponsors" className={`${SECTION} md:py-14`}>
         <div className={CONTAINER}>
-          <SectionHeading eyebrow="With gratitude" title="Our sponsors" />
+          <SectionHeading eyebrow="With gratitude" title="2026 Sponsors" />
           <div className="mt-10 flex flex-col items-center gap-10">
             {[
               {

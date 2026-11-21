@@ -1,7 +1,6 @@
 import ContactProvider from "@/v2/components/contact/ContactProvider";
 import SiteFooter from "@/v2/components/SiteFooter";
 import SiteShell from "@/v2/components/SiteShell";
-import FirstSigninFlow from "@/v2/components/first-signin/FirstSigninFlow";
 import SessionModalHost from "@/v2/components/schedule/SessionModalHost";
 // The session modal's body arrives from a server action as a rendered tree,
 // serialized against the client manifest of the page it was opened over. A
@@ -27,7 +26,10 @@ export default function SiteLayout({
         </SessionModalHost>
       </ContactProvider>
       <HatToast />
-      <FirstSigninFlow />
+      {/* The first-sign-in questions (name, age, children, recruiters…) are
+          paused until 2027 plans firm up. To bring them back, render
+          <FirstSigninFlow /> from "@/v2/components/first-signin/FirstSigninFlow"
+          here; the component and its API route are untouched. */}
     </div>
   );
 }
