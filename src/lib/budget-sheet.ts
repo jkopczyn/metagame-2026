@@ -39,7 +39,7 @@ export async function loadLedger(): Promise<{
   categories: Category[];
 }> {
   const [ledger, categories] = await readRanges(sheetId(), [
-    `'${LEDGER_TAB}'!A2:T${LAST_ROW}`,
+    `'${LEDGER_TAB}'!A2:U${LAST_ROW}`,
     `'${CATEGORIES_TAB}'!A5:J80`,
   ]);
   return { rows: parseLedger(ledger), categories: parseCategories(categories) };
@@ -60,13 +60,19 @@ function rowRanges(
       values: [[r.id, r.item, cell(r.parent), r.category]],
     },
     {
-      range: `${tab}!G${row}:J${row}`,
+      range: `${tab}!G${row}:K${row}`,
       values: [
-        [cell(r.phase), cell(r.counterparty), cell(r.budgeted), cell(r.actual)],
+        [
+          cell(r.phase),
+          cell(r.counterparty),
+          cell(r.budgeted),
+          cell(r.actual),
+          cell(r.committed),
+        ],
       ],
     },
     {
-      range: `${tab}!N${row}:R${row}`,
+      range: `${tab}!O${row}:S${row}`,
       values: [
         [
           r.status,
@@ -77,7 +83,7 @@ function rowRanges(
         ],
       ],
     },
-    { range: `${tab}!T${row}`, values: [[cell(r.proposal)]] },
+    { range: `${tab}!U${row}`, values: [[cell(r.proposal)]] },
   ];
 }
 

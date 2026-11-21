@@ -32,6 +32,7 @@ describe("budget sheet", () => {
         "Lighthaven",
         52000,
         26000,
+        1500,
         52000,
         52000,
         0,
@@ -52,6 +53,7 @@ describe("budget sheet", () => {
       row: 2,
       id: "T001",
       actual: 26000,
+      committed: 1500,
       status: "Partial",
       xeroId: "c526669e",
     });

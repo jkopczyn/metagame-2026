@@ -33,6 +33,7 @@ const row = (over: Partial<LedgerRow>): LedgerRow => ({
   counterparty: "",
   budgeted: null,
   actual: null,
+  committed: null,
   forecast: null,
   remaining: null,
   status: "Planned",

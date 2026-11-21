@@ -2,7 +2,7 @@ import type { CellValue } from "./google-sheets";
 
 // The "2026 Transactions v2" tab of the Metagame 2026 Budget sheet: one row
 // per planned or actual item, a Parent column making a two-level plan
-// hierarchy, and formula columns (E F K L M S) that are never written.
+// hierarchy, and formula columns (E F L M N T) that are never written.
 // Pure helpers only; the sheet IO is in budget-sheet.ts.
 
 export const STATUSES = [
@@ -31,6 +31,8 @@ export type LedgerRow = {
   counterparty: string;
   budgeted: number | null;
   actual: number | null;
+  /** Owed but not yet paid; the sheet's formulas count it as spend. */
+  committed: number | null;
   forecast: number | null;
   remaining: number | null;
   status: string;
@@ -67,6 +69,7 @@ export type RowInput = {
   counterparty?: string;
   budgeted?: number | null;
   actual?: number | null;
+  committed?: number | null;
   status: Status;
   date?: string | null;
   notes?: string;
@@ -102,7 +105,7 @@ export function parseLedger(values: CellValue[][]): LedgerRow[] {
     const id = str(v[0]).trim();
     const item = str(v[1]).trim();
     if (!id && !item) return;
-    const serial = num(v[14]);
+    const serial = num(v[15]);
     rows.push({
       row: i + 2,
       id,
@@ -115,15 +118,16 @@ export function parseLedger(values: CellValue[][]): LedgerRow[] {
       counterparty: str(v[7]),
       budgeted: num(v[8]),
       actual: num(v[9]),
-      forecast: num(v[11]),
-      remaining: num(v[12]),
-      status: str(v[13]).trim(),
+      committed: num(v[10]),
+      forecast: num(v[12]),
+      remaining: num(v[13]),
+      status: str(v[14]).trim(),
       date: serial === null ? null : serialToIso(serial),
-      notes: str(v[15]),
-      xeroId: str(v[16]).trim(),
-      xeroDescription: str(v[17]),
-      flags: str(v[18]),
-      proposal: str(v[19]),
+      notes: str(v[16]),
+      xeroId: str(v[17]).trim(),
+      xeroDescription: str(v[18]),
+      flags: str(v[19]),
+      proposal: str(v[20]),
     });
   });
   return rows;
@@ -172,6 +176,7 @@ export const toInput = (r: LedgerRow): RowInput => ({
   counterparty: r.counterparty,
   budgeted: r.budgeted,
   actual: r.actual,
+  committed: r.committed,
   status: (STATUSES as readonly string[]).includes(r.status)
     ? (r.status as Status)
     : "Planned",
