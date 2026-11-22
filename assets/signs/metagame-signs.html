@@ -505,6 +505,9 @@ async function drawSign(ctx, s, W, H) {
   const panelW = W * s.panel.width / 100;
   const pad = s.panel.on ? s.panel.pad * u : 0;
   const maxW = panelW - 2 * pad - (s.panel.on ? 0 : 0.5 * inch);
+  // Without a panel, maxW only anchors left/right alignment; text wraps only where it would run off the sign.
+  const edge = s.border.on ? bw : 0;
+  const wrapW = (l) => !s.panel.on ? (l.align === "center" ? W - 2 * edge : (W + maxW) / 2 - edge) : maxW;
   const gap = s.text.gap * u;
   const laid = [];
   let totalH = 0;
@@ -512,7 +515,7 @@ async function drawSign(ctx, s, W, H) {
   for (const l of s.lines) {
     const px = l.size * inch; ctx.font = fontStr(l, px);
     ctx.letterSpacing = `${l.spacing * px / 100}px`;
-    const rows = wrap(ctx, l.upper ? l.text.toUpperCase() : l.text, maxW);
+    const rows = wrap(ctx, l.upper ? l.text.toUpperCase() : l.text, wrapW(l));
     const lh = px * (l.font === "Bebas Neue" ? 1.0 : 1.2);
     laid.push({ l, px, rows, lh });
     totalH += rows.length * lh + gap;
