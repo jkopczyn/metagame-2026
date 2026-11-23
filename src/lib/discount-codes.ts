@@ -1,5 +1,5 @@
 import { env } from "@/env";
-import { airtableConfig } from "@/lib/airtable-config";
+import { airtableConfig, airtableFetch } from "@/lib/airtable-config";
 import { ticketTiers } from "@/lib/tickets";
 
 // Full BTC price of the standard ticket; discounts are resolved relative to it.
@@ -46,7 +46,7 @@ export async function lookupDiscountCode(
     `?filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`;
 
   try {
-    const res = await fetch(url, {
+    const res = await airtableFetch(url, {
       headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
     });
     if (!res.ok) {
@@ -161,7 +161,7 @@ export async function countCodeRedemptions(code: string): Promise<number> {
     do {
       const params = new URLSearchParams({ filterByFormula: formula });
       if (offset) params.set("offset", offset);
-      const res = await fetch(`${base}?${params.toString()}`, {
+      const res = await airtableFetch(`${base}?${params.toString()}`, {
         headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
       });
       if (!res.ok) {

@@ -1,5 +1,5 @@
 import { env } from "@/env";
-import { airtableConfig } from "@/lib/airtable-config";
+import { airtableConfig, airtableFetch } from "@/lib/airtable-config";
 import { SPONSOR_FORM_URL, VOLUNTEER_FORM_PATH } from "@/v2/lib/links";
 
 // Short links: /go/{slug} → Destination with the row's UTMs appended. Rows live
@@ -286,7 +286,7 @@ function tableUrl() {
 async function airtable(url: string, init?: RequestInit) {
   const { AIRTABLE_API_KEY } = env;
   if (!AIRTABLE_API_KEY) throw new Error("Airtable is not configured");
-  const res = await fetch(url, {
+  const res = await airtableFetch(url, {
     ...init,
     cache: "no-store",
     headers: {
@@ -386,11 +386,11 @@ const cached = (): RequestInit => ({
 export async function loadLinkOptions(): Promise<LinkOptions> {
   if (!env.AIRTABLE_API_KEY) throw new Error("Airtable is not configured");
   const [schemaRes, crmRes] = await Promise.all([
-    fetch(
+    airtableFetch(
       `https://api.airtable.com/v0/meta/bases/${airtableConfig.baseId}/tables`,
       cached(),
     ),
-    fetch(
+    airtableFetch(
       `https://api.airtable.com/v0/${airtableConfig.baseId}/${encodeURIComponent(airtableConfig.discordOutreachTableId)}?${new URLSearchParams(
         { "fields[]": CRM_NAME_FIELD, pageSize: "100" },
       )}`,

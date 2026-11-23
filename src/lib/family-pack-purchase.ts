@@ -12,15 +12,20 @@ import {
   allocateCents,
 } from "@/lib/family-pack";
 import { capturePurchase } from "@/lib/posthog-server";
-import { ticketCode } from "@/lib/ticket-code";
 import { followUpTicketPurchase } from "@/lib/ticket-followup";
-import { currentTicketCode, recordTicket } from "@/lib/ticket-store";
+import { recordTicket, type StoredPurchase } from "@/lib/ticket-store";
 import { pickUtm } from "@/lib/utm";
 
+/**
+ * Throws when a ticket row or an email fails. An Airtable failure comes back as
+ * `mirrorError` instead, once the tickets and emails are out; the caller still
+ * ends in a 500, so Stripe's retry fills Airtable in. `replayed` says an earlier
+ * delivery already wrote every admission.
+ */
 export async function recordFamilyPack(
   session: Stripe.Checkout.Session,
   status: PurchaseStatus,
-) {
+): Promise<{ mirrorError?: unknown; replayed: boolean }> {
   const attendees = attendeesFromMetadata(session.metadata);
   if (
     session.currency !== "usd" ||
@@ -39,15 +44,10 @@ export async function recordFamilyPack(
       ? charge.balance_transaction
       : null;
   const paymentId = intent?.id ?? session.payment_intent ?? session.id;
-  const tickets = attendees.map((attendee, index) => {
-    const id = `${paymentId}:ticket:${index + 1}`;
-    return { ...attendee, id, code: ticketCode(id) };
-  });
-  for (const [index, attendee] of tickets.entries()) {
+  const stored: StoredPurchase[] = [];
+  for (const [index, attendee] of attendees.entries()) {
     const purchase: PurchaseRecord = {
-      id: attendee.id,
-      // A retry after an unclaim must not write the old code back.
-      ticketCode: await currentTicketCode(attendee.id),
+      id: `${paymentId}:ticket:${index + 1}`,
       customerName: attendee.name,
       customerEmail: attendee.email,
       discordHandle: attendee.discord,
@@ -55,28 +55,50 @@ export async function recordFamilyPack(
       billingEmail: session.customer_details?.email ?? undefined,
       amount: FAMILY_PACK.usd,
       fee: balance
-        ? allocateCents(balance.fee, tickets.length, index) / 100
+        ? allocateCents(balance.fee, attendees.length, index) / 100
         : undefined,
       net: balance
-        ? allocateCents(balance.net, tickets.length, index) / 100
+        ? allocateCents(balance.net, attendees.length, index) / 100
         : undefined,
       ticketType: `${FAMILY_PACK.label} — Standard`,
       status,
       paymentMethod: "stripe",
       test: !session.livemode,
       receiptUrl: charge?.receipt_url ?? undefined,
-      notes: `Group order ${paymentId}; admission ${index + 1} of ${tickets.length}. Buyer: ${session.customer_details?.email ?? "unknown"}.`,
+      notes: `Group order ${paymentId}; admission ${index + 1} of ${attendees.length}. Buyer: ${session.customer_details?.email ?? "unknown"}.`,
       utm: pickUtm((key) => session.metadata?.[key]),
     };
-    const result = await recordPurchase(purchase);
-    if (!result.stored)
-      throw new Error("Family pack admissions could not be stored.");
     // A pack is a referral: every admission after the first points at the first.
-    await recordTicket(purchase, {
-      referredBy: index > 0 ? tickets[0].id : undefined,
-    });
-    await capturePurchase(purchase);
+    stored.push(
+      await recordTicket(purchase, {
+        referredBy: index > 0 ? stored[0].id : undefined,
+      }),
+    );
   }
+  const tickets = attendees.map((attendee, index) => ({
+    ...attendee,
+    code: stored[index].ticketCode!,
+  }));
+
+  let mirrorError: unknown;
+  for (const purchase of stored) {
+    await capturePurchase(purchase);
+    // One failure is enough to retry the lot; no need to wait out the rest.
+    if (mirrorError) continue;
+    try {
+      const result = await recordPurchase(purchase);
+      if (!result.stored)
+        throw new Error("Family pack admissions could not be stored.");
+    } catch (err) {
+      mirrorError = err;
+    }
+  }
+
+  // A retry only Airtable is holding up: the follow-ups have had their turn. Any
+  // other retry can be recovering from a failed email, so it still runs them.
+  const replayed = stored.every((purchase) => purchase.replayed);
+  const stuckOnMirror = replayed && !!mirrorError;
+
   if (status === "Paid") {
     const email = session.customer_details?.email;
     if (!email) throw new Error("Family pack buyer email missing.");
@@ -93,7 +115,7 @@ export async function recordFamilyPack(
     const buyerIsAttendee = tickets.some(
       (t) => t.email.toLowerCase() === email.toLowerCase(),
     );
-    if (buyerIsAttendee)
+    if (buyerIsAttendee && !stuckOnMirror)
       await followUpTicketPurchase({
         to: email,
         name: session.customer_details?.name ?? undefined,
@@ -114,14 +136,16 @@ export async function recordFamilyPack(
         idempotencyKey: `family-pack/${paymentId}/ticket/${index + 1}`,
         test: !session.livemode,
       });
-      await followUpTicketPurchase({
-        to: ticket.email,
-        name: ticket.name,
-        ticketType: `${FAMILY_PACK.label} — Standard`,
-        paymentId: `${paymentId}/ticket/${index + 1}`,
-        test: !session.livemode,
-        source: "Stripe webhook",
-      });
+      if (!stuckOnMirror)
+        await followUpTicketPurchase({
+          to: ticket.email,
+          name: ticket.name,
+          ticketType: `${FAMILY_PACK.label} — Standard`,
+          paymentId: `${paymentId}/ticket/${index + 1}`,
+          test: !session.livemode,
+          source: "Stripe webhook",
+        });
     }
   }
+  return { mirrorError, replayed };
 }

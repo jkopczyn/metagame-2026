@@ -1,5 +1,5 @@
 import { env } from "@/env";
-import { airtableConfig } from "@/lib/airtable-config";
+import { airtableConfig, airtableFetch } from "@/lib/airtable-config";
 import { cleanDiscordHandle } from "@/lib/discord-handle";
 import { EMAIL_LIST_VALUE, type InterestValue } from "@/lib/interests";
 import type { Utm } from "@/lib/utm";
@@ -69,7 +69,7 @@ export async function recordSignup(
   if (name) fields[NAME_FIELD] = name;
   if (notes) fields[NOTES_FIELD] = notes;
 
-  const res = await fetch(tableUrl, {
+  const res = await airtableFetch(tableUrl, {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${AIRTABLE_API_KEY}`,
@@ -107,7 +107,7 @@ export async function signupCreatedAt(email: string): Promise<Date | null> {
     filterByFormula: `LOWER(TRIM({${airtableConfig.signupEmailField}}))='${literal}'`,
   });
   query.append("fields[]", airtableConfig.signupEmailField);
-  const res = await fetch(
+  const res = await airtableFetch(
     `https://api.airtable.com/v0/${airtableConfig.baseId}/${encodeURIComponent(airtableConfig.signupsTableId)}?${query}`,
     { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` } },
   );
@@ -138,7 +138,7 @@ export async function unsubscribeSignup(
     return { stored: false, reason: "airtable-not-configured" };
   }
 
-  const res = await fetch(
+  const res = await airtableFetch(
     `https://api.airtable.com/v0/${airtableConfig.baseId}/${encodeURIComponent(airtableConfig.signupsTableId)}`,
     {
       method: "PATCH",
@@ -183,7 +183,7 @@ async function existingInterests(
     filterByFormula: `{${airtableConfig.signupEmailField}}='${literal}'`,
   });
   query.append("fields[]", INTEREST_FIELD);
-  const res = await fetch(`${tableUrl}?${query}`, {
+  const res = await airtableFetch(`${tableUrl}?${query}`, {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (!res.ok) {
@@ -223,7 +223,7 @@ export async function markPurchaseFailedIfExists(
 
   const tableUrl = `https://api.airtable.com/v0/${airtableConfig.baseId}/${encodeURIComponent(airtableConfig.purchasesTableId)}`;
 
-  const findRes = await fetch(
+  const findRes = await airtableFetch(
     `${tableUrl}?filterByFormula=${encodeURIComponent(`{ID}='${safe}'`)}&maxRecords=1`,
     { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` } },
   );
@@ -237,7 +237,7 @@ export async function markPurchaseFailedIfExists(
   if (!recordId) return false;
 
   const failed: PurchaseStatus = "Failed";
-  const patchRes = await fetch(tableUrl, {
+  const patchRes = await airtableFetch(tableUrl, {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${AIRTABLE_API_KEY}`,
@@ -276,7 +276,7 @@ export async function updatePurchaseTicketCode(
   if (!safe) return false;
 
   const tableUrl = `https://api.airtable.com/v0/${airtableConfig.baseId}/${encodeURIComponent(airtableConfig.purchasesTableId)}`;
-  const findRes = await fetch(
+  const findRes = await airtableFetch(
     `${tableUrl}?filterByFormula=${encodeURIComponent(`{ID}='${safe}'`)}&maxRecords=1`,
     { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` } },
   );
@@ -289,7 +289,7 @@ export async function updatePurchaseTicketCode(
   const recordId = found.records?.[0]?.id;
   if (!recordId) return false;
 
-  const patchRes = await fetch(tableUrl, {
+  const patchRes = await airtableFetch(tableUrl, {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${AIRTABLE_API_KEY}`,
@@ -411,7 +411,7 @@ export async function recordPurchase(
     fields["First Visit"] = purchase.utm.first_visit;
   if (purchase.utm?.posthog_id) fields["PostHog ID"] = purchase.utm.posthog_id;
 
-  const res = await fetch(
+  const res = await airtableFetch(
     `https://api.airtable.com/v0/${airtableConfig.baseId}/${encodeURIComponent(airtableConfig.purchasesTableId)}`,
     {
       method: "PATCH",
@@ -459,7 +459,7 @@ export async function recordCrypticClue(clue: string): Promise<ClueResult> {
     return { stored: false, reason: "airtable-not-configured" };
   }
 
-  const res = await fetch(cluesUrl(), {
+  const res = await airtableFetch(cluesUrl(), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${AIRTABLE_API_KEY}`,
@@ -493,7 +493,7 @@ export async function addCrypticClueContact(
   if (name) fields[CLUE_NAME_FIELD] = name;
   if (email) fields[CLUE_EMAIL_FIELD] = email;
 
-  const res = await fetch(cluesUrl(recordId), {
+  const res = await airtableFetch(cluesUrl(recordId), {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${AIRTABLE_API_KEY}`,
@@ -563,7 +563,7 @@ export async function recordDiscountCode(
   if (record.notes) fields["Comp Notes"] = record.notes;
   if (record.issuedBy) fields["Issued By"] = record.issuedBy;
 
-  const res = await fetch(
+  const res = await airtableFetch(
     `https://api.airtable.com/v0/${airtableConfig.baseId}/${encodeURIComponent(airtableConfig.discountCodesTableId)}`,
     {
       method: "PATCH",
@@ -598,7 +598,7 @@ export async function recordEgg(found: EggEvent, visit: string): Promise<void> {
   if (!AIRTABLE_API_KEY) return;
 
   const upsert = found.event === "clicks";
-  const res = await fetch(
+  const res = await airtableFetch(
     `https://api.airtable.com/v0/${airtableConfig.baseId}/${airtableConfig.eggTrackingTableId}`,
     {
       method: upsert ? "PATCH" : "POST",

@@ -11,6 +11,7 @@ import {
 } from "react";
 import { CircleAlertIcon, XIcon } from "lucide-react";
 import { deleteSession, saveSession, type FormState } from "./actions";
+import { retryable } from "@/lib/action-retry";
 import AttendancePanel from "./AttendancePanel";
 import ConfirmDialog from "./ConfirmDialog";
 import HostPicker from "./HostPicker";
@@ -253,7 +254,7 @@ export default function SessionForm({
   };
 
   const [state, formAction, pending] = useActionState<FormState, FormData>(
-    saveSession,
+    retryable(saveSession),
     {},
   );
   const [deleting, startDelete] = useTransition();

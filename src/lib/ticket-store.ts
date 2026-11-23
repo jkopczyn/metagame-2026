@@ -40,6 +40,8 @@ export { emailKey, holdsTicket } from "@/lib/ticket-holder";
 
 type Ticket = typeof schema.tickets.$inferInsert;
 export type TicketRow = typeof schema.tickets.$inferSelect;
+/** `replayed`: the row already had this status, so an earlier delivery got this far. */
+export type StoredPurchase = PurchaseRecord & { replayed: boolean };
 
 const { tickets, verification } = schema;
 
@@ -77,6 +79,13 @@ const STATUS: Record<PurchaseStatus, Ticket["status"]> = {
   Underpaid: "underpaid",
 };
 
+const PURCHASE_STATUS: Record<Ticket["status"], PurchaseStatus> = {
+  pending: "Pending",
+  paid: "Paid",
+  failed: "Failed",
+  underpaid: "Underpaid",
+};
+
 /** The ticket row a webhook purchase maps to. Never carries ownership. */
 export function ticketFromPurchase(purchase: PurchaseRecord): Ticket {
   return {
@@ -97,20 +106,25 @@ export function ticketFromPurchase(purchase: PurchaseRecord): Ticket {
 }
 
 // Upsert on payment id, so a redelivered webhook walks the same row through
-// pending → paid. Blank fields never clobber, and the code, owner and holder
-// are left alone: a retry must never un-claim a ticket or revive an old code.
+// pending → paid. Blank fields never clobber, a late Pending or Underpaid can't
+// undo a settled status, and the code, owner and holder are left alone: a retry must
+// never un-claim a ticket or revive an old code. Returns the purchase as stored,
+// so the mirror and the emails carry the row's status and current code.
 // `referredBy` is the referrer's payment id off the checkout's metadata; it
 // only lands when that ticket exists, so a stale link can't break the write.
 export async function recordTicket(
   purchase: PurchaseRecord,
   { referredBy }: { referredBy?: string } = {},
-): Promise<void> {
+): Promise<StoredPurchase> {
+  const row = ticketFromPurchase(purchase);
   if (!env.DATABASE_URL) {
+    // Paid buyers would get a code nothing knows about; 500 so the sender retries.
+    if (process.env.NEXT_PUBLIC_VERCEL_ENV === "production")
+      throw new Error("DATABASE_URL is not set");
     console.warn(`[tickets] DATABASE_URL not set — not stored: ${purchase.id}`);
-    return;
+    return { ...purchase, ticketCode: row.ticketCode, replayed: false };
   }
   const db = getDb();
-  const row = ticketFromPurchase(purchase);
   if (referredBy) {
     const [referrer] = await db
       .select({ id: tickets.paymentId })
@@ -121,7 +135,6 @@ export async function recordTicket(
     else console.warn(`[tickets] referrer ${referredBy} not found`);
   }
   const {
-    status,
     test,
     tier,
     year,
@@ -134,7 +147,7 @@ export async function recordTicket(
   } = row;
   const set = Object.fromEntries(
     Object.entries({
-      status,
+      status: sql`case when (${tickets.status} in ('paid', 'failed') and excluded.status = 'pending') or (${tickets.status} = 'paid' and excluded.status = 'underpaid') then ${tickets.status} else excluded.status end`,
       test,
       tier,
       year,
@@ -146,32 +159,34 @@ export async function recordTicket(
       referredByPaymentId,
     }).filter(([, v]) => v != null),
   );
-  await db
-    .insert(schema.tickets)
-    .values(row)
-    .onConflictDoUpdate({ target: schema.tickets.paymentId, set });
-}
-
-/**
- * The code a payment's ticket has now, for webhooks to record in Airtable:
- * unclaiming swaps the derived code for a random one.
- */
-export async function currentTicketCode(paymentId: string): Promise<string> {
-  if (env.DATABASE_URL) {
-    try {
-      const [row] = await getDb()
-        .select({ code: tickets.ticketCode })
-        .from(tickets)
-        .where(eq(tickets.paymentId, paymentId))
-        .limit(1);
-      if (row) return row.code;
-    } catch (err) {
-      // The purchase must still reach Airtable; the derived code is right
-      // unless the ticket was unclaimed, which a DB outage can't tell us.
-      console.error("[tickets] current code lookup failed", paymentId, err);
-    }
+  const [prior] = await db
+    .select({ status: tickets.status })
+    .from(tickets)
+    .where(eq(tickets.paymentId, row.paymentId))
+    .limit(1);
+  const upsert = () =>
+    db
+      .insert(schema.tickets)
+      .values(row)
+      .onConflictDoUpdate({ target: schema.tickets.paymentId, set })
+      .returning({ status: tickets.status, ticketCode: tickets.ticketCode });
+  let rows;
+  try {
+    rows = await upsert();
+  } catch (e) {
+    // Simultaneous first deliveries can collide on the derived code, which
+    // ON CONFLICT doesn't cover. The winner has committed by then, so a second
+    // try lands on its row; a code held by another payment still throws.
+    if (!isUniqueViolation(e)) throw e;
+    rows = await upsert();
   }
-  return ticketCode(paymentId);
+  const [stored] = rows;
+  return {
+    ...purchase,
+    status: PURCHASE_STATUS[stored.status],
+    ticketCode: stored.ticketCode,
+    replayed: prior?.status === stored.status,
+  };
 }
 
 /** Flip a recorded ticket to failed; no row, no-op. Idempotent. */

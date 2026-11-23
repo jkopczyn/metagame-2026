@@ -5,16 +5,18 @@ const {
   recordTicket,
   capturePurchase,
   sendTicketConfirmationEmail,
+  followUpTicketPurchase,
 } = vi.hoisted(() => ({
   recordPurchase: vi.fn(),
   recordTicket: vi.fn(),
   capturePurchase: vi.fn(),
   sendTicketConfirmationEmail: vi.fn(),
+  followUpTicketPurchase: vi.fn(),
 }));
 vi.mock("@/lib/airtable", () => ({ recordPurchase }));
 vi.mock("@/lib/posthog-server", () => ({ capturePurchase }));
 vi.mock("@/lib/email", () => ({ sendTicketConfirmationEmail }));
-vi.mock("@/lib/ticket-followup", () => ({ followUpTicketPurchase: vi.fn() }));
+vi.mock("@/lib/ticket-followup", () => ({ followUpTicketPurchase }));
 vi.mock("@/lib/error-report", () => ({ reportError: vi.fn() }));
 vi.mock("@/lib/ticket-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./ticket-store")>()),
@@ -22,7 +24,9 @@ vi.mock("@/lib/ticket-store", async (importOriginal) => ({
 }));
 import { recordFamilyPack } from "./family-pack-purchase";
 import { packMetadata } from "./family-pack";
+import { ticketCode } from "./ticket-code";
 import { ticketFromPurchase } from "./ticket-store";
+import type { PurchaseRecord } from "./airtable";
 
 function session(count = 4) {
   return {
@@ -52,6 +56,10 @@ describe("family pack fulfillment", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     recordPurchase.mockResolvedValue({ stored: true });
+    recordTicket.mockImplementation(async (p: PurchaseRecord) => ({
+      ...p,
+      ticketCode: ticketCode(p.id),
+    }));
     sendTicketConfirmationEmail.mockResolvedValue({ sent: true });
   });
   it.each([4, 5, 6])(
@@ -154,15 +162,96 @@ describe("family pack fulfillment", () => {
     ).rejects.toThrow();
     expect(recordPurchase).not.toHaveBeenCalled();
   });
-  it("propagates recording/email failures so Stripe retries can recover", async () => {
+  it("writes every ticket before the mirror, and delivers despite its failure", async () => {
+    recordPurchase.mockRejectedValue(new Error("Airtable 429"));
+    const { mirrorError } = await recordFamilyPack(session(4), "Paid");
+    expect(mirrorError).toEqual(new Error("Airtable 429"));
+    expect(recordTicket).toHaveBeenCalledTimes(4);
+    expect(recordPurchase).toHaveBeenCalledTimes(1);
+    expect(capturePurchase).toHaveBeenCalledTimes(4);
+    expect(sendTicketConfirmationEmail).toHaveBeenCalledTimes(5);
+    expect(recordTicket.mock.invocationCallOrder[3]).toBeLessThan(
+      recordPurchase.mock.invocationCallOrder[0],
+    );
+  });
+  describe("a retry", () => {
+    const replaying = (replayed: (id: string) => boolean) =>
+      recordTicket.mockImplementation(async (p: PurchaseRecord) => ({
+        ...p,
+        ticketCode: ticketCode(p.id),
+        replayed: replayed(p.id),
+      }));
+
+    it("skips the follow-ups when only Airtable is holding it up", async () => {
+      replaying(() => true);
+      recordPurchase.mockRejectedValue(new Error("Airtable 429"));
+      const result = await recordFamilyPack(session(4), "Paid");
+      expect(result).toMatchObject({ replayed: true });
+      expect(followUpTicketPurchase).not.toHaveBeenCalled();
+      expect(sendTicketConfirmationEmail).toHaveBeenCalledTimes(5);
+    });
+
+    it("follows up when the mirror lands, since an email may have thrown before", async () => {
+      replaying(() => true);
+      await recordFamilyPack(session(4), "Paid");
+      expect(followUpTicketPurchase).toHaveBeenCalledTimes(4);
+    });
+
+    it("follows up when an earlier delivery stopped partway through the rows", async () => {
+      replaying((id) => !id.endsWith(":4"));
+      recordPurchase.mockRejectedValue(new Error("Airtable 429"));
+      const result = await recordFamilyPack(session(4), "Paid");
+      expect(result).toMatchObject({ replayed: false });
+      expect(followUpTicketPurchase).toHaveBeenCalledTimes(4);
+    });
+  });
+  it("reports an unconfigured mirror the same way", async () => {
     recordPurchase.mockResolvedValue({ stored: false });
-    await expect(recordFamilyPack(session(), "Paid")).rejects.toThrow();
-    expect(recordTicket).not.toHaveBeenCalled();
+    const { mirrorError } = await recordFamilyPack(session(), "Paid");
+    expect(mirrorError).toBeInstanceOf(Error);
+    expect(recordTicket).toHaveBeenCalledTimes(4);
+  });
+  it("returns no mirror error when it all lands", async () => {
+    expect((await recordFamilyPack(session(), "Paid")).mirrorError).toBe(
+      undefined,
+    );
+  });
+  it("propagates ticket and email failures so Stripe retries can recover", async () => {
+    recordTicket.mockRejectedValueOnce(new Error("Neon down"));
+    await expect(recordFamilyPack(session(), "Paid")).rejects.toThrow(
+      "Neon down",
+    );
+    expect(recordPurchase).not.toHaveBeenCalled();
     expect(sendTicketConfirmationEmail).not.toHaveBeenCalled();
-    recordPurchase.mockResolvedValue({ stored: true });
     sendTicketConfirmationEmail.mockRejectedValue(new Error("mail down"));
     await expect(recordFamilyPack(session(), "Paid")).rejects.toThrow(
       "mail down",
     );
+  });
+  it("emails and mirrors the codes the tickets have now", async () => {
+    recordTicket.mockImplementation(async (p: PurchaseRecord) => ({
+      ...p,
+      ticketCode: p.id.endsWith(":2") ? "REISSU" : ticketCode(p.id),
+    }));
+    await recordFamilyPack(session(4), "Paid");
+    expect(recordPurchase.mock.calls[1][0].ticketCode).toBe("REISSU");
+    const [buyer] = sendTicketConfirmationEmail.mock.calls[0];
+    expect(buyer.groupTickets[1].code).toBe("REISSU");
+    expect(sendTicketConfirmationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "guest1@example.com",
+        ticketCode: "REISSU",
+      }),
+    );
+  });
+  it("mirrors the stored status, not a Pending the rows refused", async () => {
+    recordTicket.mockImplementation(async (p: PurchaseRecord) => ({
+      ...p,
+      status: "Paid",
+      ticketCode: ticketCode(p.id),
+    }));
+    await recordFamilyPack(session(), "Pending");
+    expect(recordPurchase.mock.calls[0][0].status).toBe("Paid");
+    expect(sendTicketConfirmationEmail).not.toHaveBeenCalled();
   });
 });

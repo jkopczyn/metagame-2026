@@ -2,42 +2,17 @@
 
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { FaEnvelope } from "react-icons/fa";
 import ContentPage from "@/v2/components/ContentPage";
 import ContactLink from "@/v2/components/contact/ContactLink";
 import PartifulInvite from "@/v2/components/tickets/PartifulInvite";
 import { Button } from "@/v2/components/ui/button";
+import { isFinal, nextPhase, phaseFor, type Phase } from "./phase";
 
-// OpenNode charge lifecycle, narrowed to what we surface here.
-type Phase =
-  | "loading"
-  | "pending"
-  | "paid"
-  | "underpaid"
-  | "expired"
-  | "refunded"
-  | "error";
-
-function phaseFor(status: string | null): Phase {
-  switch (status) {
-    case "paid":
-      return "paid";
-    case "processing":
-      return "pending";
-    case "underpaid":
-      return "underpaid";
-    case "expired":
-      return "expired";
-    case "refunded":
-      return "refunded";
-    case null:
-      return "error";
-    default:
-      // unpaid / anything else → still waiting.
-      return "pending";
-  }
-}
+const STATUS_TIMEOUT_MS = 10_000;
+const POLL_MS = 5000;
+const noSubscribe = () => () => {};
 
 export default function BitcoinCheckoutPage() {
   const params = useParams<{ orderId: string }>();
@@ -46,41 +21,53 @@ export default function BitcoinCheckoutPage() {
   const orderId = params.orderId;
 
   // Charge id comes from the ?charge= query if present; otherwise from the
-  // localStorage stash the modal wrote (keyed on orderId) before redirect. Lazy
-  // init reads localStorage once on mount (it's client-only, so guarded).
-  const [chargeId] = useState<string | null>(() => {
-    const fromQuery = search.get("charge");
-    if (fromQuery) return fromQuery;
-    try {
-      return localStorage.getItem(`btc-charge:${orderId}`);
-    } catch {
-      return null;
-    }
-  });
-  const [phase, setPhase] = useState<Phase>("loading");
+  // localStorage stash the modal wrote (keyed on orderId) before redirect. The
+  // server can't see that stash, so undefined there means "don't know yet".
+  const chargeId = useSyncExternalStore(
+    noSubscribe,
+    () => {
+      const fromQuery = search.get("charge");
+      if (fromQuery) return fromQuery;
+      try {
+        return localStorage.getItem(`btc-charge:${orderId}`);
+      } catch {
+        return null;
+      }
+    },
+    () => undefined,
+  );
+  const [polled, setPolled] = useState<Phase>("loading");
+  // No charge to look up: nothing will ever arrive, so don't sit on "loading".
+  const phase = chargeId === null ? "error" : polled;
 
   useEffect(() => {
     if (!chargeId) return;
-    let cancelled = false;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
 
+    // Each poll waits for the last, so a slow answer can't overwrite a newer one.
     async function poll() {
+      let status: string | null = null;
       try {
         const res = await fetch(
           `/api/checkout/opennode/status?id=${encodeURIComponent(chargeId!)}`,
+          { signal: AbortSignal.timeout(STATUS_TIMEOUT_MS) },
         );
-        if (!res.ok) throw new Error("status request failed");
-        const { status } = (await res.json()) as { status: string | null };
-        if (!cancelled) setPhase(phaseFor(status));
+        if (res.ok) ({ status } = (await res.json()) as { status: string });
       } catch {
-        if (!cancelled) setPhase("error");
+        // Handled as the failed poll below.
+      }
+      if (stopped) return;
+      setPolled((current) => nextPhase(current, status));
+      if (status == null || !isFinal(phaseFor(status))) {
+        timer = setTimeout(poll, POLL_MS);
       }
     }
 
     poll();
-    const interval = setInterval(poll, 5000);
     return () => {
-      cancelled = true;
-      clearInterval(interval);
+      stopped = true;
+      clearTimeout(timer);
     };
   }, [chargeId]);
 

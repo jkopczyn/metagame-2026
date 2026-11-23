@@ -1,5 +1,6 @@
 import { env } from "@/env";
-import { airtableConfig } from "@/lib/airtable-config";
+import { airtableConfig, airtableFetch } from "@/lib/airtable-config";
+import { fetchWithin } from "@/lib/fetch-timeout";
 
 // Rows from the site's journeys (src/v2/forms), written where the Airtable
 // forms they replaced used to write. Fields are addressed by id. typecast
@@ -7,6 +8,9 @@ import { airtableConfig } from "@/lib/airtable-config";
 // though it then recreates the old option: update the journey to match.
 
 export type FormRowResult = { stored: boolean; id?: string };
+
+// Up to 5 MB of base64, so it gets longer than a row write.
+const uploadFetch = fetchWithin(30_000);
 
 const headers = (key: string) => ({
   Authorization: `Bearer ${key}`,
@@ -29,7 +33,7 @@ export async function createFormRow(
     );
     return { stored: false };
   }
-  const res = await fetch(
+  const res = await airtableFetch(
     `https://api.airtable.com/v0/${airtableConfig.baseId}/${tableId}`,
     {
       method: "POST",
@@ -55,7 +59,7 @@ export async function attachFile(
 ): Promise<void> {
   const { AIRTABLE_API_KEY } = env;
   if (!AIRTABLE_API_KEY) return;
-  const res = await fetch(
+  const res = await uploadFetch(
     `https://content.airtable.com/v0/${airtableConfig.baseId}/${recordId}/${fieldId}/uploadAttachment`,
     {
       method: "POST",

@@ -2,7 +2,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { profiles, sessionHosts, sessions } from "@/db/schema";
 import { env } from "@/env";
-import { airtableConfig } from "./airtable-config";
+import { airtableConfig, airtableFetch } from "./airtable-config";
 import {
   fillOnly,
   HOST_ALIASES,
@@ -36,7 +36,7 @@ export async function fetchRfpRecord(
 ): Promise<Record<string, unknown> | null> {
   const key = env.AIRTABLE_API_KEY;
   if (!key) throw new Error("AIRTABLE_API_KEY is not set.");
-  const res = await fetch(
+  const res = await airtableFetch(
     `https://api.airtable.com/v0/${airtableConfig.baseId}/${airtableConfig.rfpSubmissionsTableId}/${recordId}`,
     { headers: { Authorization: `Bearer ${key}` }, cache: "no-store" },
   );

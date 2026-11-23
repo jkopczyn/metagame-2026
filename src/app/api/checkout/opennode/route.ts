@@ -22,6 +22,9 @@ function resolveOrigin(request: Request): string {
   return new URL(request.url).origin;
 }
 
+const isPlainObject = (value: unknown) =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_FIELD_LEN = 200;
 
@@ -45,6 +48,19 @@ export async function POST(request: Request) {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  if (
+    !isPlainObject(body) ||
+    [
+      body.ticketId,
+      body.name,
+      body.email,
+      body.discord,
+      body.discountCode,
+    ].some((field) => field != null && typeof field !== "string")
+  ) {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
   const { ticketId, name, email, discord, discountCode, btc: btcInput } = body;

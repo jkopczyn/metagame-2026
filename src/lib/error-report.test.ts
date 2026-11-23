@@ -16,6 +16,8 @@ import {
   ON_SITE_ROLE_ID,
   formatErrorReport,
   reportError,
+  reportErrorOnce,
+  reportRequestError,
 } from "./error-report";
 
 const now = new Date("2026-11-01T03:04:05Z");
@@ -127,5 +129,81 @@ describe("reportError", () => {
     ).resolves.toBe(false);
     expect(error).toHaveBeenCalled();
     error.mockRestore();
+  });
+});
+
+describe("reportErrorOnce", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("reports a key once per window, then again after it", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-06T00:00:00Z"));
+    const report = { source: "S", summary: "s", mention: false };
+    await reportErrorOnce("window", report);
+    await reportErrorOnce("window", report);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.setSystemTime(new Date("2026-11-06T00:11:00Z"));
+    await reportErrorOnce("window", report);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("caps distinct keys, so an outage can't flood the channel", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-06T01:00:00Z"));
+    for (let i = 0; i < 40; i++) {
+      await reportErrorOnce(`key-${i}`, { source: "S", summary: "s" });
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(20);
+  });
+});
+
+describe("reportRequestError", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  const request = { path: "/schedule?token=secret", method: "GET" };
+  const context = { routePath: "/schedule", routeType: "render" };
+
+  function setup() {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-06T02:00:00Z"));
+    const sent = () =>
+      JSON.parse(
+        ((fetchMock.mock.calls as unknown[][])[0][1] as RequestInit)
+          .body as string,
+      ) as { content: string; allowed_mentions: { users: string[] } };
+    return { fetchMock, sent };
+  }
+
+  it("stays quiet outside production", async () => {
+    const { fetchMock } = setup();
+    await reportRequestError(new Error("boom"), request, context);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reports without a ping, the query or a second copy", async () => {
+    vi.stubEnv("NEXT_PUBLIC_VERCEL_ENV", "production");
+    const { fetchMock, sent } = setup();
+    const err = Object.assign(new Error("boom"), { digest: "123" });
+    await reportRequestError(err, request, context);
+    await reportRequestError(err, request, context);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sent().allowed_mentions.users).toEqual([]);
+    expect(sent().content).toContain("/schedule");
+    expect(sent().content).toContain("123");
+    expect(sent().content).not.toContain("secret");
+    expect(sent().content).not.toContain(`<@${BRIAN_DISCORD_ID}>`);
   });
 });

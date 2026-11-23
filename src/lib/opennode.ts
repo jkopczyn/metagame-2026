@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { fetchWithin } from "@/lib/fetch-timeout";
 
 // OpenNode integration with no SDK — just fetch + node crypto. The 2025 site used
 // the `opennode` npm package but it dragged in a lot for two endpoints; a thin
@@ -9,6 +10,8 @@ import crypto from "node:crypto";
 export const BTC_CHECKOUT_OPEN: boolean = false;
 
 type OpenNodeEnv = "live" | "dev";
+
+const openNodeFetch = fetchWithin(10_000);
 
 function getEnv(): OpenNodeEnv {
   return process.env.OPENNODE_ENV === "live" ? "live" : "dev";
@@ -85,7 +88,7 @@ function unwrap(json: unknown): OpenNodeCharge {
 export async function createCharge(
   input: CreateChargeInput,
 ): Promise<OpenNodeCharge> {
-  const res = await fetch(`${getBaseUrl()}/v1/charges`, {
+  const res = await openNodeFetch(`${getBaseUrl()}/v1/charges`, {
     method: "POST",
     headers: {
       Authorization: getKey(),
@@ -117,7 +120,7 @@ export async function getCharge(id: string): Promise<OpenNodeCharge> {
   if (!isValidChargeId(id)) {
     throw new Error("Invalid OpenNode charge id");
   }
-  const res = await fetch(
+  const res = await openNodeFetch(
     `${getBaseUrl()}/v1/charge/${encodeURIComponent(id)}`,
     {
       headers: { Authorization: getKey() },

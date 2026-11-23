@@ -1,7 +1,7 @@
 import "server-only";
 
 import { env } from "@/env";
-import { airtableConfig } from "@/lib/airtable-config";
+import { airtableConfig, airtableFetch } from "@/lib/airtable-config";
 import { CHILD_FIELDS, FAMILY_FIELDS } from "@/v2/forms/children";
 
 export type Family = {
@@ -105,7 +105,7 @@ export async function loadChildren(): Promise<ChildrenData> {
       returnFieldsByFieldId: "true",
     });
     if (offset) params.set("offset", offset);
-    const res = await fetch(`${base}?${params}`, {
+    const res = await airtableFetch(`${base}?${params}`, {
       cache: "no-store",
       headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` },
     });

@@ -4,6 +4,11 @@ import { useActionState, useState } from "react";
 import InfoTip from "../InfoTip";
 import { submitGrades, type SaveState } from "../actions";
 import {
+  keepingSavedAt,
+  retryable,
+  submitKeepingDraft,
+} from "@/lib/action-retry";
+import {
   ADVANCE_FIELD,
   SPACE_OPTIONS_FIELD,
   type RubricGrade,
@@ -192,7 +197,7 @@ export default function GradeForm({
   phase: string | null;
 }) {
   const [state, action, pending] = useActionState(
-    submitGrades.bind(null, sessionId),
+    retryable(keepingSavedAt(submitGrades.bind(null, sessionId))),
     initialState,
   );
 
@@ -220,6 +225,7 @@ export default function GradeForm({
     <form
       key={state.savedAt ?? "initial"}
       action={action}
+      onSubmit={submitKeepingDraft(action)}
       onChange={(event) => {
         const data = new FormData(event.currentTarget);
         setComplete(RUBRIC_METRICS.every((m) => data.get(m.key)));

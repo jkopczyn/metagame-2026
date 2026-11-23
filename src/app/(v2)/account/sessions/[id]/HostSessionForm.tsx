@@ -7,6 +7,11 @@ import {
   saveHostSession,
   type SaveState,
 } from "./actions";
+import {
+  keepingSavedAt,
+  retryable,
+  submitKeepingDraft,
+} from "@/lib/action-retry";
 import { AGES, CATEGORIES } from "@/lib/schedule";
 
 type Host = { userId: string; name: string; email: string };
@@ -55,18 +60,24 @@ export default function HostSessionForm({
   viewerId: string;
 }) {
   const [state, save, saving] = useActionState(
-    saveHostSession.bind(null, sessionId),
+    retryable(keepingSavedAt(saveHostSession.bind(null, sessionId))),
     initial,
   );
   const [addState, add, adding] = useActionState(
-    addCohost.bind(null, sessionId),
+    retryable(keepingSavedAt(addCohost.bind(null, sessionId))),
     initial,
   );
   const [removing, startRemove] = useTransition();
 
   return (
     <div className="mt-8 flex max-w-[640px] flex-col gap-10">
-      <form action={save} className="flex flex-col gap-4">
+      {/* Re-keying on the save remounts the form against what's now stored. */}
+      <form
+        key={state.savedAt ?? "initial"}
+        action={save}
+        onSubmit={submitKeepingDraft(save)}
+        className="flex flex-col gap-4"
+      >
         <label className={label}>
           Title
           <input
@@ -206,7 +217,12 @@ export default function HostSessionForm({
             </li>
           ))}
         </ul>
-        <form action={add} className="flex flex-col gap-2">
+        <form
+          key={addState.savedAt ?? "initial"}
+          action={add}
+          onSubmit={submitKeepingDraft(add)}
+          className="flex flex-col gap-2"
+        >
           <label className={label}>
             Add a co-host by email
             <input

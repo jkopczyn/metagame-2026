@@ -347,12 +347,13 @@ export async function sendAdminErrorEmail(errorMessage: string) {
     );
     return;
   }
-  await resend.emails.send({
+  const { error } = await resend.emails.send({
     from: FROM,
     to: [TEAM],
     subject: "**URGENT** METAGAME Admin Error",
     html: `<p style="white-space: pre-wrap;">An error occurred: ${escapeHtml(errorMessage)}</p>`,
   });
+  if (error) throw new Error(`Resend send failed: ${error.message}`);
 }
 
 export type ContactMessage = {

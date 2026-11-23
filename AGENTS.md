@@ -39,10 +39,11 @@ applied one, so regenerate after rebasing rather than renumbering; `pnpm db:chec
 
 ### Tickets
 
-The payment webhooks write each purchase to Airtable and then to `tickets`
-through `recordTicket()` in `src/lib/ticket-store.ts`, upserting on the payment
-id so retries can't duplicate. Purchases from before that were backfilled
-from Airtable once (2026-10-20). A ticket is
+The payment webhooks write each purchase to `tickets` through `recordTicket()`
+in `src/lib/ticket-store.ts`, upserting on the payment id so retries can't
+duplicate, and then mirror it to Airtable; a mirror failure still sends the
+emails, then returns a 500 so the provider's retry fills Airtable in; a retry
+still stuck on Airtable skips the follow-up and the alert. Purchases from before that were backfilled from Airtable once (2026-10-20). A ticket is
 owned only once its code is claimed; a matching purchaser email shows the
 buyer their tickets but never grants ownership.
 

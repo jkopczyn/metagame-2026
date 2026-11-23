@@ -9,6 +9,7 @@ import {
   type UnclaimState,
 } from "./actions";
 import { CheckIcon, CopyIcon, LinkIcon } from "lucide-react";
+import { retryable } from "@/lib/action-retry";
 import { Button } from "@/v2/components/ui/button";
 import PinInput from "@/v2/components/auth/PinInput";
 import {
@@ -87,9 +88,16 @@ function InviteCode({ code }: { code: string }) {
   );
 }
 
+const claimMineOrRetry = retryable((_: ClaimState, id: string) =>
+  claimMine(id),
+);
+const unclaimOrRetry = retryable((_: UnclaimState, id: string) =>
+  unclaimMine(id),
+);
+
 export default function TicketsPanel({ tickets }: { tickets: TicketView[] }) {
   const [state, action, pending] = useActionState<ClaimState, FormData>(
-    claim,
+    retryable(claim),
     {},
   );
   const [claiming, startClaim] = useTransition();
@@ -144,7 +152,7 @@ export default function TicketsPanel({ tickets }: { tickets: TicketView[] }) {
                     onClick={() => {
                       setClaimingId(t.id);
                       startClaim(async () =>
-                        setMineState(await claimMine(t.id)),
+                        setMineState(await claimMineOrRetry({}, t.id)),
                       );
                     }}
                     className="bg-moss px-3 py-1 hover:bg-moss/85"
@@ -191,7 +199,7 @@ export default function TicketsPanel({ tickets }: { tickets: TicketView[] }) {
                       disabled={unclaiming}
                       onClick={() =>
                         startUnclaim(async () => {
-                          setUnclaimState(await unclaimMine(t.id));
+                          setUnclaimState(await unclaimOrRetry({}, t.id));
                           setConfirmingId(null);
                         })
                       }

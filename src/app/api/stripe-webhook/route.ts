@@ -10,12 +10,11 @@ import {
   type PurchaseStatus,
 } from "@/lib/airtable";
 import { sendTicketConfirmationEmail } from "@/lib/email";
-import { reportError } from "@/lib/error-report";
+import { reportError, reportErrorOnce } from "@/lib/error-report";
 import { followUpTicketPurchase } from "@/lib/ticket-followup";
 import { getStripe } from "@/lib/stripe";
 import { capturePurchase } from "@/lib/posthog-server";
-import { ticketCode } from "@/lib/ticket-code";
-import { currentTicketCode, recordTicket } from "@/lib/ticket-store";
+import { recordTicket } from "@/lib/ticket-store";
 import {
   dayPassForPaymentLinkUrl,
   tierForCheckoutMetadata,
@@ -37,12 +36,63 @@ function expanded<T extends object>(
   return value && typeof value === "object" ? value : null;
 }
 
+/**
+ * Current status of a checkout. The event's own snapshot can be days old by the
+ * time it arrives, so only the retrieved session counts as paid or not.
+ */
+function checkoutStatus(
+  eventType: Stripe.Event["type"],
+  current: Pick<Stripe.Checkout.Session, "payment_status">,
+): PurchaseStatus {
+  // Card settles instantly; a 100%-off checkout owes nothing — both are done.
+  if (
+    current.payment_status === "paid" ||
+    current.payment_status === "no_payment_required"
+  )
+    return "Paid";
+  if (eventType === "checkout.session.async_payment_failed") return "Failed";
+  // `completed` but not yet paid = a delayed method (ACH) awaiting settlement.
+  return "Pending";
+}
+
+// The ticket is good and the buyer has their email; only Airtable is behind.
+// The 500 gets it filled in by Stripe's retry, which can't duplicate either.
+// Stripe retries for days, so only the first failure alerts.
+async function mirrorFailed(
+  error: unknown,
+  session: string,
+  replayed: boolean,
+) {
+  console.error("[stripe-webhook] Airtable mirror failed:", error);
+  if (!replayed)
+    await reportError({
+      source: "Stripe webhook",
+      summary:
+        "Ticket recorded, but its Airtable row didn't update; Stripe will retry without alerting again",
+      details: { Session: session },
+      error,
+      mention: false,
+    });
+  return NextResponse.json({ error: "Processing failed" }, { status: 500 });
+}
+
 export async function POST(request: Request) {
   const stripe = getStripe();
   const webhookSecret = env.STRIPE_WEBHOOK_SECRET;
 
-  // Unconfigured env is a 200 no-op (not a 500) so it doesn't spin Stripe's retries.
   if (!stripe || !webhookSecret) {
+    // In production this is a lost purchase, so keep Stripe retrying until it's fixed.
+    // NEXT_PUBLIC_ because deploys go out prebuilt (see src/lib/tickets.ts).
+    if (process.env.NEXT_PUBLIC_VERCEL_ENV === "production") {
+      console.error("[stripe-webhook] not configured in production");
+      await reportErrorOnce("stripe-webhook-unconfigured", {
+        source: "Stripe webhook",
+        summary:
+          "STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET is unset in production, so purchases aren't being recorded; Stripe will retry",
+      });
+      return NextResponse.json({ error: "Not configured" }, { status: 500 });
+    }
+    // Elsewhere a 200 no-op (not a 500) so it doesn't spin Stripe's retries.
     console.warn("[stripe-webhook] not configured — ignoring event");
     return NextResponse.json({ received: true, configured: false });
   }
@@ -136,20 +186,6 @@ export async function POST(request: Request) {
 
   const session = event.data.object as Stripe.Checkout.Session;
 
-  let status: PurchaseStatus;
-  if (event.type === "checkout.session.async_payment_failed") {
-    status = "Failed";
-  } else if (
-    session.payment_status === "paid" ||
-    session.payment_status === "no_payment_required"
-  ) {
-    // Card settles instantly; a 100%-off checkout owes nothing — both are done.
-    status = "Paid";
-  } else {
-    // `completed` but not yet paid = a delayed method (ACH) awaiting settlement.
-    status = "Pending";
-  }
-
   try {
     // One retrieve with expands yields ticket type, receipt URL, and Stripe's fee/net.
     const full = await stripe.checkout.sessions.retrieve(session.id, {
@@ -161,12 +197,17 @@ export async function POST(request: Request) {
       ],
     });
 
+    const status = checkoutStatus(event.type, full);
+
     if (full.metadata?.tier === FAMILY_PACK.id) {
+      let mirrorError: unknown;
+      let replayed = false;
       try {
-        await recordFamilyPack(full, status);
+        ({ mirrorError, replayed } = await recordFamilyPack(full, status));
       } catch (err) {
-        // Still rethrown so Stripe retries (fulfillment is idempotent), which
-        // means a persistent failure alerts once per retry.
+        // A 500 so Stripe retries (fulfillment is idempotent), which means a
+        // persistent failure alerts once per retry.
+        console.error("[stripe-webhook] family pack failed:", err);
         await reportError({
           source: "Stripe webhook",
           summary:
@@ -178,8 +219,13 @@ export async function POST(request: Request) {
           },
           error: err,
         });
-        throw err;
+        return NextResponse.json(
+          { error: "Processing failed" },
+          { status: 500 },
+        );
       }
+      if (mirrorError)
+        return await mirrorFailed(mirrorError, full.id, replayed);
       return NextResponse.json({ received: true });
     }
 
@@ -246,8 +292,6 @@ export async function POST(request: Request) {
     const purchase: PurchaseRecord = {
       // Prefer the PaymentIntent id (the canonical payment) as the upsert key.
       id: paymentIntent?.id ?? full.id,
-      // A retry after an unclaim must not write the old code back.
-      ticketCode: await currentTicketCode(paymentIntent?.id ?? full.id),
       customerName: full.customer_details?.name ?? undefined,
       preferredName,
       customerEmail: full.customer_details?.email ?? undefined,
@@ -270,11 +314,23 @@ export async function POST(request: Request) {
       // coupon — either way it shouldn't count as a real sale.
       test: !event.livemode || isTestCoupon,
     };
-    await recordPurchase(purchase);
-    await recordTicket(purchase, {
+    // Postgres first: it's what the buyer's code and claim depend on, and an
+    // Airtable outage shouldn't keep them waiting on Stripe's backoff.
+    const stored = await recordTicket(purchase, {
       referredBy: full.metadata?.referred_by || undefined,
     });
-    await capturePurchase(purchase);
+    let mirrorError: unknown;
+    try {
+      const mirror = await recordPurchase(stored);
+      if (!mirror.stored && process.env.NEXT_PUBLIC_VERCEL_ENV === "production")
+        throw new Error(`Airtable purchase not stored: ${mirror.reason}`);
+    } catch (err) {
+      mirrorError = err;
+    }
+    await capturePurchase(stored);
+    // A retry only Airtable is holding up: the mailing list and follow-up have
+    // had their turn. The confirmation still goes, as the code's only carrier.
+    const stuckOnMirror = stored.replayed && !!mirrorError;
 
     // Confirmation email once the money is settled (or none was owed): card
     // checkouts on `completed`, ACH on `async_payment_succeeded` — never for a
@@ -286,7 +342,7 @@ export async function POST(request: Request) {
       // Soft-fail, like the email below.
       let addedToMailingList = false;
       try {
-        if ((await signupCreatedAt(email)) === null) {
+        if (!stuckOnMirror && (await signupCreatedAt(email)) === null) {
           await recordSignup(email, {
             name: preferredName ?? full.customer_details?.name ?? undefined,
             test: !event.livemode || isTestCoupon,
@@ -323,7 +379,8 @@ export async function POST(request: Request) {
               : undefined,
           receiptUrl: charge?.receipt_url ?? undefined,
           discountCode: couponCode,
-          ticketCode: ticketCode(paymentIntent?.id ?? full.id),
+          ticketCode: stored.ticketCode,
+          idempotencyKey: `ticket/${stored.id}`,
           mailingListOptOutUrl: addedToMailingList
             ? mailingListOptOutUrl({ sessionId: full.id })
             : undefined,
@@ -341,18 +398,21 @@ export async function POST(request: Request) {
       }
 
       // The follow-up is 2026 logistics; 2027 buyers hear from us later.
-      if (egg2027) return NextResponse.json({ received: true });
-      await followUpTicketPurchase({
-        to: email,
-        name: preferredName ?? full.customer_details?.name ?? undefined,
-        ticketType,
-        paymentId: paymentIntent?.id ?? full.id,
-        test: !event.livemode || isTestCoupon,
-        source: "Stripe webhook",
-      });
+      if (!stuckOnMirror && !egg2027)
+        await followUpTicketPurchase({
+          to: email,
+          name: preferredName ?? full.customer_details?.name ?? undefined,
+          ticketType,
+          paymentId: paymentIntent?.id ?? full.id,
+          test: !event.livemode || isTestCoupon,
+          source: "Stripe webhook",
+        });
     }
+
+    if (mirrorError)
+      return await mirrorFailed(mirrorError, full.id, stored.replayed);
   } catch (err) {
-    // 500 → Stripe retries; recordPurchase upserts, so a retry can't duplicate.
+    // 500 → Stripe retries; recordTicket upserts, so a retry can't duplicate.
     console.error("[stripe-webhook] failed to record purchase:", err);
     await reportError({
       source: "Stripe webhook",

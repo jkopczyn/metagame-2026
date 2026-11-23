@@ -10,6 +10,7 @@ import {
 } from "react";
 import { XIcon } from "lucide-react";
 import { deleteLocation, saveLocation, type FormState } from "./actions";
+import { retryable } from "@/lib/action-retry";
 import {
   buttonClass,
   fieldClass,
@@ -168,7 +169,7 @@ export default function LocationForm({
   onClose: () => void;
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(
-    saveLocation,
+    retryable(saveLocation),
     {},
   );
   const [deleting, startDelete] = useTransition();

@@ -1,3 +1,5 @@
+import { fetchWithin } from "@/lib/fetch-timeout";
+
 // Public Airtable identifiers for the Metagame 2026 base. These aren't secrets —
 // they're useless without AIRTABLE_API_KEY (the one real credential, still in env) —
 // so they live in committed config instead of masquerading as env vars. Repoint here
@@ -32,3 +34,6 @@ export const airtableConfig = {
   /** Night Market booth applications (the /night-market/apply journey). */
   nightMarketBoothsTableId: "tblr5fkV7iqgtGBtk",
 } as const;
+
+/** Every Airtable API call goes through this, so a stall can't hold a request open. */
+export const airtableFetch = fetchWithin(10_000);

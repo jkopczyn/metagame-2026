@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { env } from "@/env";
+import { STRIPE_CLIENT_OPTIONS } from "@/lib/stripe";
 
 let cached: Stripe | null = null;
 
@@ -12,7 +13,7 @@ export function getPromoStripe(): Stripe | null {
   if (cached) return cached;
   const key = env.STRIPE_PROMO_KEY;
   if (!key) return null;
-  cached = new Stripe(key);
+  cached = new Stripe(key, STRIPE_CLIENT_OPTIONS);
   return cached;
 }
 

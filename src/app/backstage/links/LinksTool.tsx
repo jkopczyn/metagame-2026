@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { createLink, type CreateState } from "./actions";
+import { retryable } from "@/lib/action-retry";
 import {
   buttonClass,
   fieldClass,
@@ -93,7 +94,10 @@ export default function LinksTool({
   origin: string;
   me: string;
 }) {
-  const [state, action, pending] = useActionState(createLink, initial);
+  const [state, action, pending] = useActionState(
+    retryable(createLink),
+    initial,
+  );
   const [draft, setDraft] = useState<Draft>(() => emptyDraft(options));
   const [links, setLinks] = useState(initialLinks);
   const formRef = useRef<HTMLFormElement>(null);

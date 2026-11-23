@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { env } from "@/env";
-import { airtableConfig } from "./airtable-config";
+import { airtableConfig, airtableFetch } from "./airtable-config";
 import type { GradeValues, SessionText, SessionTextKey } from "./grade-input";
 import { committeeName } from "./rfp-committee";
 import type { MirrorState, SpeakerTier } from "./rfp-sessions";
@@ -167,7 +167,7 @@ export function sessionFields(
 async function patch(recordId: string, { fields, typecast }: Write) {
   const { AIRTABLE_API_KEY } = env;
   if (!AIRTABLE_API_KEY) throw new Error("Airtable is not configured");
-  const res = await fetch(
+  const res = await airtableFetch(
     `https://api.airtable.com/v0/${airtableConfig.baseId}/${airtableConfig.rfpSubmissionsTableId}/${recordId}`,
     {
       method: "PATCH",

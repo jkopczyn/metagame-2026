@@ -1,5 +1,6 @@
-import { neon } from "@neondatabase/serverless";
+import { neon, neonConfig } from "@neondatabase/serverless";
 import { drizzle, type NeonHttpDatabase } from "drizzle-orm/neon-http";
+import { fetchWithin } from "@/lib/fetch-timeout";
 import { env } from "@/env";
 import { routeLocalDatabase } from "./local-endpoint.mjs";
 import * as schema from "./schema";
@@ -15,6 +16,7 @@ let cached: Db | null = null;
  */
 export function getDb(): Db {
   if (cached) return cached;
+  neonConfig.fetchFunction = fetchWithin(15_000);
   const url = env.DATABASE_URL;
   if (!url) {
     throw new Error("DATABASE_URL is not set — see .env.example");

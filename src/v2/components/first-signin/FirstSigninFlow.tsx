@@ -11,6 +11,7 @@ import {
   useTransition,
 } from "react";
 import { ExternalLink } from "lucide-react";
+import { retryable } from "@/lib/action-retry";
 import { SOCIAL_LINKS } from "@/v2/lib/urls";
 import { claim, claimMine, type ClaimState } from "@/app/(v2)/account/actions";
 import {
@@ -388,6 +389,10 @@ const purchased = (iso: string) =>
     year: "numeric",
   }).format(new Date(iso));
 
+const claimMineOrRetry = retryable((_: ClaimState, id: string) =>
+  claimMine(id),
+);
+
 function ClaimMine({
   tickets,
   onClaimed,
@@ -420,7 +425,7 @@ function ClaimMine({
               onClick={() => {
                 setClaimingId(t.id);
                 start(async () => {
-                  const result = await claimMine(t.id);
+                  const result = await claimMineOrRetry({}, t.id);
                   setState(result);
                   if (result.claimed) onClaimed(result.claimed);
                 });
@@ -442,11 +447,11 @@ function ClaimMine({
 
 function ClaimByCode({ onClaimed }: { onClaimed: (tier: string) => void }) {
   const [state, action, pending] = useActionState<ClaimState, FormData>(
-    async (prev, formData) => {
+    retryable(async (prev, formData) => {
       const result = await claim(prev, formData);
       if (result.claimed) onClaimed(result.claimed);
       return result;
-    },
+    }),
     {},
   );
   return (

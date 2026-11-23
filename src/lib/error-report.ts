@@ -146,3 +146,55 @@ export async function reportError(report: ErrorReport): Promise<boolean> {
     return false;
   }
 }
+
+const ONCE_WINDOW_MS = 10 * 60 * 1000;
+const ONCE_MAX_PER_WINDOW = 20;
+const reportedAt = new Map<string, number>();
+
+/**
+ * reportError for things that can fire on every request: once per key per ten
+ * minutes, and a cap across keys, so an outage can't flood the channel. Counted
+ * per server instance, so a few instances can each report the same thing.
+ */
+export async function reportErrorOnce(
+  key: string,
+  report: ErrorReport,
+): Promise<void> {
+  const now = Date.now();
+  for (const [seen, at] of reportedAt) {
+    if (now - at >= ONCE_WINDOW_MS) reportedAt.delete(seen);
+  }
+  if (reportedAt.has(key) || reportedAt.size >= ONCE_MAX_PER_WINDOW) return;
+  reportedAt.set(key, now);
+  await reportError(report);
+}
+
+/** Next's onRequestError, for uncaught page, route and action errors in production. */
+export async function reportRequestError(
+  error: unknown,
+  request: { path: string; method: string },
+  context: { routePath?: string; routeType?: string },
+): Promise<void> {
+  // Previews fail for their own reasons, and local .env files can hold the webhook.
+  // NEXT_PUBLIC_ because deploys go out prebuilt (see src/lib/tickets.ts).
+  if (process.env.NEXT_PUBLIC_VERCEL_ENV !== "production") return;
+  const digest =
+    typeof error === "object" && error !== null && "digest" in error
+      ? String(error.digest)
+      : undefined;
+  const message = error instanceof Error ? error.message : String(error);
+  await reportErrorOnce(digest ?? message, {
+    source: "Server error",
+    summary: "A request failed with an uncaught error",
+    details: {
+      // The query can carry tokens and emails.
+      Path: request.path.split("?")[0],
+      Method: request.method,
+      Route: context.routePath,
+      Type: context.routeType,
+      Digest: digest,
+    },
+    error,
+    mention: false,
+  });
+}

@@ -16,6 +16,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
+  if (
+    typeof body !== "object" ||
+    body === null ||
+    [body.code, body.ticketId].some(
+      (field) => field != null && typeof field !== "string",
+    )
+  ) {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+
   const ticket = getTicket(body.ticketId ?? "standard");
   if (!ticket) {
     return NextResponse.json({ error: "Unknown ticket" }, { status: 400 });

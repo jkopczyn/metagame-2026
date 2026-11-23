@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import {
   savePassword,
@@ -9,6 +9,7 @@ import {
   type FormState,
   type PasswordState,
 } from "./actions";
+import { retryable, submitKeepingDraft } from "@/lib/action-retry";
 import PinInput from "@/v2/components/auth/PinInput";
 import { SOCIAL_LINKS } from "@/lib/urls";
 import { Button } from "@/v2/components/ui/button";
@@ -17,6 +18,7 @@ import { FIELD_LIGHT } from "@/v2/components/styles";
 import { cn } from "@/v2/lib/utils";
 
 const initial: FormState = {};
+const submitProfile = retryable(updateProfile);
 
 const LABEL = "text-sm font-semibold text-navy";
 const TEXTAREA = cn(
@@ -80,7 +82,7 @@ export function ProfileForm({
   profileHref: string;
   initialValues: ProfileValues;
 }) {
-  const [state, action, pending] = useActionState(updateProfile, initial);
+  const [state, action, pending] = useActionState(submitProfile, initial);
   const [unsaved, setUnsaved] = useState(NONE);
   const [seen, setSeen] = useState(state);
   const v = initialValues;
@@ -93,6 +95,12 @@ export function ProfileForm({
     if (state.saved) setUnsaved(NONE);
   }
 
+  // What was saved may be normalized, and a hand submit doesn't reset by itself.
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (state.saved) formRef.current?.reset();
+  }, [state]);
+
   useEffect(() => {
     if (!dirty) return;
     const onUnload = (e: BeforeUnloadEvent) => e.preventDefault();
@@ -102,7 +110,9 @@ export function ProfileForm({
 
   return (
     <form
+      ref={formRef}
       action={action}
+      onSubmit={submitKeepingDraft(action)}
       onChange={(e) => setUnsaved(dirtyFields(e.currentTarget, v))}
       className="flex flex-col gap-4"
     >
@@ -227,6 +237,7 @@ const GREY_LINK =
   "self-start text-sm text-ink/55 underline-offset-2 hover:text-ink hover:underline";
 
 const passwordInitial: PasswordState = { mode: "password" };
+const submitPassword = retryable(savePassword);
 
 /** True only while a submit carrying this `intent` is in flight, not any submit of the form. */
 function useIntentPending(intent: string) {
@@ -267,7 +278,7 @@ export function PasswordForm({
   email: string;
 }) {
   const [state, action, pending] = useActionState(
-    savePassword,
+    submitPassword,
     passwordInitial,
   );
   const byCode = state.mode === "code";

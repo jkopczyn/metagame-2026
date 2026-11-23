@@ -13,21 +13,25 @@ import {
   verifyWebhookSignature,
 } from "@/lib/opennode";
 import { capturePurchase } from "@/lib/posthog-server";
-import { ticketCode } from "@/lib/ticket-code";
 import {
-  currentTicketCode,
   markTicketFailed,
   recordTicket,
+  type StoredPurchase,
 } from "@/lib/ticket-store";
 import { getDayPass } from "@/lib/tickets";
 import { mailingListOptOutUrl } from "@/lib/purchase-buyer";
 import { pickUtm } from "@/lib/utm";
 import { sendTicketConfirmationEmail } from "@/lib/email";
-import { reportError } from "@/lib/error-report";
+import { reportError, reportErrorOnce } from "@/lib/error-report";
 import { followUpTicketPurchase } from "@/lib/ticket-followup";
 
 // HMAC verification + the OpenNode key need Node crypto — keep this off the edge.
 export const runtime = "nodejs";
+
+// NEXT_PUBLIC_ because deploys go out prebuilt (see src/lib/tickets.ts).
+const isProduction = () =>
+  process.env.NEXT_PUBLIC_VERCEL_ENV === "production" ||
+  process.env.OPENNODE_ENV === "live";
 
 export async function POST(request: Request) {
   // OpenNode posts application/x-www-form-urlencoded.
@@ -39,8 +43,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
 
-  // Verify the HMAC when a key is configured. verifyWebhookSignature throws if
-  // OPENNODE_KEY is unset, so treat that as "unconfigured, skip" rather than 500.
+  // verifyWebhookSignature throws if OPENNODE_KEY is unset. An unverified event
+  // can't be trusted either way, so nothing is recorded.
   let keyConfigured = true;
   try {
     if (!verifyWebhookSignature({ id, hashed_order: hashedOrder })) {
@@ -48,17 +52,19 @@ export async function POST(request: Request) {
     }
   } catch {
     keyConfigured = false;
-    // In production a missing key isn't an expected dev state — surface it loudly.
-    // We still fail closed below (acknowledge, never record an unverified event).
-    if (process.env.OPENNODE_ENV === "live") {
-      console.error(
-        "[opennode-webhook] OPENNODE_KEY unset in live mode — cannot verify webhook; not recording",
-      );
-    }
   }
 
   if (!keyConfigured) {
-    // Can't trust an unverified event — acknowledge but don't record.
+    // In production this is a lost purchase, so ask OpenNode to retry.
+    if (isProduction()) {
+      console.error("[opennode-webhook] OPENNODE_KEY unset in production");
+      await reportErrorOnce("opennode-webhook-unconfigured", {
+        source: "OpenNode webhook",
+        summary:
+          "OPENNODE_KEY is unset in production, so Bitcoin purchases aren't being recorded",
+      });
+      return NextResponse.json({ error: "Not configured" }, { status: 500 });
+    }
     console.warn("[opennode-webhook] OPENNODE_KEY unset — ignoring event");
     return NextResponse.json({ received: true, configured: false });
   }
@@ -108,8 +114,8 @@ export async function POST(request: Request) {
       // so a rare stuck-Pending drops out of the redemption count. No row → the
       // charge never counted, so there's nothing to heal (keep the no-op).
       try {
-        await markPurchaseFailedIfExists(charge.id);
         await markTicketFailed(charge.id);
+        await markPurchaseFailedIfExists(charge.id);
       } catch (err) {
         // 500 → OpenNode retries; the update is idempotent on charge id.
         console.error("[opennode-webhook] self-heal to Failed failed:", err);
@@ -148,11 +154,11 @@ export async function POST(request: Request) {
       ? "Lightning"
       : undefined;
 
+  let stored: StoredPurchase;
+  let mirrorError: unknown;
   try {
     const purchase: PurchaseRecord = {
       id: charge.id,
-      // A retry after an unclaim must not write the old code back.
-      ticketCode: await currentTicketCode(charge.id),
       customerName: meta.name ? String(meta.name) : undefined,
       customerEmail: meta.email ? String(meta.email) : undefined,
       discordHandle: meta.discord ? String(meta.discord) : undefined,
@@ -184,11 +190,19 @@ export async function POST(request: Request) {
       btcNetwork,
       utm: pickUtm((key) => meta[key]),
     };
-    await recordPurchase(purchase);
-    await recordTicket(purchase);
-    await capturePurchase(purchase);
+    // Postgres first: it's what the buyer's code and claim depend on, and an
+    // Airtable outage shouldn't keep them waiting on a retry.
+    stored = await recordTicket(purchase);
+    try {
+      const mirror = await recordPurchase(stored);
+      if (!mirror.stored && isProduction())
+        throw new Error(`Airtable purchase not stored: ${mirror.reason}`);
+    } catch (err) {
+      mirrorError = err;
+    }
+    await capturePurchase(stored);
   } catch (err) {
-    // 500 → OpenNode retries; recordPurchase upserts on ID, so a retry can't dupe.
+    // 500 → OpenNode retries; recordTicket upserts on ID, so a retry can't dupe.
     console.error("[opennode-webhook] failed to record purchase:", err);
     await reportError({
       source: "OpenNode webhook",
@@ -199,6 +213,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Processing failed" }, { status: 500 });
   }
 
+  // A retry only Airtable is holding up: the mailing list and follow-up have
+  // had their turn. The confirmation still goes, as the code's only carrier.
+  const stuckOnMirror = stored.replayed && !!mirrorError;
+
   // Confirmation email once settled. Soft-fail: the purchase is already
   // recorded, so log + alert instead of a 500 (which would make OpenNode retry).
   const email = meta.email ? String(meta.email) : undefined;
@@ -207,7 +225,7 @@ export async function POST(request: Request) {
     // Soft-fail, like the email below.
     let addedToMailingList = false;
     try {
-      if ((await signupCreatedAt(email)) === null) {
+      if (!stuckOnMirror && (await signupCreatedAt(email)) === null) {
         await recordSignup(email, {
           name: meta.name ? String(meta.name) : undefined,
           test: meta.test === true || meta.test === "true",
@@ -243,7 +261,8 @@ export async function POST(request: Request) {
         // No Stripe-style receipt on this rail; the settled hosted-checkout page
         // shows the payment details and serves as one.
         receiptUrl: getHostedCheckoutUrl(charge.id, charge),
-        ticketCode: ticketCode(charge.id),
+        ticketCode: stored.ticketCode,
+        idempotencyKey: `ticket/${charge.id}`,
         mailingListOptOutUrl: addedToMailingList
           ? mailingListOptOutUrl({ chargeId: charge.id })
           : undefined,
@@ -260,14 +279,32 @@ export async function POST(request: Request) {
       });
     }
 
-    await followUpTicketPurchase({
-      to: email,
-      name: meta.name ? String(meta.name) : undefined,
-      ticketType: meta.ticketLabel ? String(meta.ticketLabel) : undefined,
-      paymentId: charge.id,
-      test: meta.test === true || meta.test === "true",
-      source: "OpenNode webhook",
-    });
+    if (!stuckOnMirror)
+      await followUpTicketPurchase({
+        to: email,
+        name: meta.name ? String(meta.name) : undefined,
+        ticketType: meta.ticketLabel ? String(meta.ticketLabel) : undefined,
+        paymentId: charge.id,
+        test: meta.test === true || meta.test === "true",
+        source: "OpenNode webhook",
+      });
+  }
+
+  // The ticket is good and the buyer has their email; only Airtable is behind.
+  // The 500 asks for a retry to fill it in, which can't duplicate either. Only
+  // the first failure alerts.
+  if (mirrorError) {
+    console.error("[opennode-webhook] Airtable mirror failed:", mirrorError);
+    if (!stuckOnMirror)
+      await reportError({
+        source: "OpenNode webhook",
+        summary:
+          "Ticket recorded, but its Airtable row didn't update; OpenNode will retry without alerting again",
+        details: { Charge: charge.id },
+        error: mirrorError,
+        mention: false,
+      });
+    return NextResponse.json({ error: "Processing failed" }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });

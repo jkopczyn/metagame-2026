@@ -3,11 +3,16 @@
 import { useActionState, useRef, useState } from "react";
 import PinInput from "./PinInput";
 import { authenticate, type AuthState } from "@/app/(v2)/login/actions";
+import { retryable } from "@/lib/action-retry";
 import { Button } from "@/v2/components/ui/button";
 import { Input } from "@/v2/components/ui/input";
 import { FIELD_LIGHT } from "@/v2/components/styles";
 
 const initial: AuthState = { step: "email", email: "" };
+
+const submit = retryable(authenticate, (data: FormData) => ({
+  email: String(data.get("email") ?? ""),
+}));
 
 const LINK =
   "text-sm font-semibold text-meeple underline-offset-2 hover:underline";
@@ -56,7 +61,7 @@ function IntentButton({
 // Email first; the next step depends on what that address has. See the
 // state chart in login/actions.ts.
 export default function AuthForm({ next }: { next: string }) {
-  const [result, action, pending] = useActionState(authenticate, initial);
+  const [result, action, pending] = useActionState(submit, initial);
   // "Use a different email" is just going back, so it's done here rather
   // than by a round trip: remember which result was backed out of, and show
   // the email step until the next result replaces it.
